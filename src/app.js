@@ -6,6 +6,7 @@
  * CSS custom properties (var(--*)); no new literal palette values.
  */
 import * as shell from "./app-shell.js";
+import * as gating from "./gating.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -102,8 +103,16 @@ class App extends React.Component {
     if (this.state.playKey === key) { this.stopAudio(); return; }
     if (this.state.playKey !== null) this.withAudio((a) => a.stop());
     this.withAudio((a) => a.play(key, specs));
-    this.setState({ playKey: key });
+    // Starting the stage's main voice is what unlocks its primary CTA (REQ-018).
+    if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
+    else this.setState({ playKey: key });
   }
+
+  // A/B pair gating (REQ-018): playing one side records it for the current
+  // pair; a new pair key re-locks both choices until both sides are heard.
+  prHeard(which, key) { this.setState((s) => gating.prHeardState(s, which, key)); }
+
+  prReady(key) { return gating.prReady(this.state, key); }
 
   goScreen(screen, extra) {
     this.hardStop();
@@ -338,20 +347,46 @@ class App extends React.Component {
     ];
   }
 
-  renderEdu() {
+  // One shared education step (REQ-006): example play buttons per the V5
+  // prototype's edu cards. Rendered by the top-level screen and the in-flow
+  // step alike; only the completion handler differs.
+  eduExample(label, key, spec) {
+    const playing = this.state.playKey === key;
+    return e("button", {
+      key, onClick: () => this.toggleKey(key, [spec]),
+      style: {
+        flex: 1, display: "flex", alignItems: "center", gap: "9px", padding: "11px 12px",
+        borderRadius: "14px", cursor: "pointer",
+        background: playing ? "var(--interface-selected)" : "var(--white)",
+        border: "1.5px solid " + (playing ? "var(--interface-selected-border)" : "var(--gray-200)")
+      }
+    },
+      e("span", { style: { flex: "none", width: "34px", height: "34px", borderRadius: "50%", border: "1.5px solid var(--blue-border)", background: playing ? "var(--control-accent)" : "var(--white)", display: "flex", alignItems: "center", justifyContent: "center" } },
+        playing
+          ? e("span", { style: { display: "flex", gap: "3px" } },
+            e("span", { style: { width: "3px", height: "11px", background: "var(--white)", borderRadius: "1px" } }),
+            e("span", { style: { width: "3px", height: "11px", background: "var(--white)", borderRadius: "1px" } }))
+          : e("span", { style: { display: "block", width: 0, height: 0, borderLeft: "9px solid var(--control-accent)", borderTop: "6px solid transparent", borderBottom: "6px solid transparent", marginLeft: "3px" } })),
+      e("span", { style: { font: "600 13.5px/1.25 var(--font-ui)", color: "var(--text-heading)", textAlign: "left" } }, label));
+  }
+
+  renderEdu(onDone) {
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "14px 22px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "What to listen for"),
-        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "8px" } },
-          "Two things describe the sound you hear: its pitch and its loudness. Play each example to hear the difference."),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } },
+          "Two things change while you match. Play these so you know what we mean before you start."),
         EDU.map((g) =>
-          e("div", { key: g.cap, style: { marginTop: "22px" } },
-            e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
-            e("div", { style: { font: "700 17px var(--font-ui)", color: "var(--text-heading)", marginTop: "6px" } }, g.title),
-            e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "4px" } }, g.body),
-            e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "12px" } },
-              g.items.map(([label, spec], i) => this.playRow(label, "edu-" + g.cap + i, [spec])))))),
-      this.bottomButton("Continue", () => this.goScreen("home", { eduSeen: true }))
+          e("div", { key: g.cap, style: { marginTop: "16px" } },
+            e(DS.Card, { variant: "section" },
+              e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
+              e("div", { style: { font: "600 15px/1.3 var(--font-ui)", color: "var(--text-heading)", marginTop: "7px" } }, g.title),
+              e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "5px" } }, g.body),
+              e("div", { style: { display: "flex", gap: "8px", marginTop: "13px" } },
+                g.items.map(([label, spec], i) => this.eduExample(label, "edu-" + g.cap + i, spec))))))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)" } },
+        e(DS.Button, { variant: "primary", size: "sm", onClick: onDone }, "I'm ready to start"),
+        e("div", { style: { height: "9px" } }))
     ];
   }
 
@@ -365,20 +400,20 @@ class App extends React.Component {
           e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "10px" } }, "Prepare"),
           e("div", { style: { font: font.body, color: "var(--text-body)", marginTop: "12px" } },
             "You'll listen and adjust until the sound comes close to what you hear. There are no wrong answers.")),
-        this.bottomButton("Begin", () => this.go(c, st.eduSeen ? first : "edu"))
+        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          e(DS.Button, { variant: "primary", size: "md", onClick: () => this.go(c, st.eduSeen ? first : "edu") }, "Begin"),
+          st.eduSeen
+            ? e("button", {
+              onClick: () => this.go(c, "edu"),
+              style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+            }, "Remind me what to listen for")
+            : e("div", { style: { height: "9px" } }))
       ];
     }
     if (s === "edu") {
-      return [
-        e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
-          e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)" } }, "What to listen for"),
-          EDU.map((g) =>
-            e("div", { key: g.cap, style: { marginTop: "18px" } },
-              e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
-              e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "10px" } },
-                g.items.map(([label, spec], i) => this.playRow(label, "fedu-" + g.cap + i, [spec])))))),
-        this.bottomButton("Continue", () => { this.setState({ eduSeen: true }); this.go(c, shell.OPTFIRST[c] || shell.STAGES[c][0][0]); })
-      ];
+      // The shared education step, not a per-option copy (REQ-006): completing
+      // it here also sets eduSeen, then continues into the option.
+      return this.renderEdu(() => { this.setState({ eduSeen: true }); this.go(c, shell.OPTFIRST[c] || shell.STAGES[c][0][0]); });
     }
     if (s === "conf") {
       const conf = st[c].conf;
@@ -407,13 +442,19 @@ class App extends React.Component {
     // task; the shell renders the stage frame, playback and stage advance.
     const list = shell.STAGES[c].map((z) => z[0]);
     const next = list[list.indexOf(s) + 1];
+    // heardHere gates the stage's primary CTA (REQ-018): it sits in the same
+    // spot at the same size and only goes gray until the sound has played.
+    const heard = gating.heardHere(st);
+    const advance = (f) => () => { if (gating.heardHere(this.state)) f(); };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "22px 22px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, shell.stageLabel(c, s)),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "8px" } },
           "Press play, listen, and compare the sound to the one you hear."),
         e("div", { style: { marginTop: "18px" } }, this.playRow("Play the sound", "main", mainSpecs(st)))),
-      next ? this.bottomButton("Continue", () => this.go(c, next)) : this.bottomButton("Finish", () => this.goScreen("home"))
+      next
+        ? this.bottomButton("Continue", advance(() => this.go(c, next)), { disabled: !heard })
+        : this.bottomButton("Finish", advance(() => this.goScreen("home")), { disabled: !heard })
     ];
   }
 
@@ -480,7 +521,7 @@ class App extends React.Component {
       ear: () => this.renderEar(),
       setup: () => this.renderSetup(),
       home: () => this.renderHome(),
-      edu: () => this.renderEdu(),
+      edu: () => this.renderEdu(() => this.goScreen("home", { eduSeen: true })),
       flow: () => this.renderFlow()
     }[st.screen]();
 
