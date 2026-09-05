@@ -9,6 +9,16 @@ const hub = (page) => page.locator('[data-screen-label="Matching options"]');
 // Substring name match: a completed row's accessible name is "Option N Done".
 const option = (page, n) => page.getByRole("button", { name: "Option " + n });
 
+async function reachUnprimedHub(page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByText("Both ears", { exact: true }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(hub(page)).toBeVisible();
+}
+
 async function completeDeviceSetup(page) {
   await page.getByRole("button", { name: "Headphones and volume" }).click();
   await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
@@ -41,9 +51,7 @@ test.describe("home hub", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("home hub keeps the option rows aria-disabled until setupSeen and eduSeen are both true", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
-    await expect(hub(page)).toBeVisible();
+    await reachUnprimedHub(page);
 
     // Locked: aria-disabled plus the non-interactive styling on all three rows.
     for (const n of [1, 2, 3]) {
@@ -83,9 +91,7 @@ test.describe("home hub", () => {
   });
 
   test("home hub shows only neutral participant-facing labels", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
-    await expect(hub(page)).toBeVisible();
+    await reachUnprimedHub(page);
     await expect(option(page, 1)).toBeVisible();
     await expect(option(page, 2)).toBeVisible();
     await expect(option(page, 3)).toBeVisible();
@@ -95,9 +101,7 @@ test.describe("home hub", () => {
   });
 
   test("home hub earns Done pills and tracks completion order", async ({ page }) => {
-    await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
-    await expect(hub(page)).toBeVisible();
+    await reachUnprimedHub(page);
     await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
 
     // Each setup row earns its gray check pill after being visited.
@@ -133,9 +137,7 @@ test.describe("home hub", () => {
         return p;
       };
     });
-    await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
-    await expect(hub(page)).toBeVisible();
+    await reachUnprimedHub(page);
 
     await page.getByRole("button", { name: "Left", exact: true }).click();
     await expect(hub(page)).toBeVisible(); // no navigation
