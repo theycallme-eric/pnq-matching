@@ -1,0 +1,36 @@
+# Product-owned CI generated from the owner-approved repository-readiness contract.
+name: Project verification
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  project-verification:
+    name: project-verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: |
+          [ ! -f package.json ] || npm ci
+      - name: Verify 1
+        run: |
+          npm run build
+      - name: Verify 2
+        run: |
+          npm run lint
+      - name: Verify 3
+        run: |
+          npm test
+      - name: Verify 4
+        run: |
+          npm run test:e2e
