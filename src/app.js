@@ -190,7 +190,7 @@ class App extends React.Component {
             e("div", { key: i, style: { display: "flex", gap: "11px", alignItems: "flex-start" } },
               e("span", { style: { flex: "none", width: "7px", height: "7px", borderRadius: "50%", background: "var(--blue-400)", marginTop: "7px" } }),
               e("span", { style: { font: "400 14.5px/1.45 var(--font-text)", color: "var(--text-body)" } }, t))))),
-      this.bottomButton("Get started", () => this.goScreen("home"))
+      this.bottomButton("Get started", () => this.goScreen("ear"))
     ];
   }
 
@@ -209,12 +209,20 @@ class App extends React.Component {
     ];
   }
 
+  // Status dot inside the setup pills: green/red disc with a check/close glyph.
+  setupDot(ok, px) {
+    return e("span", { style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "center", width: px + "px", height: px + "px", borderRadius: "50%", background: ok ? "var(--green-400)" : "var(--red-400)" } },
+      e(DS.Icon, { name: ok ? "check" : "close", size: 11, color: "var(--navy-900)", strokeWidth: 3.4 }));
+  }
+
   renderSetup() {
     const st = this.state;
     const ready = st.vol >= 100;
+    const onVolSlide = (ev) => this.setState({ vol: Math.round(parseFloat(ev.target.value)), setupWarn: false });
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "22px 22px 10px" } },
         e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
+          e(DS.Icon, { name: "headphones", size: 54, color: "var(--magenta-500)" }),
           e("div", { style: { font: font.heading(26), color: "var(--white)", letterSpacing: "-.015em", marginTop: "14px" } }, "Let's get set up"),
           e("div", { style: { font: "400 14.5px/1.45 var(--font-text)", color: "var(--on-dark-60)", marginTop: "7px" } }, "A quick check before you begin.")),
         e("div", { style: { marginTop: "20px", background: "var(--interface-dark-raised)", border: "1px solid var(--interface-dark-border)", borderRadius: "16px", padding: "18px 16px" } },
@@ -222,28 +230,41 @@ class App extends React.Component {
             onClick: () => this.setState((x) => ({ hp: !x.hp, setupWarn: false })),
             style: { display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "44px", border: "none", background: "transparent", padding: 0, cursor: "pointer", textAlign: "left" }
           },
+            e(DS.Icon, { name: "headphones", size: 26, color: "var(--magenta-500)" }),
             e("span", { style: { flex: 1 } },
               e("span", { style: { display: "block", font: "700 16px var(--font-ui)", color: "var(--white)" } }, "Headphones"),
               e("span", { style: { display: "block", font: "400 12.5px/1.35 var(--font-text)", color: "var(--on-dark-50)", marginTop: "2px" } },
                 st.hp ? "Your headphones are ready" : "Plug in headphones or earphones")),
             e("span", {
-              style: { flex: "none", display: "inline-flex", alignItems: "center", background: st.hp ? "var(--status-success-tint-dark)" : "var(--status-danger-tint)", borderRadius: "999px", padding: "6px 11px", font: "700 12px var(--font-ui)", color: st.hp ? "var(--status-success-text)" : "var(--status-danger-text)" }
-            }, st.hp ? "Connected" : "Not detected")),
+              style: { flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: st.hp ? "var(--status-success-tint-dark)" : "var(--status-danger-tint)", borderRadius: "999px", padding: "6px 11px 6px 8px" }
+            },
+              this.setupDot(st.hp, 16),
+              e("span", { style: { font: "700 12px var(--font-ui)", color: st.hp ? "var(--status-success-text)" : "var(--status-danger-text)" } }, st.hp ? "Connected" : "Not detected"))),
           e("div", { style: { height: "1px", background: "var(--interface-dark-border)", margin: "16px 0" } }),
           e("div", { style: { display: "flex", alignItems: "center", gap: "13px" } },
+            e(DS.Icon, { name: "volume", size: 26, color: "var(--magenta-500)" }),
             e("span", { style: { flex: 1 } },
               e("span", { style: { display: "block", font: "700 16px var(--font-ui)", color: "var(--white)" } }, "Device Volume"),
               e("span", { style: { display: "block", font: "400 12.5px/1.35 var(--font-text)", color: "var(--on-dark-50)", marginTop: "2px" } }, "Turn it all the way up")),
             e("span", { style: { flex: "none", font: "700 21px var(--font-ui)", color: ready ? "var(--status-success-text)" : "var(--status-danger-text)", fontVariantNumeric: "tabular-nums" } },
               st.vol + "%", ready ? null : e("span", { style: { font: "500 13px var(--font-ui)", color: "var(--on-dark-50)" } }, " / 100%"))),
           e("div", { style: { marginTop: "14px", border: "1px solid " + (ready ? "var(--status-success-border-dark)" : "var(--status-danger-border-dark)"), borderRadius: "12px", padding: "12px 13px 14px", background: ready ? "var(--status-success-tint-dark)" : "var(--status-danger-tint)" } },
-            e("div", { style: { font: "700 13px var(--font-ui)", color: ready ? "var(--status-success-text)" : "var(--status-danger-text)" } },
-              ready ? "Ready" : "100% required to continue"),
-            e("input", {
-              type: "range", min: 0, max: 100, step: 1, value: st.vol, "aria-label": "Device volume",
-              onChange: (ev) => this.setState({ vol: Math.round(parseFloat(ev.target.value)), setupWarn: false }),
-              style: { width: "100%", height: "40px", margin: "8px 0 0", cursor: "pointer" }
-            }))),
+            e("div", { style: { display: "flex", alignItems: "center", gap: "8px" } },
+              this.setupDot(ready, 17),
+              e("span", { style: { font: "700 13px var(--font-ui)", color: ready ? "var(--status-success-text)" : "var(--status-danger-text)" } },
+                ready ? "Ready" : "100% required to continue")),
+            e("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginTop: "11px" } },
+              e(DS.Icon, { name: "volumeLow", size: 17, color: "var(--on-dark-50)" }),
+              e("div", { style: { position: "relative", flex: 1, height: "40px", display: "flex", alignItems: "center" } },
+                e("div", { style: { position: "absolute", left: 0, right: 0, height: "5px", borderRadius: "999px", background: "var(--interface-dark-border)" } }),
+                e("div", { style: { position: "absolute", left: 0, height: "5px", borderRadius: "999px", background: ready ? "var(--green-400)" : "var(--red-400)", width: st.vol + "%" } }),
+                e("div", { style: { position: "absolute", left: st.vol + "%", width: "26px", height: "26px", marginLeft: "-13px", borderRadius: "50%", background: "var(--white)", boxShadow: "var(--shadow-thumb-dark)" } }),
+                e("input", {
+                  type: "range", min: 0, max: 100, step: 1, value: st.vol, "aria-label": "Device volume",
+                  onInput: onVolSlide, onChange: onVolSlide,
+                  style: { position: "absolute", left: "-13px", right: "-13px", width: "calc(100% + 26px)", height: "40px", margin: 0, opacity: 0, cursor: "pointer", WebkitAppearance: "none", appearance: "none", background: "transparent" }
+                })),
+              e(DS.Icon, { name: "volume", size: 17, color: "var(--on-dark-50)" })))),
         e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--on-dark-50)", textAlign: "center", marginTop: "18px" } },
           "You'll hear one or more sounds and compare them to the tinnitus you hear.")),
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },

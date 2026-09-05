@@ -52,7 +52,9 @@ export function initialState() {
   return {
     screen: "launch", concept: "n",
     stages: { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" },
-    showTech: false, muted: false, ear: "Both ears", playKey: null, framed: true, devScale: 1,
+    // ear starts unset: the Setup · Ear screen requires an explicit choice
+    // before Continue unlocks (REQ-003). The engine treats unset as "both".
+    showTech: false, muted: false, ear: "", playKey: null, framed: true, devScale: 1,
     hp: false, vol: 36, menuOpen: false, jumpOpen: false, menuStopped: false, optDone: {}, optOrder: [],
     setupWarn: false, earWarn: false,
     eduSeen: false, setupSeen: false, heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
@@ -78,7 +80,7 @@ export function restoreSession(raw) {
   let v;
   try { v = JSON.parse(raw) || {}; } catch (e) { return null; }
   return {
-    ear: v.ear || "Both ears", hp: !!v.hp, vol: typeof v.vol === "number" ? v.vol : 36,
+    ear: v.ear || "", hp: !!v.hp, vol: typeof v.vol === "number" ? v.vol : 36,
     setupSeen: !!v.setupSeen, eduSeen: !!v.eduSeen,
     optDone: v.optDone || {}, optOrder: v.optOrder || [],
     screen: (v.setupSeen || v.eduSeen || (v.optOrder || []).length) ? "home" : "launch"
@@ -153,7 +155,7 @@ export function resetAllState(s) {
   return {
     ...s, screen: "launch", concept: "n", menuOpen: false, jumpOpen: false, playKey: null,
     stages: { ...s.stages, n: "vol", r: "dir", d: "field" },
-    ear: "Both ears", hp: false, vol: 36, setupSeen: false, eduSeen: false,
+    ear: "", hp: false, vol: 36, setupSeen: false, eduSeen: false,
     optDone: {}, optOrder: [], heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
     setupWarn: false, earWarn: false, showTech: false,
     n: freshN(), r: freshR(), d: freshD()
