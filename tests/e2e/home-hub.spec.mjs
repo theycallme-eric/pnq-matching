@@ -41,7 +41,7 @@ async function completeOption(page, n, continues) {
   await expect(hub(page)).toHaveCount(0);
   for (let i = 0; i < continues; i++) await page.getByRole("button", { name: "Continue" }).click();
   await page.getByText("Fairly close").click();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish matching" }).click();
   await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
   await page.getByRole("button", { name: "Return to matching options" }).click();
   await expect(hub(page)).toBeVisible();
