@@ -1,0 +1,144 @@
+/* PNQ Health color system — extracted verbatim from the patient-app prototype.
+   Base ramps first, semantic aliases second. Color is reserved for status,
+   state, and wayfinding; it is never decorative. */
+:root {
+  /* Navy — brand ground, dark interfaces, headings */
+  --navy-900: #0d1526;
+  --navy-850: #0d1626;
+  --navy-800: #16263f;
+  --navy-700: #1d3354;
+  --navy-600: #23406a;
+  --navy-500: #33445e;
+  --navy-400: #25324d;
+
+  /* Blue — the single accent family */
+  --blue-700: #1f7fc4;
+  --blue-600: #2f7cc0;
+  --blue-500: #2e9fe0;
+  --blue-450: #3aa0e6;
+  --blue-400: #5aa9e2;
+  --blue-300: #7fc2ee;
+  --blue-200: #bfe0f6;
+  --blue-150: #d2ecfb;
+  --blue-100: #e3f1fc;
+  --blue-75: #eef6fc;
+  --blue-60: #eef7fc;
+  --blue-50: #f2f8fe;
+  --blue-border: #cbd8e6;
+
+  /* Green — success, readiness, confirmation */
+  --green-600: #2f9e63;
+  --green-500: #34b27b;
+  --green-400: #46c98f;
+  --green-50: #e4f6ec;
+
+  /* Red — blocking states, counts needing attention */
+  --red-600: #e2543f;
+  --red-500: #ff6f5e;
+  --red-400: #ff8575;
+  --red-300: #ffb3a9;
+
+  /* Magenta — audio-hardware iconography on dark interfaces only */
+  --magenta-500: #d24b9f;
+
+  /* Neutrals */
+  --gray-900: #1f2733;
+  --gray-800: #2c3744;
+  --gray-700: #3f4a59;
+  --gray-600: #5b6573;
+  --gray-550: #717784;
+  --gray-500: #8b91a0;
+  --gray-475: #8a94a3;
+  --gray-450: #9aa3b0;
+  --gray-400: #a7adb6;
+  --gray-350: #c2c9d2;
+  --gray-300: #cfd6de;
+  --gray-250: #d6dae0;
+  --gray-200: #dfe3e9;
+  --gray-175: #dfe2e7;
+  --gray-160: #e2e6eb;
+  --gray-150: #e6e8ec;
+  --gray-125: #e7eaef;
+  --gray-115: #eceef1;
+  --gray-100: #eef0f3;
+  --gray-75: #f1f3f6;
+  --gray-50: #f6f7f9;
+  --white: #ffffff;
+
+  /* On-dark text ramp */
+  --on-dark-100: #ffffff;
+  --on-dark-80: #aebfd6;
+  --on-dark-70: #9fb2d6;
+  --on-dark-65: #aeb8c6;
+  --on-dark-60: #8298b5;
+  --on-dark-55: #8e99a9;
+  --on-dark-50: #7c8ba3;
+  --on-dark-45: #7f93b3;
+  --on-dark-40: #6b7a91;
+
+  /* ---- Semantic: text ---- */
+  --text-heading: var(--navy-800);
+  --text-body: var(--gray-700);
+  --text-secondary: var(--gray-600);
+  --text-muted: var(--gray-550);
+  --text-label: var(--gray-450);
+  --text-disabled: var(--gray-400);
+  --text-chevron: var(--gray-350);
+  --text-link: var(--blue-700);
+  --text-on-dark: var(--on-dark-100);
+  --text-on-dark-secondary: var(--on-dark-80);
+  --text-on-dark-muted: var(--on-dark-60);
+  --text-on-dark-faint: var(--on-dark-50);
+
+  /* ---- Semantic: interfaces ---- */
+  --interface-app: var(--gray-50);
+  --interface-card: var(--white);
+  --interface-card-border: var(--gray-150);
+  --interface-tint: var(--blue-75);
+  --interface-selected: var(--blue-50);
+  --interface-selected-border: var(--blue-600);
+  --interface-track: var(--gray-100);
+  --interface-track-alt: var(--gray-125);
+  --interface-rail: var(--gray-160);
+  --interface-divider: var(--gray-100);
+  --interface-tick: var(--gray-300);
+  --interface-input-border: var(--gray-200);
+  --interface-dark: var(--navy-800);
+  --interface-dark-raised: rgba(255, 255, 255, 0.05);
+  --interface-dark-border: rgba(255, 255, 255, 0.1);
+  --interface-dark-track: var(--navy-850);
+  --interface-disabled: var(--gray-175);
+  --interface-disabled-dark: var(--navy-500);
+
+  /* ---- Semantic: brand + action ---- */
+  --brand-navy: var(--navy-800);
+  --brand-blue: var(--blue-500);
+  --brand-blue-deep: var(--blue-700);
+  --brand-blue-light: var(--blue-300);
+  --action-primary: var(--blue-400);
+  --control-accent: var(--blue-600);
+  --gradient-action: linear-gradient(155deg, #2e9fe0 0%, #1f7fc4 100%); /* @kind color */
+  --gradient-navy: linear-gradient(165deg, #16263f 0%, #1d3354 58%, #23406a 100%); /* @kind color */
+  --gradient-navy-dashboard: linear-gradient(165deg, #16263f 0%, #1d3354 64%, #23406a 100%); /* @kind color */
+  --gradient-treatment: linear-gradient(180deg, #16263f 0%, #1d3354 100%); /* @kind color */
+  --gradient-orb: linear-gradient(155deg, #3aa0e6, #2f7cc0); /* @kind color */
+
+  /* ---- Semantic: status ---- */
+  --status-success: var(--green-500);
+  --status-success-strong: var(--green-600);
+  --status-success-text: var(--green-400);
+  --status-success-tint: var(--green-50);
+  --status-success-tint-dark: rgba(52, 178, 123, 0.18);
+  --status-success-border-dark: rgba(52, 178, 123, 0.45);
+  --status-danger: var(--red-500);
+  --status-danger-text: var(--red-400);
+  --status-danger-text-strong: var(--red-600);
+  --status-danger-tint: rgba(255, 111, 94, 0.14);
+  --status-danger-tint-dark: rgba(255, 111, 94, 0.12);
+  --status-danger-border-dark: rgba(255, 111, 94, 0.32);
+  --status-danger-copy-dark: var(--red-300);
+
+  /* ---- Semantic: focus ---- */
+  --focus-ring: 0 0 0 4px rgba(46, 159, 224, 0.14);
+  --focus-border: var(--blue-500);
+}

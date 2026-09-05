@@ -1,0 +1,23 @@
+:root {
+  --radius-track: 2px;   /* slider rails */
+  --radius-track-lg: 3px;
+  --radius-sm: 8px;      /* checkbox, nudge button */
+  --radius-md: 10px;     /* segment pill inner */
+  --radius-segment-pill: 9px;
+  --radius-lg: 12px;     /* segmented track */
+  --radius-tile: 13px;   /* list-row icon tile */
+  --radius-button: 14px;
+  --radius-input: 15px;
+  --radius-card: 16px;   /* section card, option row */
+  --radius-panel: 18px;  /* dark grouped panel */
+  --radius-card-lg: 20px;/* list card, large icon tile */
+  --radius-hero: 24px;   /* gradient session card */
+  --radius-pill: 20px;
+  --radius-device: 48px;
+  --radius-device-screen: 36px;
+  --radius-full: 999px;
+
+  --border-hairline: 1px;
+  --border-control: 1.5px;
+  --border-selected: 2px;
+}

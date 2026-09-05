@@ -1,0 +1,25 @@
+/* Two shadow systems. Neutral navy-tinted shadows lift white cards off the app
+   background. Blue-tinted shadows belong only to blue action elements, and read
+   as the element glowing rather than casting. */
+:root {
+  --shadow-card: 0 4px 16px rgba(22, 38, 63, 0.06);
+  --shadow-card-sm: 0 2px 12px rgba(20, 30, 55, 0.05);
+  --shadow-row: 0 4px 14px rgba(22, 38, 63, 0.07);
+  --shadow-choice: 0 4px 14px rgba(22, 38, 63, 0.05);
+  --shadow-input: 0 3px 10px rgba(22, 38, 63, 0.05);
+  --shadow-thumb: 0 2px 6px rgba(20, 30, 55, 0.2);
+  --shadow-thumb-dark: 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  --shadow-action: 0 10px 22px rgba(31, 127, 196, 0.4);
+  --shadow-action-tall: 0 12px 26px rgba(31, 127, 196, 0.42);
+  --shadow-action-hero: 0 16px 34px rgba(31, 127, 196, 0.4);
+  --shadow-action-sm: 0 4px 12px rgba(90, 169, 226, 0.4);
+  --shadow-action-xs: 0 4px 12px rgba(47, 124, 192, 0.34);
+  --shadow-segment: 0 2px 6px rgba(47, 124, 192, 0.32);
+  --shadow-play-idle: 0 2px 8px rgba(47, 124, 192, 0.12);
+  --shadow-play-active: 0 4px 14px rgba(47, 124, 192, 0.4);
+  --shadow-orb: 0 10px 30px rgba(47, 124, 192, 0.5);
+
+  --shadow-device: 0 18px 50px rgba(20, 30, 55, 0.28);
+  --ring-thumb-active: 0 0 0 4px rgba(47, 124, 192, 0.18), 0 2px 6px rgba(20, 30, 55, 0.22);
+}

@@ -1,0 +1,24 @@
+/* Minimal resets and link defaults. Component styling lives in the components
+   themselves; this file only stops the browser defaults from leaking in. */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-text);
+  color: var(--gray-900);
+  background: var(--interface-app);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { color: var(--brand-blue); text-decoration: underline; }
+
+button { font-family: var(--font-ui); }
+
+input::placeholder { color: #aab2bd; letter-spacing: 0; }
+input:focus-visible,
+button:focus-visible {
+  outline: none;
+  border-color: var(--focus-border);
+  box-shadow: var(--focus-ring);
+}

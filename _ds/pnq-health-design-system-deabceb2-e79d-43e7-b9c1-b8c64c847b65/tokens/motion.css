@@ -1,0 +1,50 @@
+/* Motion is functional: it shows a control moving to its new value or a section
+   collapsing to make room. Nothing bounces, nothing overshoots, nothing loops
+   for decoration — the two looping animations both mean "sound is playing". */
+:root {
+  --ease-emphasized: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --ease-standard: ease; /* @kind other */
+  --ease-out: ease-out; /* @kind other */
+
+  --dur-instant: 120ms; /* @kind other */
+  --dur-fast: 180ms; /* @kind other */
+  --dur-color: 200ms; /* @kind other */
+  --dur-base: 250ms; /* @kind other */
+  --dur-control: 300ms; /* @kind other */
+  --dur-slide: 380ms; /* @kind other */
+  --dur-slider: 420ms; /* @kind other */
+  --dur-reveal: 500ms; /* @kind other */
+  --dur-reveal-long: 550ms; /* @kind other */
+
+  --transition-color: background-color var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard); /* @kind other */
+  --transition-control: left var(--dur-slide) var(--ease-emphasized); /* @kind other */
+  --transition-slider: left var(--dur-slider) var(--ease-emphasized), width var(--dur-slider) var(--ease-emphasized); /* @kind other */
+  --transition-reveal: max-height var(--dur-reveal) var(--ease-emphasized), opacity var(--dur-control) var(--ease-standard); /* @kind other */
+
+  --press-scale: 0.99; /* @kind other */
+  --press-scale-card: 0.985; /* @kind other */
+}
+
+/* Sound-is-playing animations. Both are attached to the play control or the
+   session orb and appear nowhere else. */
+@keyframes pnq-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  70% { transform: scale(1.5); opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes pnq-ring-1 {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes pnq-ring-2 {
+  0% { transform: scale(0.6); opacity: 0.4; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes pnq-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes pnq-equalizer {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
