@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// Bare (phone-sized) presentation: below the 620px breakpoint the shell
+// renders unscaled, so asset dimensions can be asserted exactly.
+test.use({ viewport: { width: 390, height: 844 } });
+
 test("launch screen loads the design system and renders the navy mark at 34px", async ({ page }) => {
   await page.goto("/");
 

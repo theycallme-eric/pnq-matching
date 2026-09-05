@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "lint": "node scripts/lint-tokens.mjs",
-    "test": "node --test tests/unit/*.test.mjs",
+    "test": "node scripts/run-tests.mjs",
     "pretest:e2e": "playwright install chromium",
     "test:e2e": "playwright test"
   },
