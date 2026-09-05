@@ -31,15 +31,19 @@ async function completeDeviceSetup(page) {
 async function completeEdu(page) {
   await page.getByRole("button", { name: "What to listen for" }).click();
   await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(hub(page)).toBeVisible();
 }
 
-// Walks a generic flow to Match complete and returns to the hub.
+// Walks a generic flow to Match complete and returns to the hub. Each stage's
+// Continue is heard-gated (REQ-018), so play the sound before advancing.
 async function completeOption(page, n, continues) {
   await option(page, n).click();
   await expect(hub(page)).toHaveCount(0);
-  for (let i = 0; i < continues; i++) await page.getByRole("button", { name: "Continue" }).click();
+  for (let i = 0; i < continues; i++) {
+    await page.getByRole("button", { name: "Play the sound" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+  }
   await page.getByText("Fairly close").click();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
