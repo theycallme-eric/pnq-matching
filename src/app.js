@@ -81,4 +81,10 @@
 
   var root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(e(LaunchScreen));
+
+  // Audio engine (REQ-017): an ES module, dynamically imported on mount.
+  // This single instance is the app's only playback path - never add a second.
+  import("./audio-engine.js").then(function (engine) {
+    window.__pnqAudioEngine = engine;
+  });
 })();
