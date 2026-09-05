@@ -18,7 +18,7 @@ async function completeSetup(page) {
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   await page.getByRole("button", { name: "What to listen for" }).click();
   await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 }
 
