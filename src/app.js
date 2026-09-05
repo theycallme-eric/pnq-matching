@@ -417,25 +417,58 @@ class App extends React.Component {
     }
     if (s === "conf") {
       const conf = st[c].conf;
+      const intro = shell.confIntro(st);
+      const notClose = conf === "Not close yet";
+      const choose = (label) => this.setState((x) => ({ [c]: { ...x[c], conf: label } }));
+      const finish = () => {
+        const x = this.state, live = x[x.concept] && x[x.concept].conf;
+        if (live) this.go(x.concept, "done", { conf: live });
+      };
+      const keepRefining = () => {
+        const x = this.state;
+        const target = shell.keepRefiningTarget(x);
+        this.go(x.concept, target.stage, target.obj);
+      };
       return [
-        e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "22px 22px 10px" } },
-          e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)" } }, "How close is the match?"),
-          e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "8px" } }, "There are no wrong answers."),
-          e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "18px" } },
+        e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
+          e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "How close is this sound to the underlying tone you hear?"),
+          e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Play it one more time, then choose what's true for you. This records your judgment. It isn't a score."),
+          intro ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "12px" } }, intro) : null,
+          e("div", { style: { marginTop: "14px" } },
+            e(DS.Card, { variant: "section" },
+              e(DS.SectionLabel, null, "YOUR MATCHED SOUND"),
+              e("div", { style: { marginTop: "11px" } },
+                e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) })))),
+          e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
-              e(DS.SelectRow, { key: label, label, selected: conf === label, onClick: () => this.setState((x) => ({ [c]: { ...x[c], conf: label } })) })))),
-        this.bottomButton("Continue", () => this.go(c, "done"), { disabled: !conf })
+              e(DS.SelectRow, { key: label, label, selected: conf === label, onClick: () => choose(label) }))),
+          notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null),
+        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          notClose
+            ? e(DS.Button, { variant: "primary", size: "sm", onClick: keepRefining }, "Keep refining")
+            : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching"),
+          e("div", { style: { minHeight: "52px", display: "flex", flexDirection: "column" } },
+            notClose ? e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway") : null))
       ];
     }
     if (s === "done") {
+      const done = shell.doneData(st, mainSpecs(st));
       return [
         e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 22px 10px" } },
           e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
-            e("div", { style: { font: font.heading(26), color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "16px" } }, "Match complete"),
-            e("div", { style: { font: "400 14.5px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "9px" } },
-              "Thank you. Your match has been noted for this session."))),
-        this.bottomButton("Return to matching options", () =>
-          this.goScreen("home", { optDone: { ...st.optDone, [c]: (st[c] && st[c].conf) || "recorded" } }))
+            e(DS.IconTile, { size: "xl", tone: "success" }, e(DS.Icon, { name: "check", size: 30 })),
+            e("div", { style: { font: font.heading(26), color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "16px" } }, done.title),
+            done.body ? e("div", { style: { font: "400 14.5px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "9px", minHeight: "66px" } }, done.body) : null),
+          e("div", { style: { marginTop: "20px" } },
+            e(DS.Card, { variant: "list" },
+              done.rows.map((row) => e("div", { key: row.label, style: { padding: "13px 18px", borderTop: row.bt } },
+                e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)" } }, row.label),
+                e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
+          st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
+        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginBottom: "1px" } }, "This exploration ends at matching. Treatment isn't part of this prototype."),
+          e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, "Return to matching options"),
+          e("div", { style: { height: "9px" } }))
       ];
     }
     // Generic working stage: real interactions land with each concept's own

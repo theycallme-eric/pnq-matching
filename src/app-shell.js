@@ -189,6 +189,95 @@ export function backTarget(s) {
   return { kind: "stage", stage: list[cur - 1] };
 }
 
+/* ---------- shared confidence + match complete (REQ-014, REQ-015) ---------- */
+// Declarative data for the two screens every option funnels into, ported from
+// the V5 prototype: technical formatting, patient-facing descriptions, the
+// per-concept confidence intro, the keep-refining re-entry point per concept,
+// the Match complete summary rows, and the completion reducer.
+
+export const FRQ = { tone: [250, 10000], hiss: [350, 8400], buzz: [55, 440], click: [400, 6400] };
+export const KWORD = { tone: "tone", hiss: "hiss", buzz: "buzzing", click: "clicking" };
+export const BWORD = { steady: "Steady", pulse: "Pulsing", gap: "Comes and goes", waver: "Wavering" };
+
+export function freqOf(kind, p) {
+  const r = FRQ[kind] || FRQ.tone, q = Math.max(0, Math.min(1, p));
+  return r[0] * Math.pow(r[1] / r[0], q);
+}
+export function fmtHz(f) { return f < 1000 ? Math.round(f / 5) * 5 + " Hz" : (f / 1000).toFixed(1) + " kHz"; }
+export function fmtDb(l) { return Math.round(18 + Math.max(0, Math.min(1, l)) * 57) + " dB"; }
+export function techOf(spec) { return "≈ " + fmtHz(freqOf(spec.kind, spec.pitch)) + " · " + fmtDb(spec.level); }
+export function describe(spec) {
+  const band = spec.pitch < .34 ? "lower pitch" : spec.pitch < .67 ? "medium pitch" : "high pitch";
+  return BWORD[spec.behavior || "steady"] + " " + KWORD[spec.kind] + " · " + band;
+}
+
+// Contextual intro on the confidence screen, only where the prototype defines
+// one for the concept's state.
+export function confIntro(st) {
+  const c = st.concept, o = st[c];
+  if (c === "n" && o.closeEnough) return "“Close enough” is a real answer. Only you can judge the match.";
+  if (c === "a" && o.stop === "patient") return "You chose to stop. That is fine. Only you can judge the match.";
+  if (c === "a" && o.stop === "cant") return "You could not tell nearby sounds apart. Usually a sign the match is as close as listening can get.";
+  if (c === "a" && o.stop) return "Refining stopped because nearby sounds were no longer getting closer to yours.";
+  if (c === "l") return "Judge today’s sound on its own, not by memory of last time.";
+  return "";
+}
+
+// Where "Keep refining" re-enters each concept's flow. Every target clears the
+// recorded answer so returning to Confidence asks again.
+export function keepRefiningTarget(st) {
+  const c = st.concept;
+  if (c === "n") return { stage: "p3", obj: { conf: null, note: "Take your time. If it still feels off, keep fine-tuning or widen the range." } };
+  if (c === "f") return { stage: "tune", obj: { conf: null, work: st.f.s1 ? { ...st.f.s1 } : st.f.work, editing: 1, note: "Adjust anything. Nothing is locked in." } };
+  if (c === "r") return { stage: "comp", obj: { conf: null, spread: .18, uncertain: 0, note: "A few more comparisons, then." } };
+  if (c === "d") return { stage: "zoom", obj: { conf: null, cx: st.d.x, cy: st.d.y, level: Math.max(1, st.d.level || 0), note: "Nothing is locked in. Move the marker as much as you like." } };
+  if (c === "a") return { stage: "listen", obj: { conf: null, unc: .32, suggest: false, closes: 0, msg: "Okay. We’ll keep refining." } };
+  return { stage: "refine", obj: { conf: null, note: "Adjust anything. Today’s judgment wins." } };
+}
+
+// Match complete: title, body, labeled summary rows and the technical readout
+// line. `specs` is the concept's final matched sound (mainSpecs in the
+// renderer), so the record reflects the participant's final parameters.
+export function doneData(st, specs) {
+  const c = st.concept, o = st[c], rows = [];
+  if (c === "f") {
+    const sounds = [o.s1, o.s2].filter(Boolean);
+    specs = sounds.map((x) => x.spec);
+    if (!sounds.length && o.work) { specs = [o.work.spec]; rows.push({ label: "YOUR MATCHED SOUND", sub: describe(o.work.spec) }); }
+    sounds.forEach((sd, i) => rows.push({ label: "SOUND " + (i + 1), sub: describe(sd.spec) }));
+  } else if (c === "n" || c === "r" || c === "d") {
+    // Nothing here for the patient. "Middle pitch, quiet" is not actionable
+    // for them; the values belong in the technical line below instead.
+  } else {
+    rows.push({ label: "YOUR MATCHED SOUND", sub: describe(specs[0]) });
+  }
+  rows.push({ label: "EAR", sub: st.ear || "Both ears" });
+  if (o.conf) rows.push({ label: "HOW CLOSE IT FEELS", sub: o.conf });
+  if (c === "a") rows.push({ label: "HOW IT ENDED", sub: o.stop === "patient" ? "You chose to stop" : "Nearby checks stopped improving" });
+  if (c === "r") rows.push({ label: "HOW IT ENDED", sub: o.stop === "floor" ? "The comparisons could not get any closer" : "You chose to finish" });
+  if (c === "l") rows.push({ label: "COMPARED WITH LAST TIME", sub: o.picked === "prior" ? "Similar to your previous match" : "A little different, and that is normal" });
+  let tech = specs.map((x) => techOf(x)).join("  ·  ");
+  if (c === "l") tech += "  ·  previous " + techOf({ kind: o.prior.kind, pitch: o.prior.pitch, level: o.prior.level });
+  return {
+    rows: rows.map((r2, i) => ({ ...r2, bt: i === 0 ? "none" : "1px solid var(--gray-100)" })),
+    title: "That’s this one done",
+    body: "",
+    tech
+  };
+}
+
+// Return to matching options: mark the open option done with its recorded
+// answer, keep its completion order, and go back to the hub. Both keys are in
+// PERSIST_KEYS, so the renderer's persistence pass stores them.
+export function completeOptionState(s) {
+  const c = s.concept;
+  return {
+    ...goScreenState(s, "home"),
+    optDone: { ...s.optDone, [c]: (s[c] && s[c].conf) || "recorded" },
+    optOrder: s.optOrder.includes(c) ? s.optOrder : [...s.optOrder, c]
+  };
+}
+
 /* ---------- moderator jump targets ---------- */
 // Each one seeds a state the destination can actually run from.
 
