@@ -1,0 +1,24 @@
+{
+  "name": "pnq-matching",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PNQ Sound Matching - static, client-only mobile test prototype app built on the PNQ Health Design System.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "node scripts/lint-tokens.mjs",
+    "test": "node --test tests/unit/*.test.mjs",
+    "pretest:e2e": "playwright install chromium",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

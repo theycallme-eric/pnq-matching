@@ -1,0 +1,63 @@
+/* The prototype spaces on odd values as often as even ones. These are the real
+   measurements, not a snapped 4/8 grid. */
+:root {
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-7: 7px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-11: 11px;
+  --space-12: 12px;
+  --space-13: 13px;
+  --space-14: 14px;
+  --space-15: 15px;
+  --space-16: 16px;
+  --space-17: 17px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-22: 22px;
+  --space-24: 24px;
+  --space-26: 26px;
+  --space-28: 28px;
+  --space-30: 30px;
+  --space-34: 34px;
+  --space-40: 40px;
+
+  /* Screen gutters, by screen density */
+  --gutter-screen: 22px;      /* default */
+  --gutter-screen-tight: 18px;/* matching screen, where cards do the framing */
+  --gutter-screen-wide: 26px; /* onboarding and prose screens */
+
+  /* Repeating internal paddings */
+  --pad-card: 18px 16px;
+  --pad-row: 17px 18px;
+  --pad-choice-card: 16px 15px;
+
+  /* Control heights */
+  --h-button-lg: 56px;
+  --h-button: 54px;
+  --h-button-md: 52px;
+  --h-button-sm: 48px;
+  --h-button-ghost: 46px;
+  --h-input: 60px;
+  --h-segment: 42px;
+  --h-segment-pill: 34px;
+  --h-nudge: 30px;
+  --h-status-bar: 44px;
+  --h-nav-bar: 50px;
+
+  /* Icon containers */
+  --tile-xl: 64px;
+  --tile-lg: 62px;
+  --tile-md: 42px;
+  --tile-sm: 40px;
+  --tile-xs: 38px;
+
+  /* Touch minimum — patients span a wide age range */
+  --hit-min: 44px;
+
+  /* Device canvas the app is designed against */
+  --viewport-w: 390px;
+  --viewport-h: 844px;
+}
