@@ -8,12 +8,14 @@ const key = "pnq-mtp-v1";
 
 async function completeSetup(page) {
   await page.getByRole("button", { name: "Get started" }).click();
-  await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-  await page.getByRole("button", { name: "Headphones and volume" }).click();
+  await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+  await page.getByText("Both ears", { exact: true }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   await page.getByRole("button", { name: "What to listen for" }).click();
   await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
@@ -62,8 +64,10 @@ test.describe("app shell", () => {
     const back = page.getByRole("button", { name: "Back" });
     await expect(back).toHaveCount(0);
     await page.getByRole("button", { name: "Get started" }).click();
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
     await expect(back).toHaveCount(0);
-    await page.getByRole("button", { name: "Headphones and volume" }).click();
+    await page.getByText("Both ears", { exact: true }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
     await expect(back).toBeVisible();
     await back.click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
@@ -112,11 +116,11 @@ test.describe("app shell chrome", () => {
     await page.setViewportSize({ width: 390, height: 700 });
     await expect(frame).toHaveAttribute("data-device-frame", "bare");
     await expect(page.getByText("9:41")).toHaveCount(0);
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
     const bare = await frame.boundingBox();
     expect(Math.round(bare.width)).toBe(390);
     await page.setViewportSize({ width: 900, height: 900 });
     await expect(frame).toHaveAttribute("data-device-frame", "framed");
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
   });
 });
