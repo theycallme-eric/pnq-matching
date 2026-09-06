@@ -42,27 +42,34 @@ test.describe("narrowing (Option 1)", () => {
     await expect(volOff).toBeEnabled();
     await volOff.click();
 
-    // Signing off is live: the tone carries into the first pitch pass.
+    // Every stage transition hard-stops audio and the new stage must be played
+    // before it can be judged (REQ-001, REQ-018).
     await expect(page.getByText("Now find the pitch")).toBeVisible();
-    expect(await playingKey(page)).toBe("main");
+    expect(await playingKey(page)).toBe(null);
     expect(await progressPhase(page)).toContain("PITCH 1 OF 3");
 
-    // Choose a pitch on the coarse pass; adjustments carry into the tone.
+    // Choose a pitch on the coarse pass; adjustments carry into the tone only
+    // while this stage's sound is playing.
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("slider", { name: "Pitch" }).fill("70");
     expect((await nState(page)).pitch).toBeCloseTo(.7, 6);
     await page.getByRole("button", { name: "Next: closer adjustments" }).click();
 
     await expect(page.getByText("Getting closer")).toBeVisible();
+    expect(await playingKey(page)).toBe(null);
     expect(await progressPhase(page)).toContain("PITCH 2 OF 3");
     let n = await nState(page);
     expect(n.center).toBeCloseTo(.7, 6);
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
 
     await expect(page.getByText("Small adjustments now")).toBeVisible();
+    expect(await playingKey(page)).toBe(null);
     expect(await progressPhase(page)).toContain("PITCH 3 OF 3");
     await expect(page.getByRole("button", { name: "Keep fine-tuning" })).toBeVisible();
 
     // The fixed sign-off ends in shared Confidence with the final pitch/level.
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "This matches what I hear" }).click();
     await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
     n = await nState(page);

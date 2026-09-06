@@ -162,15 +162,6 @@ class App extends React.Component {
     this.setState((s) => shell.stageState(s, c, stage, obj));
   }
 
-  // Stepping to the next refinement is a change of view, not of sound: if the
-  // stage's voice is already sounding it carries across instead of restarting.
-  goLive(c, stage, obj, key) {
-    if (this.state.playKey !== key) return this.go(c, stage, obj);
-    this.setState(
-      (s) => ({ stages: { ...s.stages, [c]: stage }, [c]: { ...s[c], note: "", ...(obj || {}) } }),
-      () => this.withAudio((a) => a.update(mainSpecs(this.state))));
-  }
-
   resetAll() {
     this.skipNextPersist = true;
     this.hardStop();
@@ -495,8 +486,7 @@ class App extends React.Component {
       const x = this.state;
       if (!gating.heardHere(x)) return;
       const res = nar.advance(x.stages.n, x.n);
-      if (res.kind === "live") this.goLive("n", res.stage, res.obj, "main");
-      else this.go("n", res.stage, res.obj);
+      this.go("n", res.stage, res.obj);
     };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },

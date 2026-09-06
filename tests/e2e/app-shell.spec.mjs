@@ -90,9 +90,9 @@ test.describe("app shell", () => {
 
     // Stage transition inside a flow stops the main voice too.
     await page.getByRole("button", { name: "Option 1" }).click();
-    await page.getByRole("button", { name: "Play the sound" }).click();
+    await page.getByText("Start Sound", { exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "The volume is about right" }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
   });
 });
