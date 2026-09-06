@@ -722,9 +722,10 @@ const PNQ_TUNING_HALFWIDTH = {
 function pnqClamp(x, a, b) {
   return Math.max(a, Math.min(b, x));
 }
-function pnqNudgeButton(onClick, glyph) {
+function pnqNudgeButton(onClick, glyph, label) {
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
+    "aria-label": `${label} ${glyph === "+" ? "up" : "down"}`,
     onClick: onClick,
     style: {
       width: "40px",
@@ -791,7 +792,7 @@ function TuningSlider({
       display: "flex",
       gap: "8px"
     }
-  }, pnqNudgeButton(() => onChange && onChange(pnqClamp(value - hw * 0.16, 0, 1)), "\u2212"), pnqNudgeButton(() => onChange && onChange(pnqClamp(value + hw * 0.16, 0, 1)), "+"))), /*#__PURE__*/React.createElement("div", {
+  }, pnqNudgeButton(() => onChange && onChange(pnqClamp(value - hw * 0.16, 0, 1)), "\u2212", label), pnqNudgeButton(() => onChange && onChange(pnqClamp(value + hw * 0.16, 0, 1)), "+", label))), /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative",
       height: "6px",
@@ -890,6 +891,7 @@ function TuningSlider({
     }
   }), /*#__PURE__*/React.createElement("input", {
     type: "range",
+    "aria-label": label,
     min: "0",
     max: "100",
     step: "0.5",
