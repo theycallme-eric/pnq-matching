@@ -88,6 +88,35 @@ test("opening or restarting an option reseeds working state from its fresh facto
   assert.equal(seeded.n.level, .44);
 });
 
+test("moderator jump targets mirror V5's stage jumps plus its scenario presets", () => {
+  assert.deepEqual(shell.jumpStages("n").map((j) => j.label), [
+    "Volume", "Pitch · coarse", "Pitch · medium", "Pitch · fine", "Confidence",
+    "Extended · 5 passes", "“Didn’t hear anything”", "Recovered · widened", "Low confidence", "High confidence"
+  ]);
+  assert.deepEqual(shell.jumpStages("r").map((j) => j.label), [
+    "Directional · volume", "Directional · pitch", "A/B comparisons", "A/B · near the floor", "A/B · long session", "Confidence",
+    "Steps converging", "A/B · early", "A/B · nearly identical", "“Neither is close”", "Bounced back to directions", "Long session · fatigue"
+  ]);
+  assert.deepEqual(shell.jumpStages("d").map((j) => j.label), [
+    "Whole field", "Closer look", "Closer look · closest", "Confidence",
+    "Heard it · exploring", "Edge of the range", "“Didn’t hear anything”", "Low confidence", "High confidence"
+  ]);
+  // Every chip names a real stage and its seed builds on the fresh factory,
+  // so the destination can actually run (audio playable, CTAs gated).
+  for (const cid of shell.OPTORDER) {
+    const ids = shell.STAGES[cid].map((z) => z[0]);
+    for (const j of shell.jumpStages(cid)) {
+      assert.ok(ids.includes(j.stage), cid + " chip “" + j.label + "” targets a real stage");
+      for (const k of Object.keys(shell.freshFor(cid))) assert.ok(k in j.seed, cid + " seed keeps fresh key " + k);
+    }
+  }
+  const ext = shell.jumpStages("n").find((j) => j.label === "Extended · 5 passes");
+  assert.equal(ext.stage, "p3");
+  assert.equal(ext.seed.extra, 2, "extended pass seeds the deeper window");
+  const edge = shell.jumpStages("d").find((j) => j.label === "Edge of the range");
+  assert.deepEqual([edge.seed.heard, edge.seed.x, edge.seed.y], [true, .96, .06]);
+});
+
 test("every navigation reducer clears playKey so the hard stop leaves silence", () => {
   const playing = { ...shell.initialState(), playKey: "main" };
   assert.equal(shell.goScreenState(playing, "home").playKey, null);
