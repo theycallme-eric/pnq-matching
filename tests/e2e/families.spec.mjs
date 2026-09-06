@@ -58,7 +58,9 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
     expect((await appF(page)).fam).toBe(null);
     await expect(cont).toBeDisabled();
 
-    await page.getByText("Hissing or rushing", { exact: true }).click();
+    const hissChoice = page.getByRole("button", { name: "Select Hissing or rushing", exact: true });
+    await hissChoice.press("Enter");
+    await expect(hissChoice).toHaveAttribute("aria-pressed", "true");
     expect((await appF(page)).fam).toBe("hiss");
     await expect(cont).toBeEnabled();
 
@@ -71,7 +73,7 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
   test("full run: family, character, tuning, second sound, shared completion", async ({ page }) => {
     await boot(page);
     await jumpToFamilies(page, "Families open");
-    await page.getByText("Hissing or rushing", { exact: true }).click();
+    await page.getByRole("button", { name: "Select Hissing or rushing", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
 
     await expect(page.locator('[data-screen-label="Families · Character"]')).toBeVisible();
@@ -79,7 +81,7 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
     await expect(page.getByText("All of these are hiss sounds with a different character.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Play example" })).toHaveCount(6);
     await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
-    await page.getByText("Like radio static", { exact: true }).click();
+    await page.getByRole("button", { name: "Select Like radio static", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
 
     await expect(page.locator('[data-screen-label="Families · Pitch and loudness"]')).toBeVisible();
@@ -98,10 +100,10 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
 
     await expect(page.locator('[data-screen-label="Families · Sound families"]')).toBeVisible();
     await expect(page.getByText("Matching sound 2 now. Same steps, and sound 1 is saved.")).toBeVisible();
-    await page.getByText("A tone", { exact: true }).click();
+    await page.getByRole("button", { name: "Select A tone", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByText("People often say “ringing” for tinnitus in general", { exact: false })).toBeVisible();
-    await page.getByText("Like a whistle", { exact: true }).click();
+    await page.getByRole("button", { name: "Select Like a whistle", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(page.getByText("SOUND 2", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "This matches" }).click();
@@ -146,7 +148,7 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
 
     // A non-hard family reroutes back to the family list instead.
     await jumpToFamilies(page, "Families open");
-    await page.getByText("Buzzing or humming", { exact: true }).click();
+    await page.getByRole("button", { name: "Select Buzzing or humming", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "None of these are close" }).click();
     await expect(page.locator('[data-screen-label="Families · Sound families"]')).toBeVisible();

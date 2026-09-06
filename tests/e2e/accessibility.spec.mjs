@@ -100,7 +100,10 @@ test.describe("accessibility and participant copy", () => {
     })));
     await page.reload();
     await page.getByRole("button", { name: "Get started" }).click();
-    await page.getByText("Both ears", { exact: true }).click();
+    const bothEars = page.getByRole("button", { name: "Both ears", exact: true });
+    await expect(bothEars).toHaveAttribute("aria-pressed", "false");
+    await bothEars.press("Space");
+    await expect(bothEars).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Session menu" }).click();
     await page.getByRole("button", { name: "Return to matching options" }).click();
