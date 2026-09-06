@@ -1441,14 +1441,23 @@ class App extends React.Component {
           actions.map((a) =>
             e("button", { key: a.label, onClick: a.f, style: { display: "flex", alignItems: "center", width: "100%", minHeight: "52px", padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-200)", background: "var(--white)", cursor: "pointer", textAlign: "left", font: "600 14.5px var(--font-ui)", color: "var(--text-heading)" } }, a.label))),
         e("button", { onClick: () => this.setState((x) => ({ jumpOpen: !x.jumpOpen })), style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", minHeight: "52px", marginTop: "12px", padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-300)", background: "var(--gray-50)", cursor: "pointer", textAlign: "left", font: "600 14.5px var(--font-ui)", color: "var(--text-heading)" } },
-          "Jump to a different section"),
+          "Jump to a different section",
+          e("span", { style: { flex: "none", display: "block", width: "9px", height: "9px", borderRight: "2.2px solid var(--gray-600)", borderBottom: "2.2px solid var(--gray-600)", transform: "rotate(" + (st.jumpOpen ? "225deg" : "45deg") + ")", transition: "transform 200ms ease" } })),
         st.jumpOpen ? e("div", { style: { marginTop: "12px", display: "flex", flexDirection: "column", gap: "16px" } },
           jumpGroups.map((g) =>
             e("div", { key: g.cap },
               e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
               e("div", { style: { display: "flex", flexWrap: "wrap", gap: "7px", marginTop: "9px" } },
                 g.items.map((it) =>
-                  e("button", { key: it.label, onClick: it.f, style: { minHeight: "44px", padding: "9px 13px", borderRadius: "999px", border: "1.5px solid var(--gray-300)", background: "var(--white)", color: "var(--text-body)", font: "600 12.5px var(--font-ui)", cursor: "pointer" } }, it.label)))))) : null));
+                  e("button", { key: it.label, onClick: it.f, style: { minHeight: "44px", padding: "9px 13px", borderRadius: "999px", border: "1.5px solid var(--gray-300)", background: "var(--white)", color: "var(--text-body)", font: "600 12.5px var(--font-ui)", cursor: "pointer" } }, it.label))))),
+          e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+            e("span", { style: { font: "500 13px var(--font-ui)", color: "var(--text-muted)" } }, "Technical values (Hz · dB)"),
+            e("button", {
+              onClick: () => this.setState((x) => ({ showTech: !x.showTech })),
+              "aria-label": "Toggle technical values", "aria-pressed": st.showTech ? "true" : "false",
+              style: { flex: "none", width: "44px", height: "26px", borderRadius: "13px", border: "none", background: st.showTech ? "var(--blue-500)" : "var(--gray-300)", position: "relative", cursor: "pointer", transition: "background .2s ease" }
+            },
+              e("span", { style: { position: "absolute", top: "3px", left: st.showTech ? "16px" : "2px", width: "20px", height: "20px", borderRadius: "50%", background: "var(--white)", transition: "left .2s ease" } })))) : null));
   }
 
   render() {

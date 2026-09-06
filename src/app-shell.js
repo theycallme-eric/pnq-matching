@@ -285,7 +285,8 @@ export function completeOptionState(s) {
 }
 
 /* ---------- moderator jump targets ---------- */
-// Each one seeds a state the destination can actually run from.
+// Each one seeds a state the destination can actually run from: the V5
+// prototype's stage jumps followed by its per-concept scenario presets.
 
 export function jumpStages(cid) {
   const mk = (label, stage, seed) => ({ label, stage, seed: { ...freshFor(cid), ...(seed || {}) } });
@@ -294,7 +295,12 @@ export function jumpStages(cid) {
     mk("Pitch · coarse", "p1", { center: .5 }),
     mk("Pitch · medium", "p2", { center: .5, level: .44 }),
     mk("Pitch · fine", "p3", { center: .5, level: .44 }),
-    mk("Confidence", "conf", { pitch: .5, level: .44 })
+    mk("Confidence", "conf", { pitch: .5, level: .44 }),
+    mk("Extended · 5 passes", "p3", { level: .48, pitch: .615, extra: 2, note: "Another pass, narrower again. Keep going for as long as it helps." }),
+    mk("“Didn’t hear anything”", "vol", { level: .57, note: "That’s okay. We made the sound a little easier to hear. Press play and try again." }),
+    mk("Recovered · widened", "p1", { level: .48, widened: 1, note: "We’ve widened the pitch range again. Take your time. Close is good enough at this stage." }),
+    mk("Low confidence", "conf", { pitch: .61, conf: "Not close yet" }),
+    mk("High confidence", "conf", { pitch: .61, conf: "Very close" })
   ];
   if (cid === "r") return [
     mk("Directional · volume", "dir"),
@@ -302,13 +308,24 @@ export function jumpStages(cid) {
     mk("A/B comparisons", "comp", { phase: "pitch", center: .58, level: .46, spread: .26, round: 2 }),
     mk("A/B · near the floor", "comp", { phase: "pitch", center: .58, level: .46, spread: .075, round: 7 }),
     mk("A/B · long session", "comp", { phase: "pitch", center: .58, level: .46, spread: .1, round: 11 }),
-    mk("Confidence", "conf", { center: .58, level: .46 })
+    mk("Confidence", "conf", { center: .58, level: .46 }),
+    mk("Steps converging", "dir", { phase: "pitch", volOk: 1, level: .46, center: .62, pstep: .072, dirRounds: 6 }),
+    mk("A/B · early", "comp", { phase: "pitch", center: .62, level: .46, spread: .26, round: 2 }),
+    mk("A/B · nearly identical", "comp", { phase: "pitch", center: .62, level: .46, spread: .075, round: 7 }),
+    mk("“Neither is close”", "comp", { phase: "pitch", center: .5, level: .46, spread: .38, round: 4, uncertain: 1, note: "Neither, then. We have widened out and moved to a different area." }),
+    mk("Bounced back to directions", "dir", { phase: "pitch", volOk: 1, level: .46, pstep: .18, dirRounds: 8, msg: "Those were hard to tell apart, so we have gone back to simple directions. Is your sound higher or lower than this?" }),
+    mk("Long session · fatigue", "comp", { phase: "pitch", center: .62, level: .46, spread: .1, round: 14 })
   ];
   return [
     mk("Whole field", "field"),
     mk("Closer look", "zoom", { heard: true, level: 1, cx: .5, cy: .5 }),
     mk("Closer look · closest", "zoom", { heard: true, level: 2, cx: .5, cy: .5 }),
-    mk("Confidence", "conf", { heard: true, level: 2 })
+    mk("Confidence", "conf", { heard: true, level: 2 }),
+    mk("Heard it · exploring", "field", { heard: true, x: .68, y: .44 }),
+    mk("Edge of the range", "field", { heard: true, x: .96, y: .06 }),
+    mk("“Didn’t hear anything”", "field", { note: "That’s okay, and worth telling us. Try moving the marker higher for a louder sound, or check your headphones." }),
+    mk("Low confidence", "conf", { heard: true, x: .68, y: .44, conf: "Not close yet" }),
+    mk("High confidence", "conf", { heard: true, x: .68, y: .44, conf: "Very close" })
   ];
 }
 
