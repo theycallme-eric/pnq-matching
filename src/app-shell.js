@@ -28,6 +28,12 @@ export const STAGES = {
   l: [["ret", "Welcome back"], ["check", "Check-in"], ["prior", "Today vs. before"], ["refine", "Refine today"], ["reopen", "Fresh search"], ["done", "Complete"]]
 };
 
+// First working stage of a flow: past the shared intro/edu (and the
+// longitudinal welcome-back), whether or not the concept is a hub option.
+export function firstWorkingStage(c) {
+  return OPTFIRST[c] || STAGES[c].map((z) => z[0]).find((id) => id !== "intro" && id !== "edu" && id !== "ret");
+}
+
 export function stageLabel(c, stage) {
   const row = (STAGES[c] || []).find((z) => z[0] === stage);
   return row ? row[1] : "";
