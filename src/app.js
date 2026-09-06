@@ -9,6 +9,7 @@ import * as shell from "./app-shell.js";
 import * as gating from "./gating.js";
 import * as comparison from "./comparison.js";
 import * as fam from "./family-flow.js";
+import * as pres from "./preserved.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -33,6 +34,8 @@ function mainSpecs(st) {
   if (c === "r") return [{ kind: "tone", pitch: st.r.center, level: st.r.level, bright: .3, behavior: "steady" }];
   if (c === "d") return [dSpec(st.d)];
   if (c === "f") return fam.mainSpecs(st.f, st.stages.f);
+  if (c === "a") return [pres.aSpec(st.a, st.stages.a)];
+  if (c === "t") return [pres.fieldSpec(st.t)];
   if (c === "l") return [{ kind: st.l.prior.kind, pitch: st.l.pitch, level: st.l.level, bright: .25, behavior: "steady" }];
   return [{ kind: "tone", pitch: .5, level: .42, bright: .2, behavior: "steady" }];
 }
@@ -129,6 +132,11 @@ class App extends React.Component {
   }
 
   rDir(tag) { this.applyR(comparison.dirAnswer(this.state.r, tag)); }
+
+  // Adaptive candidate loop (REQ-011): every response patches estimate,
+  // uncertainty, kind and message in place; leaving the loop is always an
+  // explicit action (final check, close enough, keep refining).
+  aResp(tag) { this.pat("a", pres.aResp(this.state.a, tag)); }
 
   // In-place concept patch. If the main voice is sounding, the change is
   // heard live (tuning sliders adjust the tone while it plays).
