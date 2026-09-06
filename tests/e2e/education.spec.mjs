@@ -41,9 +41,9 @@ test.describe("education", () => {
     await expect(advance).toBeEnabled();
     await advance.click();
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
-    // Advancing is live, so the carried tone keeps the next pass unlocked;
-    // stopping it re-locks the pass until it has been heard here.
-    await page.getByText("Stop Sound", { exact: true }).click();
+    // The stage transition hard-stops audio, so the new pass stays locked
+    // until its own sound has been played (REQ-001, REQ-018).
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
     await expect(page.getByRole("button", { name: "Next: closer adjustments" })).toBeDisabled();
   });
 });

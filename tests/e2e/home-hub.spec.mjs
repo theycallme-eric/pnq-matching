@@ -50,11 +50,14 @@ async function completeOption(page, n, continues) {
     await page.getByRole("button", { name: "They sound the same" }).click();
   } else if (n === 1) {
     // Option 1's real stages: sign off the volume, then the three pitch
-    // passes. Advancing is live, so the tone only needs starting once.
+    // passes. Each stage hard-stops and must be played before judgment.
     await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "The volume is about right" }).click();
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: closer adjustments" }).click();
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "This matches what I hear" }).click();
   } else {
     for (let i = 0; i < continues; i++) {
