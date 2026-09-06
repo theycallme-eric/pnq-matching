@@ -8,8 +8,10 @@
 import * as shell from "./app-shell.js";
 import * as gating from "./gating.js";
 import * as comparison from "./comparison.js";
+import * as nar from "./narrowing.js";
 import * as fam from "./family-flow.js";
 import * as pres from "./preserved.js";
+import * as field from "./field.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -25,14 +27,11 @@ const EDU = [
             ["Louder", { kind: "tone", pitch: .5, level: .62, bright: .14, behavior: "steady" }]] }
 ];
 
-const DVOL = { min: .12, max: .68 };
-const dSpec = (d) => ({ kind: "tone", pitch: d.x, level: DVOL.max - d.y * (DVOL.max - DVOL.min), bright: .3, behavior: "steady" });
-
 function mainSpecs(st) {
   const c = st.concept;
   if (c === "n") return [{ kind: "tone", pitch: st.n.pitch, level: st.n.level, bright: .3, behavior: "steady" }];
   if (c === "r") return [{ kind: "tone", pitch: st.r.center, level: st.r.level, bright: .3, behavior: "steady" }];
-  if (c === "d") return [dSpec(st.d)];
+  if (c === "d") return [field.dSpec(st.d)];
   if (c === "f") return fam.mainSpecs(st.f, st.stages.f);
   if (c === "a") return [pres.aSpec(st.a, st.stages.a)];
   if (c === "t") return [pres.fieldSpec(st.t)];
@@ -143,6 +142,7 @@ class App extends React.Component {
   pat(c, obj) {
     this.setState((s) => ({ [c]: { ...s[c], ...obj } }), () => {
       if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state)));
+      else if (this.state.playKey === "dfield") this.withAudio((a) => a.update([field.dSpec(this.state.d)]));
     });
   }
 
@@ -186,10 +186,7 @@ class App extends React.Component {
     const t = shell.backTarget(this.state);
     if (t.kind === "screen") return this.goScreen(t.screen);
     if (t.kind === "zoomOut") {
-      return this.go("d", t.stage, {
-        level: t.level,
-        note: t.level === 0 ? "Back to the whole range. Your marker is where you left it." : "Back out one step. Your marker is where you left it."
-      });
+      return this.go("d", t.stage, { level: t.level, heard: false, note: field.zoomOutNote(t.level + 1) });
     }
     return this.go(this.state.concept, t.stage);
   }
@@ -434,6 +431,109 @@ class App extends React.Component {
   // answers, so the way out never looks like an error.
   escapeLink(label, onClick) {
     return e("button", { onClick, style: { border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", minHeight: "44px", padding: "0 10px" } }, label);
+  }
+
+  // Narrowing · Prepare (REQ-007): Option 1's own intro copy and icon rows.
+  renderNIntro() {
+    const st = this.state;
+    const rows = [
+      ["headphones", "Listen to the sound"],
+      ["equalizer", "Set the volume once, then refine the pitch"],
+      ["check", "We'll narrow in around your choices"]
+    ];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "Match your tinnitus"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          "You'll listen to a sound and adjust it until it's close to what you hear. One step for how loud it is, then a few passes on how high or low, each one closer than the last. There are no wrong answers. Choose what feels closest to what you hear."),
+        e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "section" },
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "15px" } },
+              rows.map(([icon, text]) =>
+                e("div", { key: icon, style: { display: "flex", alignItems: "center", gap: "13px" } },
+                  e(DS.IconTile, { size: "sm", tone: "blue" }, e(DS.Icon, { name: icon, size: 20 })),
+                  e("div", { style: { font: "500 14px/1.35 var(--font-ui)", color: "var(--gray-800)" } }, text))))))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e(DS.Button, { variant: "primary", size: "md", onClick: () => this.go("n", st.eduSeen ? "vol" : "edu") }, "Begin matching"),
+        st.eduSeen
+          ? e("button", {
+            onClick: () => this.go("n", "edu"),
+            style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+          }, "Remind me what to listen for")
+          : e("div", { style: { height: "9px" } }))
+    ];
+  }
+
+  // Nudge button in the prototype's pitch-pass header: like the design
+  // system's, but wearing the pass's hue.
+  nNudge(glyph, onClick, hue) {
+    return e("button", {
+      key: glyph, onClick, "aria-label": glyph === "+" ? "Pitch up" : "Pitch down",
+      style: { width: "40px", height: "var(--h-nudge)", border: "1.5px solid var(--blue-border)", borderRadius: "8px", background: "var(--white)", color: hue.solid, font: "600 19px/1 var(--font-ui)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }
+    }, glyph);
+  }
+
+  // Narrowing · Refinement pass (REQ-007): the volume step, then the pitch
+  // passes whose window band tightens around each choice while the tick layer
+  // scales and the ticks stay fixed. Step buttons plus the fine slider, with
+  // the widen and can't-hear escapes (REQ-016).
+  renderPass() {
+    const st = this.state, n = st.n, s = st.stages.n;
+    const isVol = s === "vol";
+    const win = nar.windowOf(s, n);
+    const layer = nar.tickLayer(win);
+    const hue = nar.HUES[nar.hueIndex(s)];
+    const heard = gating.heardHere(st);
+    const onSlide = (ev) => this.pat("n", nar.slidePitch(win, parseFloat(ev.target.value)));
+    const signOff = () => {
+      const x = this.state;
+      if (!gating.heardHere(x)) return;
+      const res = nar.advance(x.stages.n, x.n);
+      this.go("n", res.stage, res.obj);
+    };
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, nar.passTitle(s, n)),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, nar.passBody(s)),
+        e(DS.Card, { variant: "section" },
+          e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+          isVol
+            ? e("div", { style: { marginTop: "18px" } },
+              e(DS.TuningSlider, { label: "Volume", value: n.level, onChange: (v) => this.pat("n", { level: v }), precision: "Coarse" }),
+              e("div", { style: { font: "400 12.5px/1.45 var(--font-text)", color: "var(--text-muted)", marginTop: "9px" } }, nar.VOL_HINT))
+            : e("div", { style: { marginTop: "18px" } },
+              e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" } },
+                e("span", { style: { font: "700 14px var(--font-ui)", color: "var(--text-heading)" } }, "Pitch"),
+                e("div", { style: { display: "flex", gap: "8px" } },
+                  this.nNudge("−", () => this.pat("n", nar.stepPitch(this.state.n, win, -1)), hue),
+                  this.nNudge("+", () => this.pat("n", nar.stepPitch(this.state.n, win, 1)), hue))),
+              e("div", { style: { position: "relative", height: "6px", background: "var(--interface-track)", borderRadius: "999px", marginBottom: "10px" } },
+                e("div", { "data-pitch-window": "", style: { position: "absolute", top: 0, bottom: 0, left: (win.edge * 100).toFixed(1) + "%", width: (win.span * 100).toFixed(1) + "%", background: hue.band, borderRadius: "999px", transition: "left 420ms cubic-bezier(.4,0,.2,1),width 420ms cubic-bezier(.4,0,.2,1)" } }),
+                e("div", { style: { position: "absolute", top: "-2px", bottom: "-2px", left: (n.pitch * 100).toFixed(1) + "%", width: "2px", marginLeft: "-1px", background: hue.solid, borderRadius: "1px" } })),
+              e("div", { style: { position: "relative", height: "40px" } },
+                e("div", { style: { position: "absolute", left: 0, right: 0, top: "13px", height: "14px", pointerEvents: "none", overflow: "hidden" } },
+                  e("div", { "data-tick-layer": "", style: { position: "absolute", top: 0, height: "14px", left: layer.left, width: layer.width, transition: "left 460ms cubic-bezier(.4,0,.2,1),width 460ms cubic-bezier(.4,0,.2,1)" } },
+                    nar.NTICKS.map((p) => e("div", { key: p, "data-tick": "", style: { position: "absolute", top: 0, width: "2px", height: "14px", marginLeft: "-1px", borderRadius: "1px", background: hue.solid, left: p } })))),
+                e("div", { style: { position: "absolute", left: 0, right: 0, top: "18px", height: "4px", borderRadius: "999px", background: "var(--interface-rail)", pointerEvents: "none" } }),
+                e("div", { style: { position: "absolute", top: "6px", left: (win.pos * 100).toFixed(1) + "%", width: "28px", height: "28px", marginLeft: "-14px", borderRadius: "50%", background: "var(--white)", border: "2px solid " + hue.solid, boxShadow: "var(--shadow-thumb)", pointerEvents: "none" } }),
+                e("input", {
+                  type: "range", min: 0, max: 100, step: 0.5, value: win.pos * 100, "aria-label": "Pitch",
+                  onInput: onSlide, onChange: onSlide,
+                  style: { position: "absolute", left: "-14px", right: "-14px", top: 0, width: "calc(100% + 28px)", height: "40px", margin: 0, opacity: 0, cursor: "pointer", WebkitAppearance: "none", appearance: "none", background: "transparent" }
+                }))),
+          st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "right", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "5px" } }, shell.techOf({ kind: "tone", pitch: n.pitch, level: n.level })) : null),
+        // The prototype computes this note but its display block sits dormant
+        // in the Field · Prepare markup; escapes must reassure (REQ-016), so
+        // it renders here on the pass screen instead.
+        n.note ? this.noteBox(n.note, "14px") : null),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s]),
+        s === "p3" ? e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning") : null,
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
+          isVol ? null : this.escapeLink("Wider range", () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }),
+          this.escapeLink("Can't hear this", () => this.pat("n", nar.noHear(this.state.n)))))
+    ];
   }
 
   // Comparison · Prepare (REQ-008): Option 2's own intro copy and icon rows.
@@ -762,8 +862,150 @@ class App extends React.Component {
     ];
   }
 
+  /* ---------- Option 3 - 2D pitch-volume field (REQ-009) ---------- */
+
+  // Pointer drag on the marker (dDown/dMove/dUp). The grab offset keeps the
+  // marker from jumping under the thumb, and the window snapshot taken at
+  // pointer-down maps local drag coordinates back into the whole space.
+  dDown(ev) {
+    const puck = ev.currentTarget, pr = puck.getBoundingClientRect();
+    this.dEl = puck.parentElement;
+    this.dWin = field.dWindow(this.state.d);
+    this.dGrab = { dx: ev.clientX - (pr.left + pr.width / 2), dy: ev.clientY - (pr.top + pr.height / 2) };
+    try { puck.setPointerCapture(ev.pointerId); } catch (err) {}
+  }
+
+  dMove(ev) { if (this.dEl) this.dFieldTo(ev); }
+
+  dUp() { this.dEl = null; this.dGrab = null; }
+
+  // Sound follows the marker while dragging: pitch across, volume up and
+  // down, live into the playing voice. Releasing keeps the position.
+  dFieldTo(ev) {
+    if (!this.dEl) return;
+    const r = this.dEl.getBoundingClientRect(), g = this.dGrab || { dx: 0, dy: 0 }, w = this.dWin || { span: 1, x0: 0, y0: 0 };
+    const p = field.dragPoint(w, (ev.clientX - g.dx - r.left) / r.width, (ev.clientY - g.dy - r.top) / r.height);
+    this.setState((s) => ({ d: { ...s.d, ...p } }), () => {
+      if (this.state.playKey === "dfield") this.withAudio((a) => a.update([field.dSpec(this.state.d)]));
+    });
+  }
+
+  renderDIntro() {
+    const st = this.state;
+    const rows = [
+      ["headphones", "Drag the marker and listen"],
+      ["equalizer", "Across for pitch, up and down for volume"],
+      ["check", "Then look closely at the area you chose"]
+    ];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "Find your sound by moving"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          "You'll move one marker around and listen. Moving across changes the pitch, moving up and down changes the volume. Go wherever it sounds closest to what you hear."),
+        e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "section" },
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "15px" } },
+              rows.map(([icon, text]) =>
+                e("div", { key: icon, style: { display: "flex", alignItems: "center", gap: "13px" } },
+                  e(DS.IconTile, { size: "sm", tone: "blue" }, e(DS.Icon, { name: icon, size: 20 })),
+                  e("div", { style: { font: "500 14px/1.35 var(--font-ui)", color: "var(--gray-800)" } }, text))))))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e(DS.Button, { variant: "primary", size: "md", onClick: () => this.go("d", st.eduSeen ? "field" : "edu") }, "Start exploring"),
+        st.eduSeen ? this.fLink("Remind me what to listen for", () => this.go("d", "edu")) : e("div", { style: { height: "9px" } }))
+    ];
+  }
+
+  // Field · Pitch and volume (REQ-009): the broad pass and both zoom levels
+  // render the same screen. The field always draws the whole space on one
+  // scaled layer, so zooming reads as the decorative grid growing rather
+  // than as a new screen.
+  renderDField() {
+    const st = this.state, d = st.d;
+    const v = field.view(d);
+    const hue = field.hueOf(v.level), nextHue = field.hueOf(v.level + 1);
+    const axis = (label) => e("span", { style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)", writingMode: "vertical-rl", transform: "rotate(180deg)" } }, label);
+    const gridLine = (p, vert) => e("line", {
+      key: (vert ? "v" : "h") + p,
+      x1: vert ? p : 0, y1: vert ? 0 : p, x2: vert ? p : 100, y2: vert ? 100 : p,
+      stroke: field.tint(hue.line, hue.lineA), strokeWidth: 1, vectorEffect: "non-scaling-stroke"
+    });
+    const advance = () => {
+      const res = field.advance(this.state.d);
+      if (res.kind === "patch") return this.pat("d", res.patch);
+      if (res.kind === "zoom") return this.go("d", "zoom", res.obj);
+      return this.go("d", "conf");
+    };
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, v.title),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, v.body),
+        e("div", { style: { marginTop: "12px" } },
+          e(DS.Button, {
+            variant: "outline", size: "sm",
+            onClick: () => {
+              if (this.state.playKey !== "dfield") this.pat("d", { heard: true });
+              this.toggleKey("dfield", [field.dSpec(this.state.d)]);
+            }
+          }, st.playKey === "dfield" ? "Stop the sound" : d.heard ? "Play from here" : "Play the sound")),
+        e("div", { style: { display: "flex", gap: "9px", marginTop: "12px", alignItems: "stretch" } },
+          e("div", { style: { flex: "none", width: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", paddingBottom: "21px" } },
+            axis("LOUDER"), axis("QUIETER")),
+          e("div", { style: { flex: 1, minWidth: 0 } },
+            e("div", { "data-field": "", style: { position: "relative", width: "100%", aspectRatio: "1", borderRadius: "18px", border: "1.5px solid var(--gray-300)", background: "var(--white)", touchAction: "none", overflow: "hidden" } },
+              e("div", { "data-field-grid": "", style: { position: "absolute", inset: 0, backgroundImage: field.fieldBg(v.level), pointerEvents: "none", transform: "scale(" + v.scale + ")", transformOrigin: v.origin, transition: "transform 560ms cubic-bezier(.4,0,.2,1),transform-origin 560ms cubic-bezier(.4,0,.2,1)" } },
+                e("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", style: { position: "absolute", inset: 0, width: "100%", height: "100%" } },
+                  field.GRID.map((p) => gridLine(p, true)),
+                  field.GRID.map((p) => gridLine(p, false)))),
+              v.level > 0 ? e("div", { style: { position: "absolute", inset: 0, border: "1.5px solid " + field.tint(hue.base, 55), borderRadius: "17px", pointerEvents: "none" } }) : null,
+              d.heard && v.hasNext ? e("div", {
+                "data-field-region": "",
+                style: {
+                  position: "absolute", left: (v.regionLeft * 100).toFixed(1) + "%", top: (v.regionTop * 100).toFixed(1) + "%",
+                  width: (v.regFrac * 100).toFixed(1) + "%", height: (v.regFrac * 100).toFixed(1) + "%",
+                  border: "1.5px dashed " + field.tint(nextHue.base, 90), borderRadius: "12px",
+                  background: field.tint(nextHue.base, 8), boxShadow: "0 2px 14px " + field.tint(nextHue.base, 18),
+                  pointerEvents: "none", transition: "width 540ms cubic-bezier(.4,0,.2,1),height 540ms cubic-bezier(.4,0,.2,1)"
+                }
+              }) : null,
+              e("div", {
+                "data-field-marker": "",
+                onPointerDown: (ev) => this.dDown(ev), onPointerMove: (ev) => this.dMove(ev), onPointerUp: () => this.dUp(),
+                style: {
+                  position: "absolute", left: (v.locX * 100).toFixed(1) + "%", top: (v.locY * 100).toFixed(1) + "%",
+                  width: "56px", height: "56px", borderRadius: "50%",
+                  background: field.tint("var(--blue-500)", 24), border: "2.5px solid var(--control-accent)",
+                  transform: "translate(-50%,-50%)", cursor: "grab", touchAction: "none",
+                  boxShadow: "0 3px 14px " + field.tint("var(--blue-500)", 42),
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }
+              },
+                e("span", { style: { display: "block", width: "12px", height: "12px", borderRadius: "50%", background: "var(--control-accent)" } }))),
+            e("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "8px", font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)" } },
+              e("span", null, "LOWER"), e("span", null, "HIGHER")))),
+        st.showTech ? e("div", { "data-technical-values": true, style: { font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "6px" } }, shell.techOf(field.dSpec(d))) : null,
+        // The prototype computes this note but its display block sits stranded
+        // in the Families intro markup; escapes must reassure (REQ-016), so it
+        // renders here on the field screen instead.
+        d.note ? this.noteBox(d.note, "12px") : null),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        // The step-forward action stays in place and goes gray until the sound
+        // has been played once, so nobody advances on a marker they have never
+        // heard. Confirming the last level is the participant's call (REQ-009).
+        e(DS.Button, { variant: "primary", size: "md", disabled: !d.heard, onClick: advance },
+          v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus"),
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
+          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())),
+          this.escapeLink("Can't hear this", () => this.pat("d", field.noHear()))))
+    ];
+  }
+
   renderFlow() {
     const st = this.state, c = st.concept, s = st.stages[c];
+    if (c === "d" && s === "intro") return this.renderDIntro();
+    if (c === "d" && (s === "field" || s === "zoom")) return this.renderDField();
+    if (c === "n" && s === "intro") return this.renderNIntro();
+    if (c === "n" && (s === "vol" || s === "p1" || s === "p2" || s === "p3")) return this.renderPass();
     if (c === "r" && s === "intro") return this.renderRIntro();
     if (c === "r" && s === "dir") return this.renderListen();
     if (c === "r" && s === "comp") return this.renderPair();
