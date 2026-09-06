@@ -105,6 +105,7 @@ test.describe("narrowing (Option 1)", () => {
     expect(parseFloat(band.left)).toBeCloseTo(54, 2);
     expect(parseFloat(band.width)).toBeCloseTo(32, 2);
 
+    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
     await expect(page.getByText("Small adjustments now")).toBeVisible();
     layer = await layerStyle(page);
