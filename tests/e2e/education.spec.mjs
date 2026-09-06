@@ -34,13 +34,16 @@ test.describe("education", () => {
     await page.getByRole("button", { name: "I'm ready to start" }).click();
     await page.getByRole("button", { name: "Option 1" }).click();
 
-    const advance = page.getByRole("button", { name: "Continue" });
+    const advance = page.getByRole("button", { name: "The volume is about right" });
     await expect(advance).toBeVisible();
     await expect(advance).toBeDisabled();
-    await page.getByRole("button", { name: "Play the sound" }).click();
+    await page.getByText("Start Sound", { exact: true }).click();
     await expect(advance).toBeEnabled();
     await advance.click();
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+    // Advancing is live, so the carried tone keeps the next pass unlocked;
+    // stopping it re-locks the pass until it has been heard here.
+    await page.getByText("Stop Sound", { exact: true }).click();
+    await expect(page.getByRole("button", { name: "Next: closer adjustments" })).toBeDisabled();
   });
 });
