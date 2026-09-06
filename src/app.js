@@ -203,6 +203,19 @@ class App extends React.Component {
       e("div", { style: { height: "9px" } }));
   }
 
+  selectRowButton(key, label, selected, onClick) {
+    return e("button", {
+      key,
+      type: "button",
+      onClick,
+      "aria-pressed": selected ? "true" : "false",
+      style: {
+        display: "block", width: "100%", padding: 0, border: "none", borderRadius: "var(--radius-card)",
+        background: "transparent", color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer"
+      }
+    }, e(DS.SelectRow, { label, selected, style: { pointerEvents: "none" } }));
+  }
+
   playRow(label, key, specs) {
     const playing = this.state.playKey === key;
     return e("button", {
@@ -248,7 +261,7 @@ class App extends React.Component {
           "Sound plays only in the ear you choose. If you hear it in both, pick the side where it is strongest, or choose both ears."),
         e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "18px" } },
           ["Left ear", "Right ear", "Both ears"].map((label) =>
-            e(DS.SelectRow, { key: label, label, selected: st.ear === label, onClick: () => this.setEar(label) }))),
+            this.selectRowButton(label, label, st.ear === label, () => this.setEar(label)))),
         st.earWarn ? e("div", { style: { marginTop: "14px" } }, e(DS.InlineAlert, { tone: "error" }, "Choose an ear to continue.")) : null),
       this.bottomButton("Continue", () => st.ear ? this.goScreen("setup") : this.setState({ earWarn: true }), { disabled: !st.ear })
     ];
@@ -799,14 +812,19 @@ class App extends React.Component {
           fam.FAMORDER.map((key) => {
             const d = fam.FAMS[key], sel = f.fam === key;
             return e("div", {
-              key, onClick: () => this.pat("f", { fam: key }),
-              style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 13px", borderRadius: "14px", cursor: "pointer", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
+              key,
+              style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 13px", borderRadius: "14px", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
             },
               d.ex ? this.fPlayBtn("fam-" + key, [d.ex]) : null,
-              e("div", { style: { flex: 1, minWidth: 0 } },
-                e("div", { style: { font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, d.name),
-                e("div", { style: { font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, d.desc)),
-              this.fTick(sel));
+              e("button", {
+                type: "button", onClick: () => this.pat("f", { fam: key }), "aria-label": "Select " + d.name,
+                "aria-pressed": sel ? "true" : "false",
+                style: { flex: 1, minWidth: 0, minHeight: "44px", display: "flex", alignItems: "center", gap: "12px", padding: 0, border: "none", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" }
+              },
+                e("span", { style: { flex: 1, minWidth: 0 } },
+                  e("span", { style: { display: "block", font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, d.name),
+                  e("span", { style: { display: "block", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, d.desc)),
+                this.fTick(sel)));
           })),
         e("div", { style: { font: "400 12.5px/1.5 var(--font-text)", color: "var(--text-muted)", marginTop: "12px" } }, "Hear more than one thing? Start with the strongest sound, and you can add another later.")),
       this.fFooter([
@@ -834,14 +852,19 @@ class App extends React.Component {
           (famDef ? famDef.chars : []).map((ch, i) => {
             const sel = f.charIdx === i;
             return e("div", {
-              key: i, onClick: () => this.pat("f", { charIdx: i }),
-              style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", cursor: "pointer", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
+              key: i,
+              style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
             },
               this.fPlayBtn("char-" + i, [ch.spec]),
-              e("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" } },
-                e("div", { style: { font: "600 14.5px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, ch.label),
-                ch.sub ? e("div", { style: { font: "400 12.5px/1.35 var(--font-text)", color: "var(--text-body)" } }, ch.sub) : null),
-              this.fTick(sel));
+              e("button", {
+                type: "button", onClick: () => this.pat("f", { charIdx: i }), "aria-label": "Select " + ch.label,
+                "aria-pressed": sel ? "true" : "false",
+                style: { flex: 1, minWidth: 0, minHeight: "44px", display: "flex", alignItems: "center", gap: "12px", padding: 0, border: "none", background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" }
+              },
+                e("span", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" } },
+                  e("span", { style: { font: "600 14.5px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, ch.label),
+                  ch.sub ? e("span", { style: { font: "400 12.5px/1.35 var(--font-text)", color: "var(--text-body)" } }, ch.sub) : null),
+                this.fTick(sel)));
           }))),
       this.fFooter([
         f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
@@ -1112,7 +1135,7 @@ class App extends React.Component {
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Compared with last time, does your tinnitus feel about the same today?"),
         e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "16px" } },
           ["About the same", "Different today", "Not sure"].map((label) =>
-            e(DS.SelectRow, { key: label, label, selected: l.checkin === label, onClick: () => this.pat("l", { checkin: label }) }))),
+            this.selectRowButton(label, label, l.checkin === label, () => this.pat("l", { checkin: label })))),
         e("div", { style: { font: "400 12.5px/1.5 var(--font-text)", color: "var(--text-muted)", marginTop: "12px" } }, "If it feels different, we'll set last time aside and search fresh. Your hearing today comes first.")),
       this.fFooter([
         e(DS.Button, {
@@ -1344,7 +1367,7 @@ class App extends React.Component {
                 e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) })))),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
-              e(DS.SelectRow, { key: label, label, selected: conf === label, onClick: () => choose(label) }))),
+              this.selectRowButton(label, label, conf === label, () => choose(label)))),
           notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
           notClose
