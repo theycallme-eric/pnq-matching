@@ -7,6 +7,7 @@
  */
 import * as shell from "./app-shell.js";
 import * as gating from "./gating.js";
+import * as comparison from "./comparison.js";
 import * as fam from "./family-flow.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
@@ -115,6 +116,19 @@ class App extends React.Component {
   prHeard(which, key) { this.setState((s) => gating.prHeardState(s, which, key)); }
 
   prReady(key) { return gating.prReady(this.state, key); }
+
+  // Adjustments while the main tone plays carry into it live instead of
+  // cutting out and restarting.
+  syncMain() { if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state))); }
+
+  // Apply an Option 2 comparison result: stay on the stage with a patch, or
+  // leave it (phase done, spread floor, fallback to directional).
+  applyR(res) {
+    if (res.kind === "stage") { this.go("r", res.stage, res.obj); return; }
+    this.setState((s) => ({ r: { ...s.r, ...res.patch } }), () => this.syncMain());
+  }
+
+  rDir(tag) { this.applyR(comparison.dirAnswer(this.state.r, tag)); }
 
   // In-place concept patch. If the main voice is sounding, the change is
   // heard live (tuning sliders adjust the tone while it plays).
@@ -403,6 +417,159 @@ class App extends React.Component {
     ];
   }
 
+  // Reassurance / status note used across the comparison screens.
+  noteBox(text, marginTop) {
+    return e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop } }, text);
+  }
+
+  // Underlined low-key escape link (REQ-016): audibility problems are useful
+  // answers, so the way out never looks like an error.
+  escapeLink(label, onClick) {
+    return e("button", { onClick, style: { border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", minHeight: "44px", padding: "0 10px" } }, label);
+  }
+
+  // Comparison · Prepare (REQ-008): Option 2's own intro copy and icon rows.
+  renderRIntro() {
+    const st = this.state;
+    const rows = [
+      ["headphones", "Say louder, quieter, higher or lower"],
+      ["check", "Then pick the closer of two sounds"],
+      ["arrowRight", "Each answer makes the next change smaller"]
+    ];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "Which is closer?"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          "First you'll hear one sound and tell us whether yours is louder, quieter, higher or lower. Then you'll hear two at a time and pick whichever is closer. There are no settings to figure out, and if neither sounds right, say so and we'll change direction."),
+        e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "section" },
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "15px" } },
+              rows.map(([icon, text]) =>
+                e("div", { key: icon, style: { display: "flex", alignItems: "center", gap: "13px" } },
+                  e(DS.IconTile, { size: "sm", tone: "blue" }, e(DS.Icon, { name: icon, size: 20 })),
+                  e("div", { style: { font: "500 14px/1.35 var(--font-ui)", color: "var(--gray-800)" } }, text))))))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e(DS.Button, { variant: "primary", size: "md", onClick: () => this.go("r", st.eduSeen ? "dir" : "edu") }, "Start comparing"),
+        st.eduSeen
+          ? e("button", {
+            onClick: () => this.go("r", "edu"),
+            style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+          }, "Remind me what to listen for")
+          : e("div", { style: { height: "9px" } }))
+    ];
+  }
+
+  // Shared · Listen and respond (REQ-008): the directional phase. Volume
+  // first, then pitch; answers stay disabled in place until the sound plays.
+  renderListen() {
+    const st = this.state, r = st.r;
+    const heard = gating.heardHere(st);
+    const chips = r.phase === "vol"
+      ? [["Mine is louder", "louder"], ["Mine is quieter", "quieter"]]
+      : [["Mine is higher", "higher"], ["Mine is lower", "lower"]];
+    const settle = r.phase === "vol" ? "The volume is set, move on" : "The pitch is set, finish up";
+    const answer = (tag) => () => {
+      if (!gating.heardHere(this.state)) { this.setState((s) => ({ r: { ...s.r, msg: "Press play first, then tell us how it compares." } })); return; }
+      this.rDir(tag);
+    };
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
+        e("div", { style: { marginTop: "14px" } },
+          e(DS.Card, { variant: "section" },
+            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }))),
+        e("div", { style: { marginTop: "18px" } },
+          e(DS.SectionLabel, null, "HOW DOES IT COMPARE?"),
+          e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "11px" } },
+            chips.map(([label, tag]) =>
+              e(DS.Button, { key: label, variant: "outline", size: "sm", disabled: !heard, onClick: answer(tag) }, label))),
+          e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle))),
+        r.msg ? this.noteBox(r.msg, "14px") : null),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
+          this.escapeLink("Can't hear this", () => this.rDir("nohear"))))
+    ];
+  }
+
+  // One side of the A/B pair: circular play control plus its choice button.
+  // The choice stays rendered and gray until both sounds have played, so
+  // nothing shifts under a thumb (REQ-018).
+  pairCard(which, spec, label, ready) {
+    const pk = which === "a" ? "prA" : "prB";
+    const playing = this.state.playKey === pk;
+    const onPlay = () => { this.prHeard(which, gating.pairKeyOf(this.state)); this.toggleKey(pk, [spec]); };
+    const onPick = () => {
+      const x = this.state;
+      if (!gating.prReady(x, gating.pairKeyOf(x))) return;
+      this.stopAudio();
+      this.rPick(spec.pitch);
+    };
+    const ring = (delay) => e("span", { style: { position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid var(--blue-300)", animation: "pnqRing 1.8s ease-out infinite" + delay } });
+    return e("div", { key: pk, style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
+      e("div", { style: { position: "relative", width: "58px", height: "58px" } },
+        playing ? ring("") : null,
+        playing ? ring(" .9s") : null,
+        e("button", {
+          onClick: onPlay, "aria-label": "Play sound " + (which === "a" ? "1" : "2"),
+          style: { position: "absolute", inset: "2px", borderRadius: "50%", border: "2px solid var(--blue-600)", background: playing ? "var(--control-accent)" : "var(--white)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
+        },
+          playing
+            ? e("span", { style: { display: "flex", gap: "4px" } },
+              e("span", { style: { width: "5px", height: "16px", background: "var(--white)", borderRadius: "1.5px" } }),
+              e("span", { style: { width: "5px", height: "16px", background: "var(--white)", borderRadius: "1.5px" } }))
+            : e("span", { style: { display: "block", width: 0, height: 0, borderLeft: "15px solid var(--blue-600)", borderTop: "9px solid transparent", borderBottom: "9px solid transparent", marginLeft: "4px" } }))),
+      e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, label),
+      e(DS.Button, { variant: "outline", size: "xs", disabled: !ready, onClick: onPick }, "This one"));
+  }
+
+  rPick(pitch) { this.applyR(comparison.pick(this.state.r, pitch)); }
+
+  rNeither() {
+    const res = comparison.neither(this.state.r);
+    if (res.kind === "patch") this.stopAudio();
+    this.applyR(res);
+  }
+
+  // Shared · Two-sound comparison (REQ-008): forced-choice pairs that halve
+  // the spread, with the same-answer stop, the fatigue finisher and the
+  // "can't hear" escape (REQ-016).
+  renderPair() {
+    const st = this.state, r = st.r;
+    const { A, B } = comparison.pairSpecs(r);
+    const ready = this.prReady(gating.pairKeyOf(st));
+    const note = comparison.compNote(r);
+    const secs = [
+      { label: "Neither is close", f: () => this.rNeither() },
+      { label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) }
+    ];
+    if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Which one is closer?"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } },
+          "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go."),
+        e("div", { style: { font: "500 13px/1.4 var(--font-ui)", color: ready ? "var(--text-muted)" : "var(--text-heading)", marginTop: "2px", minHeight: "18px" } },
+          ready ? "" : "Play both sounds before choosing."),
+        e("div", { style: { display: "flex", gap: "11px", marginTop: "14px" } },
+          this.pairCard("a", A, "Sound 1", ready),
+          this.pairCard("b", B, "Sound 2", ready)),
+        // The prototype computes this note but its display block sits dormant
+        // in the confidence markup; escapes must reassure (REQ-016), so it
+        // renders here on the pair screen instead.
+        note ? this.noteBox(note, "14px") : null),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
+          secs.map((sec) =>
+            e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
+              e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
+        e("button", {
+          onClick: () => this.applyR(comparison.compNoHear(this.state.r)),
+          style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+        }, "I can't hear these sounds"))
+    ];
+  }
+
   /* ---------- preserved V5 Sound-Family Guided flow (REQ-010) ---------- */
 
   // Blue contextual note box used across the family stages' footers.
@@ -589,6 +756,9 @@ class App extends React.Component {
 
   renderFlow() {
     const st = this.state, c = st.concept, s = st.stages[c];
+    if (c === "r" && s === "intro") return this.renderRIntro();
+    if (c === "r" && s === "dir") return this.renderListen();
+    if (c === "r" && s === "comp") return this.renderPair();
     if (c === "f" && s === "intro") return this.renderFIntro();
     if (c === "f" && s === "family") return this.renderFamily();
     if (c === "f" && s === "char") return this.renderFChar();
