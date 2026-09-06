@@ -20,6 +20,9 @@ html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: non
 body { background: var(--interface-app); }
 * { box-sizing: border-box; }
 #root { height: 100dvh; }
+/* REQ-022: every participant control keeps at least a 44px touch target. */
+[data-screen] button { min-width: 44px !important; min-height: 44px !important; }
+[data-screen] input[type="range"] { min-height: 44px !important; height: 44px !important; }
 @keyframes pnqRing { 0% { transform: scale(.72); opacity: .75; } 100% { transform: scale(1.5); opacity: 0; } }
 </style>
 <script src="vendor/react.production.min.js"></script>

@@ -300,14 +300,14 @@ class App extends React.Component {
                 ready ? "Ready" : "100% required to continue")),
             e("div", { style: { display: "flex", alignItems: "center", gap: "10px", marginTop: "11px" } },
               e(DS.Icon, { name: "volumeLow", size: 17, color: "var(--on-dark-50)" }),
-              e("div", { style: { position: "relative", flex: 1, height: "40px", display: "flex", alignItems: "center" } },
+              e("div", { style: { position: "relative", flex: 1, height: "44px", display: "flex", alignItems: "center" } },
                 e("div", { style: { position: "absolute", left: 0, right: 0, height: "5px", borderRadius: "999px", background: "var(--interface-dark-border)" } }),
                 e("div", { style: { position: "absolute", left: 0, height: "5px", borderRadius: "999px", background: ready ? "var(--green-400)" : "var(--red-400)", width: st.vol + "%" } }),
                 e("div", { style: { position: "absolute", left: st.vol + "%", width: "26px", height: "26px", marginLeft: "-13px", borderRadius: "50%", background: "var(--white)", boxShadow: "var(--shadow-thumb-dark)" } }),
                 e("input", {
                   type: "range", min: 0, max: 100, step: 1, value: st.vol, "aria-label": "Device volume",
                   onInput: onVolSlide, onChange: onVolSlide,
-                  style: { position: "absolute", left: "-13px", right: "-13px", width: "calc(100% + 26px)", height: "40px", margin: 0, opacity: 0, cursor: "pointer", WebkitAppearance: "none", appearance: "none", background: "transparent" }
+                  style: { position: "absolute", left: "-13px", right: "-13px", width: "calc(100% + 26px)", height: "44px", margin: 0, opacity: 0, cursor: "pointer", WebkitAppearance: "none", appearance: "none", background: "transparent" }
                 })),
               e(DS.Icon, { name: "volume", size: 17, color: "var(--on-dark-50)" })))),
         e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--on-dark-50)", textAlign: "center", marginTop: "18px" } },
@@ -1157,7 +1157,7 @@ class App extends React.Component {
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Let's search fresh today"),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "We've set your history aside. You'll match from the start, the same way as your first session, and it usually takes a few minutes. Nothing about last time limits what you can choose today."),
-        e("div", { style: { border: "1.5px dashed var(--gray-300)", borderRadius: "14px", padding: "14px 16px", marginTop: "18px" } },
+        e("div", { "data-moderator-only": true, style: { border: "1.5px dashed var(--gray-300)", borderRadius: "14px", padding: "14px 16px", marginTop: "18px" } },
           e("div", { style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, "EXPLORATION NOTE · NOT PATIENT UI"),
           e("div", { style: { font: "400 13px/1.5 var(--font-text)", color: "var(--text-secondary)", marginTop: "7px" } }, "Which single-session concept runs underneath a reopened search is intentionally open in the brief. Hand off to one:"),
           e("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "11px" } },
@@ -1235,6 +1235,9 @@ class App extends React.Component {
         e("div", { style: { font: "700 22px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "11px" } }, title),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, body),
         onMap ? e("div", {
+          role: "slider", tabIndex: 0, "aria-label": "Sound exploration field",
+          "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(t.x * 100),
+          "aria-valuetext": pres.FIELDPITCH(t.x) + " pitch, " + pres.FIELDWORD(t.y),
           "data-field": "", onPointerDown: (ev) => this.tDown(ev), onPointerMove: (ev) => this.tMove(ev), onPointerUp: () => this.tUp(), onPointerCancel: () => this.tUp(),
           style: { marginTop: "14px", position: "relative", width: "100%", aspectRatio: "1", borderRadius: "18px", border: "1.5px solid var(--gray-300)", background: "linear-gradient(180deg,var(--blue-100) 0%,var(--blue-50) 34%,var(--green-50) 58%,var(--purple-100) 100%)", touchAction: "none", overflow: "hidden" }
         },
@@ -1245,7 +1248,7 @@ class App extends React.Component {
         stage === "behave" ? e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
           pres.FIELDBEHAVE.map(([label, sub, patch]) => {
             const selected = t.behavior === label, playing = st.playKey === "bh-" + label;
-            return e("div", { key: label, onClick: () => playBehavior(label, patch), style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", cursor: "pointer", background: selected ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (selected ? "var(--interface-selected-border)" : "var(--gray-200)") } },
+            return e("button", { type: "button", key: label, onClick: () => playBehavior(label, patch), "aria-pressed": selected ? "true" : "false", style: { display: "flex", alignItems: "center", gap: "12px", width: "100%", minHeight: "62px", padding: "11px 13px", borderRadius: "14px", cursor: "pointer", textAlign: "left", background: selected ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (selected ? "var(--interface-selected-border)" : "var(--gray-200)") } },
               e("span", { style: { flex: "none", width: "40px", height: "40px", borderRadius: "50%", border: "1.5px solid var(--blue-border)", background: playing ? "var(--control-accent)" : "var(--white)", display: "flex", alignItems: "center", justifyContent: "center" } }, playing ? "Ⅱ" : "▶"),
               e("div", { style: { flex: 1 } }, e("div", { style: { font: "600 14.5px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, label), e("div", { style: { font: "400 12.5px/1.35 var(--font-text)", color: "var(--text-body)", marginTop: "2px" } }, sub)));
           })) : null,
@@ -1426,7 +1429,7 @@ class App extends React.Component {
         { label: "Start screen", f: () => this.goScreen("launch") }
       ] }
     ];
-    return e("div", { style: { position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column" } },
+    return e("div", { "data-moderator-only": true, style: { position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column" } },
       e("div", { style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .55 } }),
       e("button", { onClick: () => this.setState({ menuOpen: false, jumpOpen: false }), "aria-label": "Close menu", style: { flex: 1, border: "none", background: "transparent", cursor: "pointer", minHeight: "60px", position: "relative" } }),
       e("div", { style: { flex: "none", maxHeight: "86%", overflowY: "auto", background: "var(--white)", borderRadius: "22px 22px 0 0", padding: "16px 18px 22px", position: "relative" } },
