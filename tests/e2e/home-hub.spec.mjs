@@ -35,14 +35,24 @@ async function completeEdu(page) {
   await expect(hub(page)).toBeVisible();
 }
 
-// Walks a generic flow to Match complete and returns to the hub. Each stage's
-// Continue is heard-gated (REQ-018), so play the sound before advancing.
+// Walks a flow to Match complete and returns to the hub. Each stage's
+// judgment is heard-gated (REQ-018), so play the sound before advancing.
 async function completeOption(page, n, continues) {
   await option(page, n).click();
   await expect(hub(page)).toHaveCount(0);
-  for (let i = 0; i < continues; i++) {
-    await page.getByRole("button", { name: "Play the sound" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
+  if (n === 2) {
+    // Option 2's real stages: settle both directional phases, then stop the
+    // A/B loop by saying the two sound the same.
+    await page.getByText("Start Sound", { exact: true }).click();
+    await page.getByRole("button", { name: "The volume is set, move on" }).click();
+    await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
+    await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
+    await page.getByRole("button", { name: "They sound the same" }).click();
+  } else {
+    for (let i = 0; i < continues; i++) {
+      await page.getByRole("button", { name: "Play the sound" }).click();
+      await page.getByRole("button", { name: "Continue" }).click();
+    }
   }
   await page.getByText("Fairly close").click();
   await page.getByRole("button", { name: "Finish matching" }).click();
@@ -118,7 +128,7 @@ test.describe("home hub", () => {
 
     // Complete Option 2 first, then Option 1: pills appear per option and
     // optDone/optOrder record what completed, in order.
-    await completeOption(page, 2, 2); // r: dir -> comp -> conf
+    await completeOption(page, 2, 0); // r: dir -> comp -> conf
     await expect(option(page, 2).getByText("Done")).toBeVisible();
     await expect(option(page, 1).getByText("Done")).toHaveCount(0);
     await completeOption(page, 1, 4); // n: vol -> p1 -> p2 -> p3 -> conf
