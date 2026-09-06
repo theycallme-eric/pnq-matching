@@ -7,6 +7,7 @@
  */
 import * as shell from "./app-shell.js";
 import * as gating from "./gating.js";
+import * as fam from "./family-flow.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -30,6 +31,7 @@ function mainSpecs(st) {
   if (c === "n") return [{ kind: "tone", pitch: st.n.pitch, level: st.n.level, bright: .3, behavior: "steady" }];
   if (c === "r") return [{ kind: "tone", pitch: st.r.center, level: st.r.level, bright: .3, behavior: "steady" }];
   if (c === "d") return [dSpec(st.d)];
+  if (c === "f") return fam.mainSpecs(st.f, st.stages.f);
   if (c === "l") return [{ kind: st.l.prior.kind, pitch: st.l.pitch, level: st.l.level, bright: .25, behavior: "steady" }];
   return [{ kind: "tone", pitch: .5, level: .42, bright: .2, behavior: "steady" }];
 }
@@ -113,6 +115,17 @@ class App extends React.Component {
   prHeard(which, key) { this.setState((s) => gating.prHeardState(s, which, key)); }
 
   prReady(key) { return gating.prReady(this.state, key); }
+
+  // In-place concept patch. If the main voice is sounding, the change is
+  // heard live (tuning sliders adjust the tone while it plays).
+  pat(c, obj) {
+    this.setState((s) => ({ [c]: { ...s[c], ...obj } }), () => {
+      if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state)));
+    });
+  }
+
+  // Apply a pure family-flow transition ({ pat } or { go: [stage, obj] }).
+  fAct(r) { if (r.pat) this.pat("f", r.pat); else this.go("f", r.go[0], r.go[1]); }
 
   goScreen(screen, extra) {
     this.hardStop();
@@ -390,8 +403,197 @@ class App extends React.Component {
     ];
   }
 
+  /* ---------- preserved V5 Sound-Family Guided flow (REQ-010) ---------- */
+
+  // Blue contextual note box used across the family stages' footers.
+  fNote(text) {
+    return e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginBottom: "1px" } }, text);
+  }
+
+  // 40px round preview button: independent of the row's select handler.
+  fPlayBtn(pk, specs) {
+    const playing = this.state.playKey === pk;
+    return e("button", {
+      "aria-label": playing ? "Stop example" : "Play example",
+      onClick: (ev) => { ev.stopPropagation(); this.toggleKey(pk, specs); },
+      style: { flex: "none", width: "40px", height: "40px", borderRadius: "50%", border: "1.5px solid var(--blue-border)", background: playing ? "var(--control-accent)" : "var(--white)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
+    },
+      playing
+        ? e("span", { style: { display: "flex", gap: "3px" } },
+          e("span", { style: { width: "4px", height: "13px", background: "var(--white)", borderRadius: "1px" } }),
+          e("span", { style: { width: "4px", height: "13px", background: "var(--white)", borderRadius: "1px" } }))
+        : e("span", { style: { display: "block", width: 0, height: 0, borderLeft: "11px solid var(--control-accent)", borderTop: "7px solid transparent", borderBottom: "7px solid transparent", marginLeft: "3px" } }));
+  }
+
+  fTick(sel) {
+    return e("span", { style: { flex: "none", width: "22px", height: "22px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: sel ? "var(--control-accent)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--control-accent)" : "var(--gray-300)") } },
+      sel ? e(DS.Icon, { name: "checkThin", size: 12, color: "var(--white)", strokeWidth: 3.4 }) : null);
+  }
+
+  fFooter(children) {
+    return e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } }, children);
+  }
+
+  fLink(label, onClick) {
+    return e("button", { onClick, style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" } }, label);
+  }
+
+  renderFIntro() {
+    const st = this.state;
+    const rows = [["headphones", "Listen to a few kinds of sounds"], ["check", "Choose whatever feels closest"], ["equalizer", "Then we'll shape it to match yours"]];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "What does it sound like?"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          "Everyone's tinnitus is different. You'll listen to a few kinds of sounds and pick whatever feels closest. There are no wrong answers, and you can change your mind at any point."),
+        e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "section" },
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "15px" } },
+              rows.map(([icon, t]) =>
+                e("div", { key: icon, style: { display: "flex", alignItems: "center", gap: "13px" } },
+                  e(DS.IconTile, { size: "sm", tone: "blue" }, e(DS.Icon, { name: icon, size: 20 })),
+                  e("div", { style: { font: "500 14px/1.35 var(--font-ui)", color: "var(--gray-800)" } }, t))))))),
+      this.fFooter([
+        e(DS.Button, { key: "go", variant: "primary", size: "md", onClick: () => this.go("f", st.eduSeen ? "family" : "edu") }, "Start listening"),
+        st.eduSeen ? e(React.Fragment, { key: "edu" }, this.fLink("Remind me what to listen for", () => this.go("f", "edu"))) : null
+      ])
+    ];
+  }
+
+  renderFamily() {
+    const st = this.state, f = st.f;
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 18px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Which kind is closest?"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Play each one. Pick the closest. It doesn't have to be exact, and you can change it later."),
+        e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
+          fam.FAMORDER.map((key) => {
+            const d = fam.FAMS[key], sel = f.fam === key;
+            return e("div", {
+              key, onClick: () => this.pat("f", { fam: key }),
+              style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 13px", borderRadius: "14px", cursor: "pointer", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
+            },
+              d.ex ? this.fPlayBtn("fam-" + key, [d.ex]) : null,
+              e("div", { style: { flex: 1, minWidth: 0 } },
+                e("div", { style: { font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, d.name),
+                e("div", { style: { font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, d.desc)),
+              this.fTick(sel));
+          })),
+        e("div", { style: { font: "400 12.5px/1.5 var(--font-text)", color: "var(--text-muted)", marginTop: "12px" } }, "Hear more than one thing? Start with the strongest sound, and you can add another later.")),
+      this.fFooter([
+        f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
+        e(DS.Button, { key: "c", variant: "primary", size: "sm", disabled: !f.fam, onClick: () => this.fAct(fam.famContinue(this.state.f)) }, "Continue"),
+        e(DS.Button, { key: "g", variant: "ghost", onClick: () => this.fAct(fam.noneFit()) }, "None of these fit"),
+        e(React.Fragment, { key: "l" }, this.fLink("I can't hear these examples", () => this.fAct(fam.famNoHear())))
+      ])
+    ];
+  }
+
+  renderFChar() {
+    const st = this.state, f = st.f;
+    const { famDef, isHard } = fam.famContext(f);
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 18px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, isHard ? "Just listen" : "Which is closest?"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } },
+          isHard ? "Words can get in the way. Play these and pick whichever is closest to yours. No labels needed."
+            : (famDef ? "All of these are " + famDef.short + " sounds with a different character." : "")),
+        !isHard && famDef && famDef.caution
+          ? e("div", { style: { background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "12px" } }, famDef.caution)
+          : null,
+        e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
+          (famDef ? famDef.chars : []).map((ch, i) => {
+            const sel = f.charIdx === i;
+            return e("div", {
+              key: i, onClick: () => this.pat("f", { charIdx: i }),
+              style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", cursor: "pointer", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
+            },
+              this.fPlayBtn("char-" + i, [ch.spec]),
+              e("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" } },
+                e("div", { style: { font: "600 14.5px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, ch.label),
+                ch.sub ? e("div", { style: { font: "400 12.5px/1.35 var(--font-text)", color: "var(--text-body)" } }, ch.sub) : null),
+              this.fTick(sel));
+          }))),
+      this.fFooter([
+        f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
+        e(DS.Button, { key: "c", variant: "primary", size: "sm", disabled: f.charIdx == null, onClick: () => this.fAct(fam.charContinue(this.state.f)) }, "Continue"),
+        e(DS.Button, { key: "g", variant: "ghost", onClick: () => this.fAct(fam.charGhost(this.state.f)) }, isHard ? "Still not close" : "None of these are close")
+      ])
+    ];
+  }
+
+  renderFTune() {
+    const st = this.state, f = st.f;
+    const { tuneSpec } = fam.famContext(f);
+    const setSpec = (patch) => this.pat("f", { work: { ...f.work, spec: { ...tuneSpec, ...patch } } });
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
+        e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, f.editing === 2 ? "SOUND 2" : "YOUR SOUND"),
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "6px" } }, "Bring it closer"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Adjust until it sounds like yours. Press play to hear your changes as you make them."),
+        e("div", { style: { marginTop: "14px" } },
+          e(DS.Card, { variant: "section" },
+            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+            e("div", { style: { marginTop: "18px" } },
+              e(DS.TuningSlider, { label: "Pitch", value: tuneSpec.pitch, onChange: (v) => setSpec({ pitch: v }), precision: "Medium" })),
+            st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "right", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "5px" } }, shell.techOf(tuneSpec)) : null,
+            e("div", { style: { marginTop: "16px" } },
+              e(DS.TuningSlider, { label: "Loudness", value: tuneSpec.level, onChange: (v) => setSpec({ level: v }) })),
+            e("div", { style: { marginTop: "18px" } },
+              e(DS.SectionLabel, { description: "How does the sound behave over time?" }, "BEHAVIOR"),
+              e("div", { style: { marginTop: "9px" } },
+                e(DS.SegmentedControl, { options: fam.BEH_UI, value: fam.BEH_LBL[tuneSpec.behavior] || "Steady", onChange: (v) => setSpec({ behavior: fam.BEH_MAP[v] }) })))))),
+      this.fFooter([
+        f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
+        e(DS.Button, { key: "c", variant: "primary", size: "sm", onClick: () => this.fAct(fam.tuneDone(this.state.f)) }, "This matches"),
+        e(DS.Button, { key: "g", variant: "ghost", onClick: () => this.go("f", "char") }, "Back to the sounds"),
+        e(React.Fragment, { key: "l" }, this.fLink("I can't hear this sound", () => this.fAct(fam.tuneNoHear(this.state.f))))
+      ])
+    ];
+  }
+
+  renderFLayer() {
+    const st = this.state, f = st.f;
+    const sounds = fam.layerSounds(f);
+    const hasTwo = !!f.s1 && !!f.s2;
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Is there another sound?"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Many people hear more than one sound at once. If you do, add it. Your match can include both."),
+        e("div", { style: { marginTop: "16px" } },
+          e(DS.Card, { variant: "list" },
+            sounds.map((sd, i) =>
+              e("div", { key: i, style: { display: "flex", alignItems: "center", gap: "13px", padding: "14px 18px", borderTop: i === 0 ? "none" : "1px solid var(--gray-100)" } },
+                this.fPlayBtn("ly" + i, [sd.spec]),
+                e("div", { style: { flex: 1, minWidth: 0 } },
+                  e("div", { style: { font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, "Sound " + (i + 1) + ": " + (fam.FAMS[sd.fam] ? fam.FAMS[sd.fam].name.toLowerCase() : "sound")),
+                  e("div", { style: { font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, shell.describe(sd.spec))))))),
+        hasTwo ? e("div", { style: { marginTop: "14px" } },
+          e(DS.PlayToggle, {
+            playing: st.playKey === "together",
+            label: st.playKey === "together" ? "Stop" : "Play them together",
+            onToggle: () => this.toggleKey("together", fam.layerSounds(this.state.f).map((x) => x.spec))
+          })) : null),
+      this.fFooter([
+        f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
+        ...(hasTwo
+          ? [e(DS.Button, { key: "d2", variant: "primary", size: "sm", onClick: () => this.fAct(fam.layerDone()) }, "Done, this matches"),
+            e(DS.Button, { key: "r2", variant: "ghost", onClick: () => this.fAct(fam.removeSecond()) }, "Remove sound 2")]
+          : [e(DS.Button, { key: "a1", variant: "outline", size: "sm", onClick: () => this.fAct(fam.addSound()) }, "Add another sound"),
+            e("div", { key: "sp", style: { height: "8px" } }),
+            e(DS.Button, { key: "d1", variant: "primary", size: "sm", onClick: () => this.fAct(fam.layerDone()) }, "Just this one sound")])
+      ])
+    ];
+  }
+
   renderFlow() {
     const st = this.state, c = st.concept, s = st.stages[c];
+    if (c === "f" && s === "intro") return this.renderFIntro();
+    if (c === "f" && s === "family") return this.renderFamily();
+    if (c === "f" && s === "char") return this.renderFChar();
+    if (c === "f" && s === "tune") return this.renderFTune();
+    if (c === "f" && s === "layer") return this.renderFLayer();
     if (s === "intro" || s === "ret") {
       const first = shell.OPTFIRST[c] || shell.STAGES[c].map((z) => z[0]).find((id) => id !== "intro" && id !== "edu" && id !== "ret");
       return [
@@ -413,7 +615,7 @@ class App extends React.Component {
     if (s === "edu") {
       // The shared education step, not a per-option copy (REQ-006): completing
       // it here also sets eduSeen, then continues into the option.
-      return this.renderEdu(() => { this.setState({ eduSeen: true }); this.go(c, shell.OPTFIRST[c] || shell.STAGES[c][0][0]); });
+      return this.renderEdu(() => { this.setState({ eduSeen: true }); this.go(c, shell.firstWorkingStage(c)); });
     }
     if (s === "conf") {
       const conf = st[c].conf;
@@ -506,6 +708,10 @@ class App extends React.Component {
         cap: shell.OPTLABEL[cid].toUpperCase(),
         items: shell.jumpStages(cid).map((it) => ({ label: it.label, f: () => this.openOption(cid, it.stage, it.seed) }))
       })),
+      // Preserved V5 flow (REQ-010): moderator menu only, never the hub.
+      { cap: "SOUND-FAMILY GUIDED (PRESERVED)", items: fam.jumpStages().map((it) => ({
+        label: it.label, f: () => this.openOption("f", it.stage, { ...shell.freshF(), ...it.seed })
+      })) },
       { cap: "SHARED", items: [
         { label: "Headphone setup", f: () => this.goScreen("setup") },
         { label: "Pitch and volume", f: () => this.goScreen("edu") },
