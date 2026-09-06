@@ -236,7 +236,7 @@ export function keepRefiningTarget(st) {
   if (c === "n") return { stage: "p3", obj: { conf: null, note: "Take your time. If it still feels off, keep fine-tuning or widen the range." } };
   if (c === "f") return { stage: "tune", obj: { conf: null, work: st.f.s1 ? { ...st.f.s1 } : st.f.work, editing: 1, note: "Adjust anything. Nothing is locked in." } };
   if (c === "r") return { stage: "comp", obj: { conf: null, spread: .18, uncertain: 0, note: "A few more comparisons, then." } };
-  if (c === "d") return { stage: "zoom", obj: { conf: null, cx: st.d.x, cy: st.d.y, level: Math.max(1, st.d.level || 0), note: "Nothing is locked in. Move the marker as much as you like." } };
+  if (c === "d") return { stage: "zoom", obj: { conf: null, cx: st.d.x, cy: st.d.y, level: Math.max(1, st.d.level || 0), heard: false, note: "Nothing is locked in. Move the marker as much as you like." } };
   if (c === "a") return { stage: "listen", obj: { conf: null, unc: .32, suggest: false, closes: 0, msg: "Okay. We’ll keep refining." } };
   return { stage: "refine", obj: { conf: null, note: "Adjust anything. Today’s judgment wins." } };
 }
