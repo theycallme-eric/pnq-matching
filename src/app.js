@@ -135,7 +135,11 @@ class App extends React.Component {
   // Adaptive candidate loop (REQ-011): every response patches estimate,
   // uncertainty, kind and message in place; leaving the loop is always an
   // explicit action (final check, close enough, keep refining).
-  aResp(tag) { this.pat("a", pres.aResp(this.state.a, tag)); }
+  aResp(tag) {
+    this.setState((s) => ({ a: { ...s.a, ...pres.aResp(s.a, tag) } }), () => {
+      if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state)));
+    });
+  }
 
   // In-place concept patch. If the main voice is sounding, the change is
   // heard live (tuning sliders adjust the tone while it plays).
@@ -571,15 +575,25 @@ class App extends React.Component {
   // Shared · Listen and respond (REQ-008): the directional phase. Volume
   // first, then pitch; answers stay disabled in place until the sound plays.
   renderListen() {
-    const st = this.state, r = st.r;
+    const st = this.state, c = st.concept, o = c === "a" ? st.a : st.r;
     const heard = gating.heardHere(st);
-    const chips = r.phase === "vol"
-      ? [["Mine is louder", "louder"], ["Mine is quieter", "quieter"]]
-      : [["Mine is higher", "higher"], ["Mine is lower", "lower"]];
-    const settle = r.phase === "vol" ? "The volume is set, move on" : "The pitch is set, finish up";
+    const chips = c === "a"
+      ? (o.phase === "pitch"
+        ? [["Mine is higher", "higher"], ["Mine is lower", "lower"], ["Not like mine at all", "notmine"]]
+        : [["Mine is louder", "louder"], ["Mine is softer", "softer"]])
+      : (o.phase === "vol"
+        ? [["Mine is louder", "louder"], ["Mine is quieter", "quieter"]]
+        : [["Mine is higher", "higher"], ["Mine is lower", "lower"]]);
+    const settle = c === "a"
+      ? (o.phase === "pitch" ? "This sounds like mine" : "This is as loud as mine")
+      : (o.phase === "vol" ? "The volume is set, move on" : "The pitch is set, finish up");
     const answer = (tag) => () => {
-      if (!gating.heardHere(this.state)) { this.setState((s) => ({ r: { ...s.r, msg: "Press play first, then tell us how it compares." } })); return; }
-      this.rDir(tag);
+      if (!gating.heardHere(this.state)) {
+        this.setState((s) => ({ [c]: { ...s[c], msg: "Press play first, then tell us how it compares." } }));
+        return;
+      }
+      if (c === "a") this.aResp(tag);
+      else this.rDir(tag);
     };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
@@ -592,18 +606,27 @@ class App extends React.Component {
             chips.map(([label, tag]) =>
               e(DS.Button, { key: label, variant: "outline", size: "sm", disabled: !heard, onClick: answer(tag) }, label))),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
-            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle))),
-        r.msg ? this.noteBox(r.msg, "14px") : null),
+            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(c === "a" && o.phase === "pitch" ? "close" : "right") }, settle))),
+        o.msg ? this.noteBox(o.msg, "14px") : null),
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        c === "a" && o.suggest
+          ? this.noteBox("Nothing nearby has beaten this sound for a while. One final check and we're done, or keep refining if you're not sure.")
+          : null,
         e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          this.escapeLink("Can't hear this", () => this.rDir("nohear"))))
+          this.escapeLink("Can't hear this", () => c === "a" ? this.aResp("nohear") : this.rDir("nohear"))),
+        c === "a" && o.suggest
+          ? e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.go("a", "chal") }, "Do the final check")
+          : null,
+        c === "a" && o.responded
+          ? e(DS.Button, { variant: "ghost", onClick: () => this.go("a", "conf", { stop: "patient" }) }, "This is close enough")
+          : null)
     ];
   }
 
   // One side of the A/B pair: circular play control plus its choice button.
   // The choice stays rendered and gray until both sounds have played, so
   // nothing shifts under a thumb (REQ-018).
-  pairCard(which, spec, label, ready) {
+  pairCard(which, spec, label, ready, pick, badge) {
     const pk = which === "a" ? "prA" : "prB";
     const playing = this.state.playKey === pk;
     const onPlay = () => { this.prHeard(which, gating.pairKeyOf(this.state)); this.toggleKey(pk, [spec]); };
@@ -611,7 +634,7 @@ class App extends React.Component {
       const x = this.state;
       if (!gating.prReady(x, gating.pairKeyOf(x))) return;
       this.stopAudio();
-      this.rPick(spec.pitch);
+      pick(spec);
     };
     const ring = (delay) => e("span", { style: { position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid var(--blue-300)", animation: "pnqRing 1.8s ease-out infinite" + delay } });
     return e("div", { key: pk, style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
@@ -627,7 +650,9 @@ class App extends React.Component {
               e("span", { style: { width: "5px", height: "16px", background: "var(--white)", borderRadius: "1.5px" } }),
               e("span", { style: { width: "5px", height: "16px", background: "var(--white)", borderRadius: "1.5px" } }))
             : e("span", { style: { display: "block", width: 0, height: 0, borderLeft: "15px solid var(--blue-600)", borderTop: "9px solid transparent", borderBottom: "9px solid transparent", marginLeft: "4px" } }))),
-      e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, label),
+      e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" } },
+        e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, label),
+        badge ? e("span", { style: { font: "700 9px var(--font-ui)", letterSpacing: ".12em", color: "var(--blue-700)", background: "var(--blue-100)", borderRadius: "999px", padding: "3px 8px" } }, "PREVIOUS MATCH") : null),
       e(DS.Button, { variant: "outline", size: "xs", disabled: !ready, onClick: onPick }, "This one"));
   }
 
@@ -643,25 +668,53 @@ class App extends React.Component {
   // the spread, with the same-answer stop, the fatigue finisher and the
   // "can't hear" escape (REQ-016).
   renderPair() {
-    const st = this.state, r = st.r;
-    const { A, B } = comparison.pairSpecs(r);
+    const st = this.state, c = st.concept;
+    let A, B, title, caption, note = "", badgeB = false, pickA, pickB, noHear;
+    const secs = [];
+    if (c === "r") {
+      const r = st.r;
+      ({ A, B } = comparison.pairSpecs(r));
+      title = "Which one is closer?";
+      caption = "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
+      note = comparison.compNote(r);
+      pickA = (spec) => this.rPick(spec.pitch);
+      pickB = (spec) => this.rPick(spec.pitch);
+      secs.push({ label: "Neither is close", f: () => this.rNeither() });
+      secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
+      if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+      noHear = () => this.applyR(comparison.compNoHear(this.state.r));
+    } else if (c === "a") {
+      ({ A, B } = pres.aChalSpecs(st.a));
+      title = "One more check";
+      caption = "Before we finish, which is more like what you hear?";
+      pickA = () => this.go("a", "conf", { stop: "system" });
+      pickB = (spec) => this.go("a", "conf", { stop: "system", est: spec.pitch });
+      secs.push({ label: "I can't tell them apart", f: () => this.go("a", "conf", { stop: "cant" }) });
+      noHear = () => this.pat("a", { level: Math.min(.85, this.state.a.level + .12) });
+    } else {
+      ({ A, B } = pres.lPriorSpecs(st.l));
+      title = "Which is more like today?";
+      caption = st.l.transparent
+        ? "One of these is your previous match. Pick what is true today, even if it is the other one."
+        : "Listen to both and pick whichever is closer to what you hear right now.";
+      badgeB = st.l.transparent;
+      pickA = (spec) => this.go("l", "refine", { pitch: spec.pitch, level: spec.level, picked: "nearby" });
+      pickB = (spec) => this.go("l", "refine", { pitch: spec.pitch, level: spec.level, picked: "prior" });
+      secs.push({ label: "Neither sounds right today", f: () => this.go("l", "reopen", { note: "That's useful. Your hearing today comes first. We'll search fresh." }) });
+      noHear = () => this.pat("l", { note: "We made the sounds a little easier to hear. Try again.", prior: { ...this.state.l.prior, level: Math.min(.85, this.state.l.prior.level + .12) } });
+      note = st.l.note;
+    }
     const ready = this.prReady(gating.pairKeyOf(st));
-    const note = comparison.compNote(r);
-    const secs = [
-      { label: "Neither is close", f: () => this.rNeither() },
-      { label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) }
-    ];
-    if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
-        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Which one is closer?"),
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, title),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } },
-          "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go."),
+          caption),
         e("div", { style: { font: "500 13px/1.4 var(--font-ui)", color: ready ? "var(--text-muted)" : "var(--text-heading)", marginTop: "2px", minHeight: "18px" } },
           ready ? "" : "Play both sounds before choosing."),
         e("div", { style: { display: "flex", gap: "11px", marginTop: "14px" } },
-          this.pairCard("a", A, "Sound 1", ready),
-          this.pairCard("b", B, "Sound 2", ready)),
+          this.pairCard("a", A, "Sound 1", ready, pickA, false),
+          this.pairCard("b", B, "Sound 2", ready, pickB, badgeB)),
         // The prototype computes this note but its display block sits dormant
         // in the confidence markup; escapes must reassure (REQ-016), so it
         // renders here on the pair screen instead.
@@ -672,7 +725,7 @@ class App extends React.Component {
             e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
               e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
         e("button", {
-          onClick: () => this.applyR(comparison.compNoHear(this.state.r)),
+          onClick: noHear,
           style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
         }, "I can't hear these sounds"))
     ];
@@ -1000,8 +1053,233 @@ class App extends React.Component {
     ];
   }
 
+  /* ---------- preserved Adaptive, Longitudinal, and Education flows (REQ-011–013) ---------- */
+
+  renderAIntro() {
+    const st = this.state;
+    const rows = [
+      ["headphones", "Hear one sound at a time"],
+      ["message", "Say how it compares to yours"],
+      ["sparkles", "We adjust based on your answers"]
+    ];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "Listen and react"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          "You'll hear one sound at a time. Tell us how it compares to yours, and we'll adjust from your answers. There's no fixed number of steps. It continues only while it's helping, and you can stop whenever it feels close."),
+        e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "section" },
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "15px" } },
+              rows.map(([icon, text]) => e("div", { key: icon, style: { display: "flex", alignItems: "center", gap: "13px" } },
+                e(DS.IconTile, { size: "sm", tone: "blue" }, e(DS.Icon, { name: icon, size: 20 })),
+                e("div", { style: { font: "500 14px/1.35 var(--font-ui)", color: "var(--gray-800)" } }, text))))))),
+      this.fFooter([
+        e(DS.Button, { key: "start", variant: "primary", size: "md", onClick: () => this.go("a", "listen") }, "Start listening")
+      ])
+    ];
+  }
+
+  renderLReturn() {
+    const st = this.state, l = st.l;
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 24px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-100)", borderRadius: "999px", padding: "4px 10px", font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, (st.ear || "Both ears").toUpperCase()),
+        e("div", { style: { font: "700 26px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "12px" } }, "Welcome back"),
+        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "10px" } },
+          l.hasPrior
+            ? "We saved what we learned last time, so today can start closer. Your hearing today comes first. If things sound different, we'll search again."
+            : "This looks like your first match, so today starts from a broad search. Next time, we can start closer using what we learn today."),
+        l.hasPrior ? e("div", { style: { marginTop: "22px" } },
+          e(DS.Card, { variant: "list" },
+            e("div", { style: { display: "flex", alignItems: "center", gap: "13px", padding: "15px 18px" } },
+              e(DS.IconTile, { size: "md", tone: "blue" }, e(DS.Icon, { name: "history", size: 21 })),
+              e("div", { style: { flex: 1 } },
+                e("div", { style: { font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, "Previous match on file"),
+                e("div", { style: { font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, "6 days ago · " + (st.ear || "Both ears")))))) : null),
+      this.fFooter([
+        e(DS.Button, { key: "start", variant: "primary", size: "md", onClick: () => this.go("l", l.hasPrior ? "check" : "reopen") }, l.hasPrior ? "Start today’s matching" : "Start matching"),
+        l.hasPrior ? e(DS.Button, { key: "fresh", variant: "ghost", onClick: () => this.go("l", "reopen", { note: "History set aside at your request. Nothing from last time will steer today’s search." }) }, "Start fresh instead") : null
+      ])
+    ];
+  }
+
+  renderLCheck() {
+    const l = this.state.l;
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Quick check-in"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Compared with last time, does your tinnitus feel about the same today?"),
+        e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "16px" } },
+          ["About the same", "Different today", "Not sure"].map((label) =>
+            e(DS.SelectRow, { key: label, label, selected: l.checkin === label, onClick: () => this.pat("l", { checkin: label }) }))),
+        e("div", { style: { font: "400 12.5px/1.5 var(--font-text)", color: "var(--text-muted)", marginTop: "12px" } }, "If it feels different, we'll set last time aside and search fresh. Your hearing today comes first.")),
+      this.fFooter([
+        e(DS.Button, {
+          key: "continue", variant: "primary", size: "sm", disabled: !l.checkin,
+          onClick: () => l.checkin === "Different today" ? this.go("l", "reopen", { note: "We’ll search fresh today." }) : this.go("l", "prior")
+        }, "Continue")
+      ])
+    ];
+  }
+
+  renderLRefine() {
+    const st = this.state, l = st.l;
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px" } },
+        e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, "TODAY'S MATCH"),
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "6px" } }, "Fine-tune today's match"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Starting near what you chose. Small adjustments. Trust what you hear right now, not what you remember."),
+        e("div", { style: { marginTop: "14px" } },
+          e(DS.Card, { variant: "section" },
+            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+            e("div", { style: { marginTop: "18px" } }, e(DS.TuningSlider, { label: "Pitch", value: l.pitch, onChange: (v) => this.pat("l", { pitch: v }), precision: "Fine" })),
+            st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "right", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "5px" } }, shell.techOf(mainSpecs(st)[0])) : null,
+            e("div", { style: { marginTop: "16px" } }, e(DS.TuningSlider, { label: "Loudness", value: l.level, onChange: (v) => this.pat("l", { level: v }) }))))),
+      this.fFooter([
+        l.note ? e(React.Fragment, { key: "note" }, this.noteBox(l.note)) : null,
+        e(DS.Button, { key: "done", variant: "primary", size: "sm", onClick: () => this.go("l", "conf") }, "This matches today"),
+        e(DS.Button, { key: "fresh", variant: "ghost", onClick: () => this.go("l", "reopen", { note: "We’ll search fresh today." }) }, "It sounds different today")
+      ])
+    ];
+  }
+
+  renderLReopen() {
+    const l = this.state.l;
+    const choices = [
+      ["Narrowing", "n", "vol", shell.freshN],
+      ["Comparison", "r", "dir", shell.freshR],
+      ["2D field", "d", "field", shell.freshD],
+      ["Families", "f", "family", shell.freshF],
+      ["Adaptive", "a", "listen", shell.freshA]
+    ];
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px" } },
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Let's search fresh today"),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "We've set your history aside. You'll match from the start, the same way as your first session, and it usually takes a few minutes. Nothing about last time limits what you can choose today."),
+        e("div", { style: { border: "1.5px dashed var(--gray-300)", borderRadius: "14px", padding: "14px 16px", marginTop: "18px" } },
+          e("div", { style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, "EXPLORATION NOTE · NOT PATIENT UI"),
+          e("div", { style: { font: "400 13px/1.5 var(--font-text)", color: "var(--text-secondary)", marginTop: "7px" } }, "Which single-session concept runs underneath a reopened search is intentionally open in the brief. Hand off to one:"),
+          e("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "11px" } },
+            choices.map(([label, cid, stage, fresh]) => e(DS.Button, { key: label, variant: "outline", size: "xs", onClick: () => this.jump(cid, stage, fresh()) }, label)))),
+        l.note ? this.noteBox(l.note, "14px") : null),
+      this.fFooter([])
+    ];
+  }
+
+  tPoint(ev) {
+    const rect = this.tEl.getBoundingClientRect();
+    const lx = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+    const ly = Math.max(0, Math.min(1, (ev.clientY - rect.top) / rect.height));
+    const w = this.tWin || { x0: 0, y0: 0, span: 1 };
+    return { x: w.x0 + lx * w.span, y: w.y0 + ly * w.span };
+  }
+
+  tDown(ev) {
+    this.tEl = ev.currentTarget;
+    this.tWin = pres.fieldWindow(this.state.t, this.state.stages.t);
+    try { this.tEl.setPointerCapture(ev.pointerId); } catch (err) {}
+    const point = this.tPoint(ev);
+    this.setState((s) => ({ t: { ...s.t, ...point, heard: true, labels: true }, playKey: "field" }), () =>
+      this.withAudio((a) => a.play("field", [pres.fieldSpec(this.state.t)])));
+  }
+
+  tMove(ev) {
+    if (!this.tEl) return;
+    const point = this.tPoint(ev);
+    this.setState((s) => ({ t: { ...s.t, ...point } }), () => {
+      if (this.state.playKey === "field") this.withAudio((a) => a.update([pres.fieldSpec(this.state.t)]));
+    });
+  }
+
+  tUp() {
+    if (!this.tEl) return;
+    this.tEl = null;
+    this.tWin = null;
+    this.stopAudio();
+  }
+
+  renderTFlow() {
+    const st = this.state, t = st.t, stage = st.stages.t;
+    const onMap = stage === "field" || stage === "zoom";
+    const w = pres.fieldWindow(t, stage);
+    const localX = (t.x - w.x0) / w.span;
+    const localY = (t.y - w.y0) / w.span;
+    const cap = { field: "EDUCATION · SOUND EXPLORATION", zoom: "EDUCATION · A CLOSER LOOK", behave: "EDUCATION · HOW SOUND BEHAVES", recap: "EDUCATION · WHAT YOU HEARD" }[stage];
+    const title = { field: "Move around and listen", zoom: "Explore this area", behave: "How can a sound behave?", recap: "That is the sound space" }[stage];
+    const body = {
+      field: t.heard ? "Drag the marker anywhere. Notice what changes as you move across and up and down. Nothing here is your tinnitus match." : "Press play, then drag the marker around and notice how the sound changes.",
+      zoom: "Same idea, smaller area, so small movements matter less. Listen for what changes.",
+      behave: "Same sound as before. Only the way it behaves over time changes.",
+      recap: "Two things describe a sound in this app: what it is like, and how it behaves. Your tinnitus match comes later, and nothing you did here was saved as it."
+    }[stage];
+    const playBehavior = (label, patch) => {
+      const key = "bh-" + label;
+      this.setState((s) => ({ t: { ...s.t, behavior: label }, playKey: key }), () =>
+        this.withAudio((a) => a.play(key, [{ ...pres.fieldSpec(this.state.t), ...patch }])));
+    };
+    const advance = () => {
+      if (stage === "field") return this.go("t", "zoom", { cx: t.x, cy: t.y });
+      if (stage === "zoom") return this.go("t", "behave", { behavior: null });
+      if (stage === "behave") return this.go("t", "recap");
+      return this.jump("t", "field", shell.freshT());
+    };
+    const back = () => {
+      if (stage === "zoom") return this.go("t", "field");
+      if (stage === "behave") return this.go("t", "zoom");
+      return this.jump("t", "field", shell.freshT());
+    };
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
+        e("div", { style: { display: "inline-flex", background: "var(--gray-200)", borderRadius: "999px", padding: "4px 10px", font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--gray-600)" } }, cap),
+        e("div", { style: { font: "700 22px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "11px" } }, title),
+        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, body),
+        onMap ? e("div", {
+          "data-field": "", onPointerDown: (ev) => this.tDown(ev), onPointerMove: (ev) => this.tMove(ev), onPointerUp: () => this.tUp(), onPointerCancel: () => this.tUp(),
+          style: { marginTop: "14px", position: "relative", width: "100%", aspectRatio: "1", borderRadius: "18px", border: "1.5px solid var(--gray-300)", background: "linear-gradient(180deg,var(--blue-100) 0%,var(--blue-50) 34%,var(--green-50) 58%,var(--purple-100) 100%)", touchAction: "none", overflow: "hidden" }
+        },
+          stage === "field" && t.heard ? e("div", { style: { position: "absolute", left: Math.max(0, Math.min(1 - t.span, t.x - t.span / 2)) * 100 + "%", top: Math.max(0, Math.min(1 - t.span, t.y - t.span / 2)) * 100 + "%", width: t.span * 100 + "%", height: t.span * 100 + "%", border: "1.5px dashed var(--control-accent)", borderRadius: "12px", background: "var(--blue-50)", pointerEvents: "none" } }) : null,
+          e("div", { style: { position: "absolute", left: Math.max(0, Math.min(1, localX)) * 100 + "%", top: Math.max(0, Math.min(1, localY)) * 100 + "%", width: "56px", height: "56px", borderRadius: "50%", background: "var(--blue-100)", border: "2.5px solid var(--control-accent)", transform: "translate(-50%,-50%)", pointerEvents: "none", boxShadow: "var(--shadow-thumb)", display: "flex", alignItems: "center", justifyContent: "center" } },
+            e("span", { style: { width: "12px", height: "12px", borderRadius: "50%", background: "var(--control-accent)" } }))) : null,
+        onMap && t.labels ? e("div", { style: { font: "500 13.5px/1.45 var(--font-ui)", color: "var(--text-heading)", marginTop: "11px" } }, "Sounds around here may feel " + pres.FIELDWORD(t.y) + ", and " + pres.FIELDPITCH(t.x) + " in pitch.") : null,
+        stage === "behave" ? e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
+          pres.FIELDBEHAVE.map(([label, sub, patch]) => {
+            const selected = t.behavior === label, playing = st.playKey === "bh-" + label;
+            return e("div", { key: label, onClick: () => playBehavior(label, patch), style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", cursor: "pointer", background: selected ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (selected ? "var(--interface-selected-border)" : "var(--gray-200)") } },
+              e("span", { style: { flex: "none", width: "40px", height: "40px", borderRadius: "50%", border: "1.5px solid var(--blue-border)", background: playing ? "var(--control-accent)" : "var(--white)", display: "flex", alignItems: "center", justifyContent: "center" } }, playing ? "Ⅱ" : "▶"),
+              e("div", { style: { flex: 1 } }, e("div", { style: { font: "600 14.5px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, label), e("div", { style: { font: "400 12.5px/1.35 var(--font-text)", color: "var(--text-body)", marginTop: "2px" } }, sub)));
+          })) : null,
+        stage === "recap" ? e("div", { style: { marginTop: "14px" } },
+          e(DS.Card, { variant: "section" },
+            e(DS.SectionLabel, null, "WHAT YOU HEARD"),
+            e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "12px" } },
+              [
+                ["What it is like", "You heard sounds that felt " + pres.FIELDWORD(t.y) + ", around " + pres.FIELDPITCH(t.x) + " in pitch."],
+                ["How it behaves", t.behavior ? "You tried " + t.behavior.toLowerCase() + ". A sound can hold steady or change over time, separately from what it is like." : "A sound can hold steady or change over time, separately from what it is like."],
+                ["Why this came first", "When matching starts, these are the words the app will use. You have already heard what they mean."]
+              ].map(([heading, text]) => e("div", { key: heading }, e("div", { style: { font: "600 14px/1.3 var(--font-ui)", color: "var(--text-heading)" } }, heading), e("div", { style: { font: "400 13px/1.45 var(--font-text)", color: "var(--text-body)", marginTop: "3px" } }, text)))),
+            st.showTech ? e("div", { "data-technical-values": true, style: { font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, shell.techOf(pres.fieldSpec(t, true))) : null)) : null,
+        t.note ? this.noteBox(t.note, "14px") : null),
+      this.fFooter([
+        onMap && !t.heard ? e(DS.Button, { key: "play", variant: "primary", size: "md", onClick: () => { if (this.state.playKey !== "field") this.pat("t", { heard: true, labels: true }); this.toggleKey("field", [pres.fieldSpec(this.state.t)]); } }, st.playKey === "field" ? "Stop the sound" : "Play the sound") : null,
+        ((onMap && t.heard) || stage === "behave" || stage === "recap") ? e(DS.Button, { key: "next", variant: "primary", size: "sm", onClick: advance }, stage === "field" ? "Explore this area closely" : stage === "zoom" ? "Next, how a sound behaves" : stage === "behave" ? "I understand" : "Done") : null,
+        onMap && t.heard ? e(DS.Button, { key: "replay", variant: "ghost", onClick: () => this.toggleKey("field", [pres.fieldSpec(this.state.t)]) }, st.playKey === "field" ? "Stop the sound" : "Play from here") : null,
+        stage !== "field" ? e(DS.Button, { key: "back", variant: "ghost", onClick: back }, stage === "zoom" ? "Back to the whole range" : stage === "behave" ? "Back to the sounds" : "Explore sounds again") : null,
+        onMap ? e(React.Fragment, { key: "escape" }, this.fLink("I can't hear this sound", () => this.pat("t", { note: "That is okay, and worth telling us. We made it a little easier to hear. Press play and try again." }))) : null
+      ])
+    ];
+  }
+
   renderFlow() {
     const st = this.state, c = st.concept, s = st.stages[c];
+    if (c === "a" && s === "intro") return this.renderAIntro();
+    if ((c === "a" && s === "chal") || (c === "l" && s === "prior")) return this.renderPair();
+    if (c === "a" && s === "listen") return this.renderListen();
+    if (c === "l" && s === "ret") return this.renderLReturn();
+    if (c === "l" && s === "check") return this.renderLCheck();
+    if (c === "l" && s === "refine") return this.renderLRefine();
+    if (c === "l" && s === "reopen") return this.renderLReopen();
+    if (c === "t") return this.renderTFlow();
     if (c === "d" && s === "intro") return this.renderDIntro();
     if (c === "d" && (s === "field" || s === "zoom")) return this.renderDField();
     if (c === "n" && s === "intro") return this.renderNIntro();
@@ -1131,6 +1409,15 @@ class App extends React.Component {
       // Preserved V5 flow (REQ-010): moderator menu only, never the hub.
       { cap: "SOUND-FAMILY GUIDED (PRESERVED)", items: fam.jumpStages().map((it) => ({
         label: it.label, f: () => this.openOption("f", it.stage, { ...shell.freshF(), ...it.seed })
+      })) },
+      { cap: "ADAPTIVE REFINEMENT (PRESERVED)", items: pres.jumpStagesA().map((it) => ({
+        label: it.label, f: () => this.openOption("a", it.stage, { ...shell.freshA(), ...it.seed })
+      })) },
+      { cap: "LONGITUDINAL (PRESERVED)", items: pres.jumpStagesL().map((it) => ({
+        label: it.label, f: () => this.openOption("l", it.stage, { ...shell.freshL(), ...it.seed })
+      })) },
+      { cap: "EDUCATION · SOUND EXPLORATION (PRESERVED)", items: pres.jumpStagesT().map((it) => ({
+        label: it.label, f: () => this.openOption("t", it.stage, { ...shell.freshT(), ...it.seed })
       })) },
       { cap: "SHARED", items: [
         { label: "Headphone setup", f: () => this.goScreen("setup") },

@@ -11,8 +11,9 @@ async function boot(page) {
 async function jumpTo(page, cap, chip) {
   await page.getByRole("button", { name: "Session menu" }).click();
   await page.getByRole("button", { name: "Jump to a different section" }).click();
-  await expect(page.getByText(cap, { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: chip, exact: true }).click();
+  const group = page.getByText(cap, { exact: true }).locator("..");
+  await expect(group).toBeVisible();
+  await group.getByRole("button", { name: chip, exact: true }).click();
 }
 
 const playing = (page) => page.evaluate(() => window.__pnqAudioEngine.playingKey());

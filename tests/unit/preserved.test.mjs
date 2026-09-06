@@ -48,7 +48,7 @@ test("adaptive: repeated settled answers reach loudness, then suggest the final 
 
 test("adaptive: the escape raises the level, reassures, and stays in the loop", () => {
   const p = pres.aResp(freshA(), "nohear", () => .5);
-  assert.equal(p.level, .57);
+  assert.ok(Math.abs(p.level - .57) < 1e-9);
   assert.equal(p.msg, "We made it a little easier to hear. Try again.");
   const capped = pres.aResp({ ...freshA(), level: .8 }, "nohear", () => .5);
   assert.equal(capped.level, .85);
@@ -93,5 +93,5 @@ test("education: the zoom window clamps to the field; STAGES.t has no confidence
   assert.equal(pres.fieldWindow(freshT(), "field").span, 1);
   assert.deepEqual(STAGES.t.map((z) => z[0]), ["field", "zoom", "behave", "recap"]);
   assert.deepEqual(STAGES.a.map((z) => z[0]), ["intro", "listen", "chal", "conf", "done"]);
-  assert.deepEqual(STAGES.l.map((z) => z[0]), ["ret", "check", "prior", "refine", "reopen", "done"]);
+  assert.deepEqual(STAGES.l.map((z) => z[0]), ["ret", "check", "prior", "refine", "reopen", "conf", "done"]);
 });

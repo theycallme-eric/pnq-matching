@@ -67,6 +67,9 @@ test("resetAll returns the app to first-run Launch state with fresh options", ()
   assert.deepEqual(r.optDone, {});
   assert.deepEqual(r.optOrder, []);
   assert.deepEqual(r.n, shell.freshN());
+  assert.deepEqual(r.a, shell.freshA());
+  assert.deepEqual(r.l, shell.freshL());
+  assert.deepEqual(r.t, shell.freshT());
   assert.equal(r.stages.n, "vol");
   assert.equal(shell.STORAGE_KEY, "pnq-mtp-v1");
 });

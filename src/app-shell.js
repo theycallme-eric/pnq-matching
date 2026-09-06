@@ -25,7 +25,7 @@ export const STAGES = {
   r: [["intro", "Prepare"], ["edu", "What to listen for"], ["dir", "Directional"], ["comp", "A/B comparisons"], ["conf", "Confidence"], ["done", "Complete"]],
   a: [["intro", "Prepare"], ["listen", "Adaptive loop"], ["chal", "Final check"], ["conf", "Confidence"], ["done", "Complete"]],
   t: [["field", "Broad field"], ["zoom", "Closer look"], ["behave", "How it behaves"], ["recap", "What you heard"]],
-  l: [["ret", "Welcome back"], ["check", "Check-in"], ["prior", "Today vs. before"], ["refine", "Refine today"], ["reopen", "Fresh search"], ["done", "Complete"]]
+  l: [["ret", "Welcome back"], ["check", "Check-in"], ["prior", "Today vs. before"], ["refine", "Refine today"], ["reopen", "Fresh search"], ["conf", "Confidence"], ["done", "Complete"]]
 };
 
 // First working stage of a flow: past the shared intro/edu (and the
@@ -113,7 +113,7 @@ const FLOW_LABELS = {
   r: { intro: "Comparison · Prepare", edu: "Shared · What to listen for", dir: "Shared · Listen and respond", comp: "Shared · Two-sound comparison", conf: "Shared · Confidence", done: "Shared · Match complete" },
   a: { intro: "Adaptive · Prepare", listen: "Shared · Listen and respond", chal: "Shared · Two-sound comparison", conf: "Shared · Confidence", done: "Shared · Match complete" },
   t: { field: "Education · Sound exploration", zoom: "Education · Sound exploration", behave: "Education · Sound exploration", recap: "Education · Sound exploration" },
-  l: { ret: "Longitudinal · Welcome back", check: "Longitudinal · Check-in", prior: "Shared · Two-sound comparison", refine: "Longitudinal · Refine today", reopen: "Longitudinal · Fresh search", done: "Shared · Match complete" }
+  l: { ret: "Longitudinal · Welcome back", check: "Longitudinal · Check-in", prior: "Shared · Two-sound comparison", refine: "Longitudinal · Refine today", reopen: "Longitudinal · Fresh search", conf: "Shared · Confidence", done: "Shared · Match complete" }
 };
 
 export function screenLabelOf(screen, concept, stage) {
@@ -160,11 +160,11 @@ export function stageState(s, c, stage, obj) {
 export function resetAllState(s) {
   return {
     ...s, screen: "launch", concept: "n", menuOpen: false, jumpOpen: false, playKey: null,
-    stages: { ...s.stages, n: "vol", r: "dir", d: "field" },
+    stages: { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" },
     ear: "", hp: false, vol: 36, setupSeen: false, eduSeen: false,
     optDone: {}, optOrder: [], heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
     setupWarn: false, earWarn: false, showTech: false,
-    n: freshN(), r: freshR(), d: freshD()
+    n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
   };
 }
 
