@@ -216,10 +216,43 @@ class App extends React.Component {
     }, e(DS.SelectRow, { label, selected, style: { pointerEvents: "none" } }));
   }
 
+  // The exported prototype components preserve the intended visuals, but the
+  // vendored PlayToggle is a clickable div and SegmentedControl does not expose
+  // its selected state. Keep the vendor snapshot untouched and add the missing
+  // browser semantics at the app boundary.
+  playToggleButton(playing, onToggle, label) {
+    const text = label || (playing ? "Stop Sound" : "Start Sound");
+    return e("button", {
+      type: "button",
+      onClick: onToggle,
+      "aria-label": text,
+      "aria-pressed": playing ? "true" : "false",
+      style: {
+        display: "block", width: "100%", padding: 0, border: "none",
+        borderRadius: "var(--radius-input)", background: "transparent",
+        color: "inherit", font: "inherit", cursor: "pointer"
+      }
+    }, e(DS.PlayToggle, { playing, label: text, style: { pointerEvents: "none" } }));
+  }
+
+  segmentedControl(label, options, value, onChange) {
+    return e("div", {
+      role: "group",
+      "aria-label": label,
+      ref: (node) => {
+        if (!node) return;
+        node.querySelectorAll("button").forEach((button) => {
+          button.setAttribute("aria-pressed", button.textContent.trim() === value ? "true" : "false");
+        });
+      }
+    }, e(DS.SegmentedControl, { options, value, onChange }));
+  }
+
   playRow(label, key, specs) {
     const playing = this.state.playKey === key;
     return e("button", {
-      key, onClick: () => this.toggleKey(key, specs),
+      key, type: "button", onClick: () => this.toggleKey(key, specs),
+      "aria-pressed": playing ? "true" : "false",
       style: {
         display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "56px",
         padding: "12px 16px", borderRadius: "14px", cursor: "pointer",
@@ -381,11 +414,12 @@ class App extends React.Component {
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
         e(DS.SectionLabel, null, "SOUND PLAYS IN"),
         e("div", { style: { marginTop: "11px" } },
-          e(DS.SegmentedControl, {
-            options: ["Left", "Right", "Both"],
-            value: { "Left ear": "Left", "Right ear": "Right", "Both ears": "Both" }[st.ear] || "Both",
-            onChange: (v) => this.setEar({ Left: "Left ear", Right: "Right ear", Both: "Both ears" }[v] || "Both ears")
-          })),
+          this.segmentedControl(
+            "Sound plays in",
+            ["Left", "Right", "Both"],
+            { "Left ear": "Left", "Right ear": "Right", "Both ears": "Both" }[st.ear] || "Both",
+            (v) => this.setEar({ Left: "Left ear", Right: "Right ear", Both: "Both ears" }[v] || "Both ears")
+          )),
         e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "GETTING SET UP")),
         e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
           setupRows.map((row) => this.homeRow(row))),
@@ -402,7 +436,8 @@ class App extends React.Component {
   eduExample(label, key, spec) {
     const playing = this.state.playKey === key;
     return e("button", {
-      key, onClick: () => this.toggleKey(key, [spec]),
+      key, type: "button", onClick: () => this.toggleKey(key, [spec]),
+      "aria-pressed": playing ? "true" : "false",
       style: {
         flex: 1, display: "flex", alignItems: "center", gap: "9px", padding: "11px 12px",
         borderRadius: "14px", cursor: "pointer",
@@ -514,7 +549,7 @@ class App extends React.Component {
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, nar.passTitle(s, n)),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, nar.passBody(s)),
         e(DS.Card, { variant: "section" },
-          e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+          this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))),
           isVol
             ? e("div", { style: { marginTop: "18px" } },
               e(DS.TuningSlider, { label: "Volume", value: n.level, onChange: (v) => this.pat("n", { level: v }), precision: "Coarse" }),
@@ -612,7 +647,7 @@ class App extends React.Component {
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
         e("div", { style: { marginTop: "14px" } },
           e(DS.Card, { variant: "section" },
-            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }))),
+            this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))))),
         e("div", { style: { marginTop: "18px" } },
           e(DS.SectionLabel, null, "HOW DOES IT COMPARE?"),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "11px" } },
@@ -655,7 +690,9 @@ class App extends React.Component {
         playing ? ring("") : null,
         playing ? ring(" .9s") : null,
         e("button", {
-          onClick: onPlay, "aria-label": "Play sound " + (which === "a" ? "1" : "2"),
+          type: "button", onClick: onPlay,
+          "aria-label": (playing ? "Stop" : "Play") + " sound " + (which === "a" ? "1" : "2"),
+          "aria-pressed": playing ? "true" : "false",
           style: { position: "absolute", inset: "2px", borderRadius: "50%", border: "2px solid var(--blue-600)", background: playing ? "var(--control-accent)" : "var(--white)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
         },
           playing
@@ -752,10 +789,12 @@ class App extends React.Component {
   }
 
   // 40px round preview button: independent of the row's select handler.
-  fPlayBtn(pk, specs) {
+  fPlayBtn(pk, specs, label) {
     const playing = this.state.playKey === pk;
     return e("button", {
-      "aria-label": playing ? "Stop example" : "Play example",
+      type: "button",
+      "aria-label": (playing ? "Stop " : "Play ") + label,
+      "aria-pressed": playing ? "true" : "false",
       onClick: (ev) => { ev.stopPropagation(); this.toggleKey(pk, specs); },
       style: { flex: "none", width: "40px", height: "40px", borderRadius: "50%", border: "1.5px solid var(--blue-border)", background: playing ? "var(--control-accent)" : "var(--white)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
     },
@@ -815,7 +854,7 @@ class App extends React.Component {
               key,
               style: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 13px", borderRadius: "14px", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
             },
-              d.ex ? this.fPlayBtn("fam-" + key, [d.ex]) : null,
+              d.ex ? this.fPlayBtn("fam-" + key, [d.ex], d.name + " example") : null,
               e("button", {
                 type: "button", onClick: () => this.pat("f", { fam: key }), "aria-label": "Select " + d.name,
                 "aria-pressed": sel ? "true" : "false",
@@ -855,7 +894,7 @@ class App extends React.Component {
               key: i,
               style: { display: "flex", alignItems: "center", gap: "12px", padding: "11px 13px", borderRadius: "14px", background: sel ? "var(--interface-selected)" : "var(--white)", border: "1.5px solid " + (sel ? "var(--interface-selected-border)" : "var(--gray-200)") }
             },
-              this.fPlayBtn("char-" + i, [ch.spec]),
+              this.fPlayBtn("char-" + i, [ch.spec], ch.label + " example"),
               e("button", {
                 type: "button", onClick: () => this.pat("f", { charIdx: i }), "aria-label": "Select " + ch.label,
                 "aria-pressed": sel ? "true" : "false",
@@ -885,7 +924,7 @@ class App extends React.Component {
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Adjust until it sounds like yours. Press play to hear your changes as you make them."),
         e("div", { style: { marginTop: "14px" } },
           e(DS.Card, { variant: "section" },
-            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+            this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))),
             e("div", { style: { marginTop: "18px" } },
               e(DS.TuningSlider, { label: "Pitch", value: tuneSpec.pitch, onChange: (v) => setSpec({ pitch: v }), precision: "Medium" })),
             st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "right", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "5px" } }, shell.techOf(tuneSpec)) : null,
@@ -894,7 +933,7 @@ class App extends React.Component {
             e("div", { style: { marginTop: "18px" } },
               e(DS.SectionLabel, { description: "How does the sound behave over time?" }, "BEHAVIOR"),
               e("div", { style: { marginTop: "9px" } },
-                e(DS.SegmentedControl, { options: fam.BEH_UI, value: fam.BEH_LBL[tuneSpec.behavior] || "Steady", onChange: (v) => setSpec({ behavior: fam.BEH_MAP[v] }) })))))),
+                this.segmentedControl("Sound behavior", fam.BEH_UI, fam.BEH_LBL[tuneSpec.behavior] || "Steady", (v) => setSpec({ behavior: fam.BEH_MAP[v] }))))))),
       this.fFooter([
         f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
         e(DS.Button, { key: "c", variant: "primary", size: "sm", onClick: () => this.fAct(fam.tuneDone(this.state.f)) }, "This matches"),
@@ -916,16 +955,16 @@ class App extends React.Component {
           e(DS.Card, { variant: "list" },
             sounds.map((sd, i) =>
               e("div", { key: i, style: { display: "flex", alignItems: "center", gap: "13px", padding: "14px 18px", borderTop: i === 0 ? "none" : "1px solid var(--gray-100)" } },
-                this.fPlayBtn("ly" + i, [sd.spec]),
+                this.fPlayBtn("ly" + i, [sd.spec], "sound " + (i + 1)),
                 e("div", { style: { flex: 1, minWidth: 0 } },
                   e("div", { style: { font: "600 14.5px/1.25 var(--font-ui)", color: "var(--text-heading)" } }, "Sound " + (i + 1) + ": " + (fam.FAMS[sd.fam] ? fam.FAMS[sd.fam].name.toLowerCase() : "sound")),
                   e("div", { style: { font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)", marginTop: "2px" } }, shell.describe(sd.spec))))))),
         hasTwo ? e("div", { style: { marginTop: "14px" } },
-          e(DS.PlayToggle, {
-            playing: st.playKey === "together",
-            label: st.playKey === "together" ? "Stop" : "Play them together",
-            onToggle: () => this.toggleKey("together", fam.layerSounds(this.state.f).map((x) => x.spec))
-          })) : null),
+          this.playToggleButton(
+            st.playKey === "together",
+            () => this.toggleKey("together", fam.layerSounds(this.state.f).map((x) => x.spec)),
+            st.playKey === "together" ? "Stop" : "Play them together"
+          )) : null),
       this.fFooter([
         f.note ? e(React.Fragment, { key: "n" }, this.fNote(f.note)) : null,
         ...(hasTwo
@@ -1155,7 +1194,7 @@ class App extends React.Component {
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px" } }, "Starting near what you chose. Small adjustments. Trust what you hear right now, not what you remember."),
         e("div", { style: { marginTop: "14px" } },
           e(DS.Card, { variant: "section" },
-            e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) }),
+            this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))),
             e("div", { style: { marginTop: "18px" } }, e(DS.TuningSlider, { label: "Pitch", value: l.pitch, onChange: (v) => this.pat("l", { pitch: v }), precision: "Fine" })),
             st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "right", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "5px" } }, shell.techOf(mainSpecs(st)[0])) : null,
             e("div", { style: { marginTop: "16px" } }, e(DS.TuningSlider, { label: "Loudness", value: l.level, onChange: (v) => this.pat("l", { level: v }) }))))),
@@ -1364,7 +1403,7 @@ class App extends React.Component {
             e(DS.Card, { variant: "section" },
               e(DS.SectionLabel, null, "YOUR MATCHED SOUND"),
               e("div", { style: { marginTop: "11px" } },
-                e(DS.PlayToggle, { playing: st.playKey === "main", onToggle: () => this.toggleKey("main", mainSpecs(this.state)) })))),
+                this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state)))))),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
               this.selectRowButton(label, label, conf === label, () => choose(label)))),

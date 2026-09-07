@@ -47,13 +47,16 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
       await expect(page.getByText(name, { exact: true })).toBeVisible();
     }
     // Four playable examples: "Hard to describe" has none in V5.
-    await expect(page.getByRole("button", { name: "Play example" })).toHaveCount(4);
+    await expect(page.getByRole("button", { name: /^Play .+ example$/ })).toHaveCount(4);
 
     const cont = page.getByRole("button", { name: "Continue" });
     await expect(cont).toBeDisabled();
 
     // Previewing the first family (hiss) plays it but selects nothing.
-    await page.getByRole("button", { name: "Play example" }).first().click();
+    const hissPreview = page.getByRole("button", { name: "Play Hissing or rushing example", exact: true });
+    await expect(hissPreview).toHaveAttribute("aria-pressed", "false");
+    await hissPreview.click();
+    await expect(page.getByRole("button", { name: "Stop Hissing or rushing example", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => playing(page)).toBe("fam-hiss");
     expect((await appF(page)).fam).toBe(null);
     await expect(cont).toBeDisabled();
@@ -79,7 +82,7 @@ test.describe("families (preserved V5 sound-family guided flow)", () => {
     await expect(page.locator('[data-screen-label="Families · Character"]')).toBeVisible();
     await expect(page.getByText("Which is closest?", { exact: true })).toBeVisible();
     await expect(page.getByText("All of these are hiss sounds with a different character.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Play example" })).toHaveCount(6);
+    await expect(page.getByRole("button", { name: /^Play .+ example$/ })).toHaveCount(6);
     await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
     await page.getByRole("button", { name: "Select Like radio static", exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();

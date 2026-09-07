@@ -77,7 +77,10 @@ test.describe("comparison (Option 2)", () => {
     await expect(picks.nth(1)).toBeDisabled();
     await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
 
-    await page.getByRole("button", { name: "Play sound 1" }).click();
+    const sound1 = page.getByRole("button", { name: "Play sound 1" });
+    await expect(sound1).toHaveAttribute("aria-pressed", "false");
+    await sound1.click();
+    await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
     await expect(picks.first()).toBeDisabled();
 
