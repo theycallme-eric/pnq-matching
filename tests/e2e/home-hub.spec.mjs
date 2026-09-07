@@ -164,7 +164,13 @@ test.describe("home hub", () => {
     });
     await reachUnprimedHub(page);
 
-    await page.getByRole("button", { name: "Left", exact: true }).click();
+    const earControl = page.getByRole("group", { name: "Sound plays in" });
+    await expect(earControl.getByRole("button", { name: "Both", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const left = earControl.getByRole("button", { name: "Left", exact: true });
+    await expect(left).toHaveAttribute("aria-pressed", "false");
+    await left.press("Enter");
+    await expect(left).toHaveAttribute("aria-pressed", "true");
+    await expect(earControl.getByRole("button", { name: "Both", exact: true })).toHaveAttribute("aria-pressed", "false");
     await expect(hub(page)).toBeVisible(); // no navigation
     expect(await page.evaluate(() => window.__pnqAppState().ear)).toBe("Left ear");
 
@@ -174,7 +180,7 @@ test.describe("home hub", () => {
     expect(await page.evaluate(() => window.__panners[0].pan.value)).toBe(-1);
 
     // Switching ears re-routes the engine, still without leaving the hub.
-    await page.getByRole("button", { name: "Right", exact: true }).click();
+    await earControl.getByRole("button", { name: "Right", exact: true }).click();
     await expect(hub(page)).toBeVisible();
     expect(await page.evaluate(() => window.__pnqAppState().ear)).toBe("Right ear");
     // panic() rebuilds the output graph from the engine's current ear, so the

@@ -4,7 +4,8 @@
  * PNQ Health Design System bundle, the brand assets (verbatim), and the
  * React runtime the component bundle renders with.
  */
-import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync } from "node:fs";
+import { cpSync, mkdirSync, rmSync, existsSync, copyFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +13,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "dist");
 
 const DS_DIR = "_ds/pnq-health-design-system-deabceb2-e79d-43e7-b9c1-b8c64c847b65";
+
+// This is a copy-based build, so validate source syntax before replacing the
+// last known-good dist bundle. Browser tests remain the behavioral gate.
+for (const file of readdirSync(join(root, "src"))) {
+  if (file.endsWith(".js")) execFileSync(process.execPath, ["--check", join(root, "src", file)], { stdio: "inherit" });
+}
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(join(dist, "vendor"), { recursive: true });

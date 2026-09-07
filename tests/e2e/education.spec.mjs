@@ -18,9 +18,13 @@ test.describe("education", () => {
     await reachEducation(page);
     await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
 
-    await page.getByRole("button", { name: /A lower sound/ }).click();
+    const lower = page.getByRole("button", { name: /A lower sound/ });
+    await expect(lower).toHaveAttribute("aria-pressed", "false");
+    await lower.press("Enter");
+    await expect(lower).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
-    await page.getByRole("button", { name: /A lower sound/ }).click();
+    await lower.press("Space");
+    await expect(lower).toHaveAttribute("aria-pressed", "false");
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
 
     await page.getByRole("button", { name: "I'm ready to start" }).click();
@@ -37,7 +41,10 @@ test.describe("education", () => {
     const advance = page.getByRole("button", { name: "The volume is about right" });
     await expect(advance).toBeVisible();
     await expect(advance).toBeDisabled();
-    await page.getByText("Start Sound", { exact: true }).click();
+    const play = page.getByRole("button", { name: "Start Sound", exact: true });
+    await expect(play).toHaveAttribute("aria-pressed", "false");
+    await play.press("Enter");
+    await expect(page.getByRole("button", { name: "Stop Sound", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(advance).toBeEnabled();
     await advance.click();
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
