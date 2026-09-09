@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // renders unscaled, so asset dimensions can be asserted exactly.
 test.use({ viewport: { width: 390, height: 844 } });
 
-test("launch screen loads the design system and renders the navy mark at 34px", async ({ page }) => {
+test("launch screen loads the design system and renders the blue welcome mark", async ({ page }) => {
   await page.goto("/");
 
   // Component bundle is loaded and exposes the documented components.
@@ -24,16 +24,16 @@ test("launch screen loads the design system and renders the navy mark at 34px", 
   const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(bodyBg).toBe("rgb(246, 247, 249)");
 
-  // Navy waveform mark renders on Launch at 34x34 from the bundled SVG asset.
-  const mark = page.locator('img[src$="waveform-mark-navy.svg"]');
+  // Blue waveform mark renders on the navy patient-app splash from the bundled asset.
+  const mark = page.locator('img[src$="waveform-mark.svg"]');
   await expect(mark).toBeVisible();
   const box = await mark.boundingBox();
-  expect(Math.round(box.width)).toBe(34);
-  expect(Math.round(box.height)).toBe(34);
+  expect(Math.round(box.width)).toBe(118);
+  expect(Math.round(box.height)).toBe(40);
 
   // Launch chrome comes from design-system components.
   await expect(page.locator('[data-screen="launch"]')).toBeVisible();
-  await expect(page.getByText("Let's find the sound you hear")).toBeVisible();
+  await expect(page.getByText("A guided sound-matching study experience.")).toBeVisible();
 });
 
 test("both waveform mark variants are served byte-for-byte from the built bundle", async ({ request }) => {
