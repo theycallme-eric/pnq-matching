@@ -38,24 +38,133 @@ async function participantText(page) {
   });
 }
 
-async function accessibilityProblems(page) {
-  return page.locator("[data-screen]").evaluate((root) => {
+async function accessibilityProblems(page, includeModerator = false) {
+  const rootSelector = includeModerator ? "[data-device-frame]" : "[data-screen]";
+  return page.locator(rootSelector).evaluate((root, auditModerator) => {
     const selector = 'button,input,select,textarea,a[href],[role="button"],[role="slider"]';
     const problems = [];
     for (const el of root.querySelectorAll(selector)) {
-      if (el.closest("[data-moderator-only]")) continue;
+      if (!auditModerator && el.closest("[data-moderator-only]")) continue;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) continue;
       const labelledBy = el.getAttribute("aria-labelledby");
       const referenced = labelledBy ? document.getElementById(labelledBy)?.textContent : "";
-      const name = (el.getAttribute("aria-label") || referenced || el.textContent || "").replace(/\s+/g, " ").trim();
+      const nativeLabel = [...(el.labels || [])].map((label) => label.textContent).join(" ");
+      const name = (el.getAttribute("aria-label") || referenced || nativeLabel || el.textContent || "").replace(/\s+/g, " ").trim();
       const id = name || `<${el.tagName.toLowerCase()}>`;
       if (!name) problems.push(`${id}: missing accessible name`);
       if (rect.width < 44 || rect.height < 44) problems.push(`${id}: ${Math.round(rect.width)}x${Math.round(rect.height)} touch target`);
       if (el.hasAttribute("disabled") && el.getAttribute("aria-disabled") === "false") problems.push(`${id}: conflicting disabled semantics`);
     }
     return problems;
+  }, includeModerator);
+}
+
+async function contrastProblems(page) {
+  return page.locator("[data-device-frame]").evaluate((frame) => {
+    const parse = (value) => {
+      const match = value && value.match(/rgba?\(([^)]+)\)/);
+      if (!match) return null;
+      const values = match[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+      return [values[0], values[1], values[2], values.length > 3 ? values[3] : 1];
+    };
+    const composite = (top, bottom) => {
+      const alpha = top[3] + bottom[3] * (1 - top[3]);
+      return [0, 1, 2].map((index) => (
+        (top[index] * top[3] + bottom[index] * bottom[3] * (1 - top[3])) / alpha
+      )).concat(alpha);
+    };
+    const luminance = (color) => {
+      const channel = color.slice(0, 3).map((value) => {
+        const normalized = value / 255;
+        return normalized <= .04045 ? normalized / 12.92 : ((normalized + .055) / 1.055) ** 2.4;
+      });
+      return .2126 * channel[0] + .7152 * channel[1] + .0722 * channel[2];
+    };
+    const ratio = (a, b) => {
+      const [lighter, darker] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (lighter + .05) / (darker + .05);
+    };
+    const backgrounds = (element) => {
+      const path = [];
+      for (let node = element; node instanceof Element; node = node.parentElement) path.unshift(node);
+      let candidates = [[255, 255, 255, 1]];
+      for (const node of path) {
+        const style = getComputedStyle(node);
+        const solid = parse(style.backgroundColor);
+        if (solid && solid[3] > 0) candidates = candidates.map((base) => composite(solid, base));
+        if (style.backgroundImage !== "none") {
+          const stops = [...style.backgroundImage.matchAll(/rgba?\([^)]+\)/g)].map((match) => parse(match[0])).filter(Boolean);
+          if (stops.length) candidates = candidates.flatMap((base) => stops.map((stop) => composite(stop, base)));
+        }
+      }
+      return candidates;
+    };
+    const problems = [];
+    for (const element of frame.querySelectorAll("[data-screen] *, [role=dialog] *")) {
+      const ownText = [...element.childNodes]
+        .filter((node) => node.nodeType === Node.TEXT_NODE)
+        .map((node) => node.textContent.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join(" ");
+      if (!ownText || !element.getClientRects().length) continue;
+      const foreground = parse(getComputedStyle(element).color);
+      if (!foreground) continue;
+      const ratios = backgrounds(element).map((background) => ratio(composite(foreground, background), background));
+      const minimum = Math.min(...ratios);
+      if (minimum < 4.5) problems.push(`${ownText.slice(0, 48)}: ${minimum.toFixed(2)}:1`);
+    }
+    return [...new Set(problems)];
   });
+}
+
+async function expectVisibleFocus(locator) {
+  await locator.focus();
+  const focus = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      active: document.activeElement === element,
+      outline: style.outlineStyle !== "none" && parseFloat(style.outlineWidth) > 0,
+      shadow: style.boxShadow !== "none"
+    };
+  });
+  expect(focus.active).toBe(true);
+  expect(focus.outline || focus.shadow).toBe(true);
+}
+
+async function finishOptionWithKeyboard(page, cap) {
+  const menu = page.getByRole("button", { name: "Session menu" });
+  await expectVisibleFocus(menu);
+  await menu.press("Enter");
+  const jumps = page.getByRole("button", { name: "Jump to a different section" });
+  await expect(jumps).toHaveAttribute("aria-expanded", "false");
+  await expectVisibleFocus(jumps);
+  await jumps.press("Enter");
+  await expect(jumps).toHaveAttribute("aria-expanded", "true");
+  const group = page.getByText(cap, { exact: true }).locator("..");
+  const confidence = group.getByRole("button", { name: "Confidence", exact: true });
+  await expectVisibleFocus(confidence);
+  await confidence.press("Enter");
+  const choice = page.getByRole("button", { name: "Very close", exact: true });
+  await expectVisibleFocus(choice);
+  await choice.press("Space");
+  await expect(choice).toHaveAttribute("aria-pressed", "true");
+  const finish = page.getByRole("button", { name: "Finish matching" });
+  await expectVisibleFocus(finish);
+  await finish.press("Enter");
+  const completion = page.getByRole("button", { name: /Return to matching options|Finish session/ });
+  await expectVisibleFocus(completion);
+  await completion.press("Enter");
+}
+
+async function openCompletion(page, cap) {
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("button", { name: "Jump to a different section" }).click();
+  const group = page.getByText(cap, { exact: true }).locator("..");
+  await group.getByRole("button", { name: "Confidence", exact: true }).click();
+  await page.getByRole("button", { name: "Very close", exact: true }).click();
+  await page.getByRole("button", { name: "Finish matching" }).click();
+  await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
 }
 
 test.describe("accessibility and participant copy", () => {
@@ -91,6 +200,145 @@ test.describe("accessibility and participant copy", () => {
     await auditScreen("Matching options");
 
     expect(problems).toEqual([]);
+  });
+
+  test("accessibility: shell screens have named 44px controls and at least 4.5:1 text contrast", async ({ page }) => {
+    const problems = [];
+    const audit = async (name) => {
+      for (const issue of await accessibilityProblems(page)) problems.push(`${name}: ${issue}`);
+      for (const issue of await contrastProblems(page)) problems.push(`${name}: contrast ${issue}`);
+    };
+
+    await page.goto("/");
+    await audit("Launch");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await audit("Privacy");
+    await page.getByRole("checkbox", { name: /research prototype/i }).check();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await audit("Account entry");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await audit("Account confirmation");
+    await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+    await audit("Dashboard");
+    await page.getByRole("button", { name: "New Session" }).click();
+    await audit("Ear");
+    await page.getByRole("button", { name: "Continue" }).evaluate((button) => button.click());
+    await expect(page.getByRole("alert")).toContainText("Action needed: Choose an ear to continue.");
+    await audit("Ear error");
+    await page.getByRole("button", { name: "Both ears", exact: true }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await audit("Setup");
+    await page.getByRole("button", { name: /Headphones/ }).click();
+    await page.getByLabel("Device volume").fill("100");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await audit("Education");
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
+    await audit("Matching options");
+    await page.getByRole("button", { name: "Session menu" }).click();
+    await page.getByRole("button", { name: "Jump to a different section" }).click();
+    for (const issue of await accessibilityProblems(page, true)) problems.push(`Session menu: ${issue}`);
+    for (const issue of await contrastProblems(page)) problems.push(`Session menu: contrast ${issue}`);
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+
+    for (const cap of ["OPTION 1", "OPTION 2", "OPTION 3"]) {
+      await openCompletion(page, cap);
+      await audit(`${cap} completion`);
+      await page.getByRole("button", { name: /Return to matching options|Finish session/ }).click();
+    }
+    await expect(page.locator('[data-screen-label="Session complete"]')).toBeVisible();
+    await audit("Conclusion");
+
+    expect(problems).toEqual([]);
+  });
+
+  test("keyboard: shell controls expose focus and state through completion, conclusion, menu, and reset", async ({ page }) => {
+    await page.goto("/");
+    const start = page.getByRole("button", { name: "Get started" });
+    await expectVisibleFocus(start);
+    await start.press("Enter");
+
+    const checkbox = page.getByRole("checkbox", { name: /research prototype/i });
+    const privacyContinue = page.getByRole("button", { name: "Continue" });
+    await expect(privacyContinue).toHaveAttribute("aria-disabled", "true");
+    expect(await privacyContinue.evaluate((button) => getComputedStyle(button).borderStyle)).toBe("dashed");
+    await expect(checkbox).not.toBeChecked();
+    await expectVisibleFocus(checkbox);
+    await checkbox.press("Space");
+    await expect(checkbox).toBeChecked();
+    await expect(page.locator(".pnq-checkbox-visual svg")).toBeVisible();
+    await privacyContinue.press("Enter");
+
+    const input = page.getByRole("textbox", { name: "Simulated prescription ID" });
+    await expectVisibleFocus(input);
+    await input.press("ControlOrMeta+A");
+    await input.pressSequentially("KEYBOARD-DEMO");
+    const onboardingBack = page.getByRole("button", { name: "Back" });
+    await expectVisibleFocus(onboardingBack);
+    await onboardingBack.press("Enter");
+    await expect(page.locator('[data-screen-label="Privacy"]')).toBeVisible();
+    await page.getByRole("checkbox", { name: /research prototype/i }).press("Space");
+    await page.getByRole("button", { name: "Continue" }).press("Enter");
+    await page.getByRole("button", { name: "Continue" }).press("Enter");
+    await page.getByRole("button", { name: "Confirm fictional profile" }).press("Enter");
+
+    const newSession = page.getByRole("button", { name: "New Session" });
+    await expectVisibleFocus(newSession);
+    await newSession.press("Enter");
+    const ear = page.getByRole("button", { name: "Both ears", exact: true });
+    await expect(ear).toHaveAttribute("aria-pressed", "false");
+    await expectVisibleFocus(ear);
+    await ear.press("Space");
+    await expect(ear).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Continue" }).press("Enter");
+
+    const shellBack = page.getByRole("button", { name: "Back" });
+    await expectVisibleFocus(shellBack);
+    await shellBack.press("Enter");
+    await expect(ear).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Continue" }).press("Enter");
+    const headphones = page.getByRole("button", { name: /Headphones/ });
+    await expect(headphones).toHaveAttribute("aria-pressed", "false");
+    await expectVisibleFocus(headphones);
+    await headphones.press("Space");
+    await expect(headphones).toHaveAttribute("aria-pressed", "true");
+    await expect(headphones).toContainText("Connected");
+    const volume = page.getByRole("slider", { name: "Device volume" });
+    await expectVisibleFocus(volume);
+    await volume.press("End");
+    await expect(volume).toHaveValue("100");
+    await page.getByRole("button", { name: "Continue" }).press("Enter");
+    await page.getByRole("button", { name: "I'm ready to start" }).press("Enter");
+
+    const selectedEar = page.getByRole("button", { name: "Both", exact: true });
+    await expect(selectedEar).toHaveAttribute("aria-pressed", "true");
+    await expect(selectedEar.locator("svg")).toBeVisible();
+
+    const option = page.getByRole("button", { name: "Option 1" });
+    await expectVisibleFocus(option);
+    await option.press("Enter");
+    await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
+    await page.getByRole("button", { name: "Back" }).press("Enter");
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+
+    await finishOptionWithKeyboard(page, "OPTION 1");
+    await expect(page.locator('[data-option-id="1"]')).toHaveAttribute("data-option-state", "done");
+    await expect(page.locator('[data-option-id="1"] [data-option-status="done"]')).toContainText("Done");
+    await finishOptionWithKeyboard(page, "OPTION 2");
+    await finishOptionWithKeyboard(page, "OPTION 3");
+    await expect(page.locator('[data-screen-label="Session complete"]')).toBeVisible();
+
+    const menu = page.getByRole("button", { name: "Session menu" });
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await expectVisibleFocus(menu);
+    await menu.press("Enter");
+    await expect(menu).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("dialog", { name: "Session menu" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+    const reset = page.getByRole("button", { name: "Reset the prototype" });
+    await expectVisibleFocus(reset);
+    await reset.press("Enter");
+    await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
+    expect(await page.evaluate(() => sessionStorage.getItem("pnq-mtp-v1"))).toBeNull();
   });
 
   test("accessibility: every V5 jump destination has named 44px controls and audited participant copy", async ({ page }) => {
