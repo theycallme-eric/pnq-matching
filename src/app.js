@@ -15,6 +15,7 @@ import * as field from "./field.js";
 
 const DS = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
+const DEMO_PRESCRIPTION_ID = "DEMO-RX-4821";
 
 // Onboarding examples: loudness holds pitch constant and pitch holds loudness
 // constant, so neither word gets defined by the other.
@@ -48,7 +49,11 @@ const font = {
 class App extends React.Component {
   constructor(props) {
     super(props);
-    this.state = shell.initialState();
+    this.state = {
+      ...shell.initialState(),
+      privacyAcknowledged: false,
+      accountConfirmation: false
+    };
     this.aud = null;
     this.skipNextPersist = false;
   }
@@ -64,7 +69,11 @@ class App extends React.Component {
     }).catch(() => null);
     try {
       const restored = shell.restoreSession(sessionStorage.getItem(shell.STORAGE_KEY));
-      if (restored) this.setState(restored);
+      if (restored) this.setState({
+        ...restored,
+        privacyAcknowledged: false,
+        accountConfirmation: false
+      });
     } catch (err) {}
     this.measure = () => {
       this.setState(shell.measure(window.innerWidth, window.innerHeight));
@@ -158,9 +167,47 @@ class App extends React.Component {
     this.setState((s) => shell.goScreenState(s, screen, extra));
   }
 
+  startOnboarding() {
+    this.goScreen("privacy", {
+      privacyAcknowledged: false,
+      accountConfirmation: false,
+      onboardingInput: ""
+    });
+  }
+
+  openAccountEntry() {
+    if (!this.state.privacyAcknowledged) return;
+    this.goScreen("account", {
+      privacyAcknowledged: false,
+      accountConfirmation: false,
+      onboardingInput: DEMO_PRESCRIPTION_ID
+    });
+  }
+
+  returnToPrivacy() {
+    this.goScreen("privacy", {
+      privacyAcknowledged: false,
+      accountConfirmation: false,
+      onboardingInput: ""
+    });
+  }
+
+  showAccountConfirmation() {
+    if (this.state.onboardingInput.trim().length < 3) return;
+    this.goScreen("account", {
+      privacyAcknowledged: false,
+      accountConfirmation: true,
+      onboardingInput: ""
+    });
+  }
+
   startNewSession() {
     this.hardStop();
-    this.setState((s) => shell.newSessionState(s));
+    this.setState((s) => ({
+      ...shell.newSessionState(s),
+      privacyAcknowledged: false,
+      accountConfirmation: false
+    }));
   }
 
   openOption(cid, stage, seed) {
@@ -273,21 +320,148 @@ class App extends React.Component {
 
   renderLaunch() {
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "30px 24px 10px" } },
-        e("img", { src: "assets/waveform-mark-navy.svg", alt: "", style: { width: "34px", height: "34px" } }),
-        e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)", marginTop: "20px" } }, "PNQ SOUND MATCHING"),
-        e("div", { style: { font: "700 28px/1.1 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.02em", marginTop: "10px" } }, "Let's find the sound you hear"),
-        e("div", { style: { font: "400 15px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "12px" } },
-          "You'll listen through headphones and adjust a tone until it comes close to the sound you hear in your tinnitus."),
-        e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "22px" } },
-          ["There are no right or wrong answers. Only you can hear your tinnitus.",
-            "You can stop the sound at any time, and take a break whenever you need one.",
-            "If you cannot hear something, say so. That is useful, not a failure."].map((t, i) =>
-            e("div", { key: i, style: { display: "flex", gap: "11px", alignItems: "flex-start" } },
-              e("span", { style: { flex: "none", width: "7px", height: "7px", borderRadius: "50%", background: "var(--blue-400)", marginTop: "7px" } }),
-              e("span", { style: { font: "400 14.5px/1.45 var(--font-text)", color: "var(--text-body)" } }, t))))),
-      this.bottomButton("Get started", () => this.goScreen("ear"))
+      e("div", {
+        key: "b",
+        style: {
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          textAlign: "center", padding: "24px 40px", background: "var(--gradient-navy)"
+        }
+      },
+        e("img", { src: "assets/waveform-mark.svg", alt: "", style: { width: "118px", height: "40px" } }),
+        e("div", { "aria-label": "pnq health", style: { marginTop: "26px", font: "700 40px/1 var(--font-ui)", letterSpacing: "-.02em", color: "var(--white)" } },
+          e("span", null, "pnq"),
+          e("span", { style: { marginLeft: "4px", fontWeight: 500, color: "var(--brand-blue-light)" } }, "health")),
+        e("div", { style: { maxWidth: "270px", marginTop: "18px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
+          "A guided sound-matching study experience."),
+        e("div", { style: { marginTop: "12px", font: font.label, letterSpacing: ".14em", color: "var(--text-on-dark-muted)" } },
+          "Research prototype")),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 24px 12px", background: "var(--navy-600)" } },
+        e(DS.Button, { variant: "primary", size: "md", onDark: true, onClick: () => this.startOnboarding() }, "Get started"),
+        e("div", { style: { marginTop: "14px", textAlign: "center", font: "400 13.5px var(--font-text)", color: "var(--text-on-dark-muted)" } },
+          "Prepared for this research session"))
     ];
+  }
+
+  onboardingBack(onClick) {
+    return e("div", { key: "nav", style: { flex: "none", minHeight: "50px", display: "flex", alignItems: "center", padding: "0 14px", background: "var(--navy-800)" } },
+      e("button", {
+        type: "button", onClick,
+        style: { display: "flex", alignItems: "center", gap: "4px", minHeight: "44px", padding: "0 8px", border: "none", background: "transparent", color: "var(--white)", font: "500 16px var(--font-text)", cursor: "pointer" }
+      },
+        e(DS.Icon, { name: "chevronLeft", size: 20, color: "var(--white)", strokeWidth: 2.4 }),
+        "Back"));
+  }
+
+  renderPrivacy() {
+    const checked = this.state.privacyAcknowledged;
+    return [
+      this.onboardingBack(() => this.goScreen("launch", {
+        privacyAcknowledged: false,
+        accountConfirmation: false,
+        onboardingInput: ""
+      })),
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "24px 26px 12px", background: "var(--white)" } },
+        e("div", { style: { font: "700 28px/1.15 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Privacy for this prototype"),
+        e("div", { style: { marginTop: "18px", font: "700 15px var(--font-ui)", color: "var(--text-heading)" } }, "Before you continue"),
+        e("p", { style: { margin: "8px 0 0", font: "400 14.5px/1.62 var(--font-text)", color: "var(--text-body)" } },
+          "This research prototype does not collect or send personal, health, or treatment information."),
+        e("p", { style: { margin: "14px 0 0", font: "400 14.5px/1.62 var(--font-text)", color: "var(--text-body)" } },
+          "Your progress stays in this browser for the current study session. This acknowledgment is a prototype step and is not legal consent.")),
+      e("div", { key: "f", style: { flex: "none", padding: "14px 24px 8px", background: "var(--white)", borderTop: "1px solid var(--interface-divider)" } },
+        e("label", { style: { display: "flex", alignItems: "center", gap: "13px", minHeight: "50px", padding: "2px 2px 14px", cursor: "pointer" } },
+          e("input", {
+            type: "checkbox", checked,
+            onChange: (ev) => this.setState({ privacyAcknowledged: ev.target.checked }),
+            style: { flex: "none", width: "26px", height: "26px", margin: 0, accentColor: "var(--status-success-strong)", cursor: "pointer" }
+          }),
+          e("span", { style: { font: "500 14.5px/1.4 var(--font-text)", color: "var(--gray-800)" } },
+            "I understand this is a research prototype and will not enter personal or health information.")),
+        e(DS.Button, {
+          variant: "primary", size: "md", disabled: !checked,
+          onClick: () => { if (this.state.privacyAcknowledged) this.openAccountEntry(); }
+        }, "Continue"))
+    ];
+  }
+
+  renderAccountEntry() {
+    const ready = this.state.onboardingInput.trim().length >= 3;
+    return [
+      this.onboardingBack(() => this.returnToPrivacy()),
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "36px 28px 12px", background: "var(--interface-app)" } },
+        e(DS.IconTile, { size: "xl", tone: "blue", style: { marginBottom: "24px" } },
+          e(DS.Icon, { name: "prescription", size: 32, color: "var(--brand-blue-deep)" })),
+        e("div", { style: { font: "700 30px/1.12 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } },
+          "Enter a simulated", e("br"), "prescription ID"),
+        e("div", { style: { marginTop: "14px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-secondary)" } },
+          "This fictional ID frames the study experience. It is checked only on this screen and is never looked up."),
+        e(DS.TextField, {
+          label: "Simulated prescription ID",
+          "aria-label": "Simulated prescription ID",
+          value: this.state.onboardingInput,
+          onChange: (ev) => this.setState({ onboardingInput: ev.target.value }),
+          placeholder: DEMO_PRESCRIPTION_ID,
+          hint: "Prototype only. Use fictional study values.",
+          hintIcon: e(DS.Icon, { name: "lock", size: 16, color: "var(--gray-450)" }),
+          style: { marginTop: "30px" }
+        })),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 24px", background: "var(--interface-app)" } },
+        e(DS.Button, {
+          variant: "primary", size: "md", disabled: !ready,
+          onClick: () => { if (this.state.onboardingInput.trim().length >= 3) this.showAccountConfirmation(); }
+        }, "Continue"))
+    ];
+  }
+
+  renderAccountConfirmation() {
+    const rows = [
+      ["user", "Fictional study profile", "Avery Example"],
+      ["forms", "Prototype participant ID", "DEMO PARTICIPANT 001"]
+    ];
+    return [
+      this.onboardingBack(() => this.goScreen("account", {
+        privacyAcknowledged: false,
+        accountConfirmation: false,
+        onboardingInput: DEMO_PRESCRIPTION_ID
+      })),
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "30px 26px 12px", background: "var(--interface-app)" } },
+        e("div", { style: { width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "22px", background: "var(--status-success-tint)" } },
+          e(DS.Icon, { name: "checkThin", size: 30, color: "var(--status-success-strong)" })),
+        e("div", { style: { font: "700 29px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } }, "Fictional profile ready"),
+        e("div", { style: { marginTop: "12px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-secondary)" } },
+          "This fixed profile is used only to frame the study."),
+        e(DS.Card, { variant: "list", style: { marginTop: "26px" } },
+          rows.map(([icon, label, value], i) => e(React.Fragment, { key: label },
+            i ? e(DS.CardDivider) : null,
+            e("div", { style: { display: "flex", alignItems: "center", gap: "15px", padding: "16px 18px" } },
+              e(DS.IconTile, { size: "sm", tone: "blue" },
+                e(DS.Icon, { name: icon, size: 20, color: "var(--brand-blue-deep)" })),
+              e("div", { style: { flex: 1, minWidth: 0 } },
+                e("div", { style: { font: font.label, color: "var(--text-label)", letterSpacing: ".08em", textTransform: "uppercase" } }, label),
+                e("div", { style: { marginTop: "3px", font: "600 16px var(--font-ui)", color: "var(--text-heading)" } }, value))))))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 24px", background: "var(--interface-app)" } },
+        e(DS.Button, {
+          variant: "primary", size: "md",
+          onClick: () => this.goScreen("dashboard", {
+            onboardingSeen: true,
+            onboardingInput: "",
+            privacyAcknowledged: false,
+            accountConfirmation: false
+          })
+        }, "Confirm fictional profile"),
+        e(DS.Button, {
+          variant: "ghost", size: "md",
+          onClick: () => this.goScreen("account", {
+            privacyAcknowledged: false,
+            accountConfirmation: false,
+            onboardingInput: DEMO_PRESCRIPTION_ID
+          }),
+          style: { marginTop: "8px", color: "var(--text-secondary)" }
+        }, "Use a different ID"))
+    ];
+  }
+
+  renderAccount() {
+    return this.state.accountConfirmation ? this.renderAccountConfirmation() : this.renderAccountEntry();
   }
 
   renderDashboard() {
@@ -1578,7 +1752,9 @@ class App extends React.Component {
   render() {
     const st = this.state, c = st.concept, s = st.stages[c];
     const framed = st.framed, dark = st.screen === "setup";
-    const statusOnDark = dark || st.screen === "dashboard";
+    const onboardingScreen = ["launch", "privacy", "account", "dashboard"].includes(st.screen);
+    const statusOnDark = dark || onboardingScreen;
+    const indicatorOnDark = dark || st.screen === "launch";
     const chromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
     const statusBg = statusOnDark ? "var(--navy-800)" : "var(--gray-50)";
     const chromeLine = dark ? "var(--interface-dark-border)" : "var(--gray-200)";
@@ -1590,6 +1766,8 @@ class App extends React.Component {
 
     const body = {
       launch: () => this.renderLaunch(),
+      privacy: () => this.renderPrivacy(),
+      account: () => this.renderAccount(),
       dashboard: () => this.renderDashboard(),
       ear: () => this.renderEar(),
       setup: () => this.renderSetup(),
@@ -1601,7 +1779,8 @@ class App extends React.Component {
     const screenRoot = e("div", {
       "data-screen": st.screen,
       "data-screen-label": label,
-      style: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark ? "var(--navy-900)" : undefined }
+      ...(st.screen === "account" ? { "data-account-step": st.accountConfirmation ? "confirmation" : "entry" } : {}),
+      style: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark || st.screen === "launch" ? "var(--navy-900)" : undefined }
     }, body);
 
     return e("div", {
@@ -1623,8 +1802,8 @@ class App extends React.Component {
         }
       },
         framed
-          ? e(DS.StatusBar, { time: "9:41", onDark: statusOnDark, background: statusBg })
-          : e("div", { style: { flex: "none", height: "env(safe-area-inset-top)", background: statusBg } }),
+          ? e(DS.StatusBar, { time: "9:41", onDark: statusOnDark, background: statusOnDark ? "var(--navy-800)" : chromeBg })
+          : e("div", { style: { flex: "none", height: "env(safe-area-inset-top)", background: chromeBg } }),
         progShow ? e("div", { "data-progress": "", style: { flex: "none", padding: "10px 22px 12px", background: "var(--gray-50)", borderBottom: "1px solid var(--gray-200)" } },
           e("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" } },
             e("span", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, prog.lbl),
@@ -1633,7 +1812,7 @@ class App extends React.Component {
             e("div", { style: { height: "100%", background: "var(--control-accent)", borderRadius: "3px", transition: "width 420ms cubic-bezier(.4,0,.2,1)", width: prog.w } }))) : null,
         screenRoot,
         st.menuOpen ? this.renderMenu() : null,
-        e("div", { style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
+        onboardingScreen ? null : e("div", { style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
           nav
             ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
@@ -1646,7 +1825,7 @@ class App extends React.Component {
               style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
             })),
         framed
-          ? e(DS.HomeIndicator, { onDark: dark })
+          ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
           : e("div", { style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
   }
 }

@@ -61,10 +61,10 @@ test("waveform mark SVGs are present, unmodified prototype assets", () => {
   assert.ok(blue.includes(wave) && blue.includes('stroke="#2e9fe0"'), "blue mark geometry and stroke intact");
 });
 
-test("launch screen renders the navy mark at 34px from the bundled asset", () => {
+test("launch screen renders the blue welcome mark from the bundled asset", () => {
   const app = readFileSync(join(root, "src/app.js"), "utf8");
-  assert.ok(app.includes("assets/waveform-mark-navy.svg"), "launch uses the navy mark asset");
-  assert.ok(app.includes('width: "34px"') && app.includes('height: "34px"'), "mark sized 34x34");
+  assert.ok(app.includes("assets/waveform-mark.svg"), "launch uses the blue mark asset on navy");
+  assert.ok(app.includes('width: "118px"') && app.includes('height: "40px"'), "welcome mark sized 118x40");
 });
 
 test("token lint flags hard-coded palette values and allows tokens plus documented exceptions", () => {

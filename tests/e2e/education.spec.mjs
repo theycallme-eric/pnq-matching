@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 async function reachEducation(page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Get started" }).click();
+  await startSessionFromSplash(page);
   await page.getByText("Both ears", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();

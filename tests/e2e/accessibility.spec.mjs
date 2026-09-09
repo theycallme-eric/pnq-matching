@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { startSessionFromSplash } from "./onboarding-helpers.mjs";
 import { auditParticipantStrings, REQUIRED_COPY } from "../../src/participant-copy.js";
 
 const GROUPS = [
@@ -99,7 +100,7 @@ test.describe("accessibility and participant copy", () => {
       ear: "Both ears", hp: false, vol: 36, setupSeen: false, eduSeen: false, optDone: {}, optOrder: []
     })));
     await page.reload();
-    await page.getByRole("button", { name: "Get started" }).click();
+    await startSessionFromSplash(page);
     const bothEars = page.getByRole("button", { name: "Both ears", exact: true });
     await expect(bothEars).toHaveAttribute("aria-pressed", "false");
     await bothEars.press("Space");

@@ -4,37 +4,32 @@
  * Setup · Headphones and volume gate with setupSeen persistence.
  */
 import { test, expect } from "@playwright/test";
+import { startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const key = "pnq-mtp-v1";
 
 test.describe("onboarding", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("Launch renders the V5 cover copy and Get started advances to Setup · Ear", async ({ page }) => {
+  test("Launch renders the PNQ patient-app framing and Get started advances only to Privacy", async ({ page }) => {
     await page.goto("/");
     const launch = page.locator('[data-screen-label="Launch"]');
     await expect(launch).toBeVisible();
 
-    // Mark, overline, heading, body and the three orientation bullets.
-    await expect(launch.locator('img[src$="waveform-mark-navy.svg"]')).toBeVisible();
-    await expect(launch.getByText("PNQ SOUND MATCHING")).toBeVisible();
-    await expect(launch.getByText("Let's find the sound you hear")).toBeVisible();
-    await expect(launch.getByText("You'll listen through headphones and adjust a tone until it comes close to the sound you hear in your tinnitus.")).toBeVisible();
-    for (const t of [
-      "There are no right or wrong answers. Only you can hear your tinnitus.",
-      "You can stop the sound at any time, and take a break whenever you need one.",
-      "If you cannot hear something, say so. That is useful, not a failure."
-    ]) {
-      await expect(launch.getByText(t)).toBeVisible();
-    }
+    await expect(launch.locator('img[src$="waveform-mark.svg"]')).toBeVisible();
+    await expect(launch.getByText("pnq", { exact: true })).toBeVisible();
+    await expect(launch.getByText("health", { exact: true })).toBeVisible();
+    await expect(launch.getByText("A guided sound-matching study experience.")).toBeVisible();
+    await expect(launch.getByText("Research prototype")).toBeVisible();
 
     await page.getByRole("button", { name: "Get started" }).click();
-    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Privacy"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toHaveCount(0);
   });
 
   test("Setup · Ear gates Continue, shows the inline error, and routes the engine to the chosen ear", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
+    await startSessionFromSplash(page);
     const ear = page.locator('[data-screen-label="Setup · Ear"]');
     await expect(ear).toBeVisible();
     await expect(ear.getByText("Which ear would you like to work with?")).toBeVisible();
@@ -75,7 +70,7 @@ test.describe("onboarding", () => {
 
   test("Setup · Headphones and volume gates Continue, updates live, and persists setupSeen as Done on the hub", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: "Get started" }).click();
+    await startSessionFromSplash(page);
     await page.getByText("Both ears", { exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     const setup = page.locator('[data-screen-label="Setup · Headphones and volume"]');
