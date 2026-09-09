@@ -21,6 +21,13 @@ export const OPTORDER = ["n", "r", "d"];
 export const OPTLABEL = { n: "Option 1", r: "Option 2", d: "Option 3" };
 export const OPTFIRST = { n: "vol", r: "dir", d: "field" };
 
+// The selector is normally reached only after the ear journey has led through
+// these two shared gates. Keep the availability rule in the state module so
+// every participant control applies the same prerequisite check.
+export function optionSelectionReady(s) {
+  return s.setupSeen === true && s.eduSeen === true;
+}
+
 export const STAGES = {
   n: [["intro", "Prepare"], ["edu", "What to listen for"], ["vol", "Volume"], ["p1", "Pitch · coarse"], ["p2", "Pitch · medium"], ["p3", "Pitch · fine"], ["conf", "Confidence"], ["done", "Complete"]],
   d: [["intro", "Prepare"], ["edu", "What to listen for"], ["field", "Broad field"], ["zoom", "Closer look"], ["conf", "Confidence"], ["done", "Complete"]],

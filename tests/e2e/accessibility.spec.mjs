@@ -61,6 +61,38 @@ async function accessibilityProblems(page) {
 test.describe("accessibility and participant copy", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  test("participant copy audit covers every immersive shell screen through the shared selector", async ({ page }) => {
+    const problems = [];
+    const auditScreen = async (name) => {
+      for (const issue of auditParticipantStrings(await participantText(page))) problems.push(`${name}: ${issue}`);
+    };
+
+    await page.goto("/");
+    await auditScreen("Launch");
+    await page.getByRole("button", { name: "Get started" }).click();
+    await auditScreen("Privacy");
+    await page.getByRole("checkbox", { name: /research prototype/i }).check();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await auditScreen("Create account / entry");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await auditScreen("Create account / confirmation");
+    await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+    await auditScreen("Dashboard");
+    await page.getByRole("button", { name: "New Session" }).click();
+    await auditScreen("Setup / ear");
+    await page.getByText("Both ears", { exact: true }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await auditScreen("Setup / headphones and volume");
+    await page.getByRole("button", { name: /Headphones Plug in/ }).click();
+    await page.getByLabel("Device volume").fill("100");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await auditScreen("Education");
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
+    await auditScreen("Matching options");
+
+    expect(problems).toEqual([]);
+  });
+
   test("accessibility: every V5 jump destination has named 44px controls and audited participant copy", async ({ page }) => {
     test.setTimeout(120000);
     const pageErrors = [];

@@ -598,6 +598,7 @@ class App extends React.Component {
     const locked = !!row.locked;
     return e("button", {
       key: row.key, onClick: row.open, "aria-disabled": locked ? "true" : undefined,
+      ...(row.optionId ? { "data-option-id": row.optionId, "data-option-state": row.done ? "done" : "available" } : {}),
       style: {
         display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "72px", padding: "16px 16px",
         borderRadius: "16px", border: "1.5px solid var(--gray-200)",
@@ -607,9 +608,9 @@ class App extends React.Component {
       }
     },
       e("span", { style: { flex: 1 } },
-        e("span", { style: { display: "block", font: "700 17px var(--font-ui)", color: locked ? "var(--gray-400)" : "var(--text-heading)" } }, row.label),
+        e("span", { ...(row.optionId ? { "data-option-label": "" } : {}), style: { display: "block", font: "700 17px var(--font-ui)", color: locked ? "var(--gray-400)" : "var(--text-heading)" } }, row.label),
         row.subShow ? e("span", { style: { display: "block", font: "400 13px/1.4 var(--font-text)", color: "var(--text-muted)", marginTop: "3px" } }, row.sub) : null),
-      row.done ? e("span", { style: { flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--gray-100)", borderRadius: "999px", padding: "5px 10px 5px 7px" } },
+      row.done ? e("span", { "data-option-status": row.optionId ? "done" : undefined, style: { flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--gray-100)", borderRadius: "999px", padding: "5px 10px 5px 7px" } },
         e(DS.Icon, { name: "check", size: 13, color: "var(--gray-600)", strokeWidth: 3.2 }),
         e("span", { style: { font: "600 11.5px var(--font-ui)", color: "var(--gray-600)" } }, "Done")) : null,
       e(DS.Icon, { name: "chevronRight", size: 20, color: "var(--gray-400)" }));
@@ -617,7 +618,7 @@ class App extends React.Component {
 
   renderHome() {
     const st = this.state;
-    const ready = st.setupSeen && st.eduSeen;
+    const ready = shell.optionSelectionReady(st);
     const setupRows = [
       { key: "setup", label: "Headphones and volume", sub: "", subShow: false, done: st.setupSeen, open: () => this.goScreen("setup") },
       { key: "edu", label: "What to listen for", sub: "", subShow: false, done: st.eduSeen, open: () => this.goScreen("edu") }
@@ -626,12 +627,13 @@ class App extends React.Component {
     // complete. Ordinary navigation reaches this screen only after the ear
     // gate too. The open handler re-checks
     // live state: aria-disabled does not block clicks by itself.
-    const optionRows = shell.OPTORDER.map((cid) => ({
+    const optionRows = shell.OPTORDER.map((cid, index) => ({
       key: cid, label: shell.OPTLABEL[cid], sub: "", subShow: false,
+      optionId: String(index + 1),
       done: !!st.optDone[cid], locked: !ready,
       open: () => {
         const x = this.state;
-        if (!(x.setupSeen && x.eduSeen)) return;
+        if (!shell.optionSelectionReady(x)) return;
         this.openOption(cid);
       }
     }));
@@ -649,7 +651,7 @@ class App extends React.Component {
         e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
           setupRows.map((row) => this.homeRow(row))),
         e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "MATCHING")),
-        e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
+        e("div", { "data-option-selector": "", role: "group", "aria-label": "Matching options", style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
           optionRows.map((row) => this.homeRow(row)))),
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)" } }, e("div", { style: { height: "9px" } }))
     ];
