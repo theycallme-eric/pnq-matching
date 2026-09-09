@@ -4,6 +4,7 @@
  * segmented control re-routing audio without leaving the hub.
  */
 import { test, expect } from "@playwright/test";
+import { startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const hub = (page) => page.locator('[data-screen-label="Matching options"]');
 // Substring name match: a completed row's accessible name is "Option N Done".
@@ -11,7 +12,7 @@ const option = (page, n) => page.getByRole("button", { name: "Option " + n });
 
 async function reachUnprimedHub(page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Get started" }).click();
+  await startSessionFromSplash(page);
   await page.getByText("Both ears", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();

@@ -3,11 +3,12 @@
  * persistence, framed vs bare chrome, conditional Back, and audio hard stop.
  */
 import { test, expect } from "@playwright/test";
+import { startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const key = "pnq-mtp-v1";
 
 async function completeSetup(page) {
-  await page.getByRole("button", { name: "Get started" }).click();
+  await startSessionFromSplash(page);
   await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
   await page.getByText("Both ears", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
@@ -65,7 +66,7 @@ test.describe("app shell", () => {
     await page.goto("/");
     const back = page.getByRole("button", { name: "Back" });
     await expect(back).toHaveCount(0);
-    await page.getByRole("button", { name: "Get started" }).click();
+    await startSessionFromSplash(page);
     await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
     await expect(back).toHaveCount(0);
     await page.getByText("Both ears", { exact: true }).click();
@@ -114,7 +115,7 @@ test.describe("app shell chrome", () => {
     expect(canvasBg).toBe("rgb(233, 231, 226)"); // the documented #e9e7e2 canvas
 
     // Navigate, then cross the breakpoint: same markup, state preserved.
-    await page.getByRole("button", { name: "Get started" }).click();
+    await startSessionFromSplash(page);
     await page.setViewportSize({ width: 390, height: 700 });
     await expect(frame).toHaveAttribute("data-device-frame", "bare");
     await expect(page.getByText("9:41")).toHaveCount(0);
