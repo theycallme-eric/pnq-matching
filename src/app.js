@@ -13,8 +13,22 @@ import * as fam from "./family-flow.js";
 import * as pres from "./preserved.js";
 import * as field from "./field.js";
 
-const DS = window.PNQHealthDesignSystem_deabce;
+const DSBase = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
+// Keep the vendored component snapshot immutable. This boundary adapter adds
+// state hooks for the shell's stricter contrast treatment.
+const DS = {
+  ...DSBase,
+  Button(props) {
+    const variant = props.variant || "primary";
+    return e(DSBase.Button, {
+      ...props,
+      "data-pnq-variant": variant,
+      "data-pnq-disabled": props.disabled ? "true" : "false",
+      "data-pnq-on-dark": props.onDark ? "true" : "false"
+    });
+  }
+};
 const DEMO_PRESCRIPTION_ID = "DEMO-RX-4821";
 
 // Onboarding examples: loudness holds pitch constant and pitch holds loudness
@@ -232,6 +246,40 @@ class App extends React.Component {
     this.setState((s) => shell.resetAllState(s));
   }
 
+  openMenu() {
+    const wasPlaying = this.state.playKey !== null;
+    this.hardStop();
+    this.setState({ menuOpen: true, menuStopped: wasPlaying }, () => {
+      if (this.menuCloseButton) this.menuCloseButton.focus();
+    });
+  }
+
+  closeMenu() {
+    this.setState({ menuOpen: false, jumpOpen: false }, () => {
+      if (this.menuButton) this.menuButton.focus();
+    });
+  }
+
+  onMenuKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.closeMenu();
+      return;
+    }
+    if (event.key !== "Tab" || !this.menuDialog) return;
+    const controls = [...this.menuDialog.querySelectorAll("button,input,[tabindex]")]
+      .filter((control) => control.tabIndex >= 0 && control.getClientRects().length);
+    if (!controls.length) return;
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   setEar(label) {
     const key = label === "Left ear" ? "left" : label === "Right ear" ? "right" : "both";
     this.setState({ ear: label, earWarn: false });
@@ -253,6 +301,19 @@ class App extends React.Component {
     return e("div", { style: { flex: "none", padding: "8px 22px 0", background: (opts && opts.bg) || "var(--gray-50)" } },
       e(DS.Button, { variant: "primary", size: "md", disabled: !!(opts && opts.disabled), onDark: !!(opts && opts.onDark), onClick }, label),
       e("div", { style: { height: "9px" } }));
+  }
+
+  alertBox(text, onDark) {
+    return e("div", {
+      role: "alert",
+      style: {
+        padding: "11px 13px", border: "var(--border-selected) solid var(--status-danger)",
+        borderRadius: "var(--radius-tile)",
+        background: onDark ? "var(--navy-700)" : "var(--white)",
+        color: onDark ? "var(--white)" : "var(--gray-800)",
+        font: "500 12.5px/1.42 var(--font-text)"
+      }
+    }, e("strong", { style: { fontFamily: "var(--font-ui)" } }, "Action needed:"), " " + text);
   }
 
   selectRowButton(key, label, selected, onClick) {
@@ -291,13 +352,32 @@ class App extends React.Component {
     return e("div", {
       role: "group",
       "aria-label": label,
-      ref: (node) => {
-        if (!node) return;
-        node.querySelectorAll("button").forEach((button) => {
-          button.setAttribute("aria-pressed", button.textContent.trim() === value ? "true" : "false");
-        });
+      "data-segmented-control": "",
+      style: {
+        display: "flex", gap: "4px", minHeight: "44px", padding: "3px",
+        borderRadius: "var(--radius-lg)", background: "var(--interface-track)"
       }
-    }, e(DS.SegmentedControl, { options, value, onChange }));
+    }, options.map((option) => {
+      const selected = option === value;
+      return e("button", {
+        key: option,
+        type: "button",
+        onClick: () => onChange(option),
+        "aria-pressed": selected ? "true" : "false",
+        style: {
+          flex: 1, minWidth: 0, minHeight: "44px", display: "flex", alignItems: "center",
+          justifyContent: "center", gap: "5px", padding: "0 7px",
+          border: "var(--border-selected) solid " + (selected ? "var(--brand-navy)" : "transparent"),
+          borderRadius: "var(--radius-segment-pill)",
+          background: selected ? "var(--action-primary)" : "transparent",
+          color: selected ? "var(--brand-navy)" : "var(--text-body)",
+          font: "700 13px var(--font-ui)", cursor: "pointer"
+        }
+      },
+        e("span", { "aria-hidden": "true", style: { width: "14px", height: "14px", display: "flex", alignItems: "center", justifyContent: "center" } },
+          selected ? e(DS.Icon, { name: "check", size: 13, color: "var(--brand-navy)", strokeWidth: 3.2 }) : null),
+        option);
+    }));
   }
 
   playRow(label, key, specs) {
@@ -333,11 +413,11 @@ class App extends React.Component {
           e("span", { style: { marginLeft: "4px", fontWeight: 500, color: "var(--brand-blue-light)" } }, "health")),
         e("div", { style: { maxWidth: "270px", marginTop: "18px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
           "A guided sound-matching study experience."),
-        e("div", { style: { marginTop: "12px", font: font.label, letterSpacing: ".14em", color: "var(--text-on-dark-muted)" } },
+        e("div", { style: { marginTop: "12px", font: font.label, letterSpacing: ".14em", color: "var(--text-on-dark-secondary)" } },
           "Research prototype")),
       e("div", { key: "f", style: { flex: "none", padding: "8px 24px 12px", background: "var(--navy-600)" } },
         e(DS.Button, { variant: "primary", size: "md", onDark: true, onClick: () => this.startOnboarding() }, "Get started"),
-        e("div", { style: { marginTop: "14px", textAlign: "center", font: "400 13.5px var(--font-text)", color: "var(--text-on-dark-muted)" } },
+        e("div", { style: { marginTop: "14px", textAlign: "center", font: "400 13.5px var(--font-text)", color: "var(--text-on-dark-secondary)" } },
           "Prepared for this research session"))
     ];
   }
@@ -368,12 +448,23 @@ class App extends React.Component {
         e("p", { style: { margin: "14px 0 0", font: "400 14.5px/1.62 var(--font-text)", color: "var(--text-body)" } },
           "Your progress stays in this browser for the current study session. This acknowledgment is a prototype step and is not legal consent.")),
       e("div", { key: "f", style: { flex: "none", padding: "14px 24px 8px", background: "var(--white)", borderTop: "1px solid var(--interface-divider)" } },
-        e("label", { style: { display: "flex", alignItems: "center", gap: "13px", minHeight: "50px", padding: "2px 2px 14px", cursor: "pointer" } },
-          e("input", {
-            type: "checkbox", checked,
-            onChange: (ev) => this.setState({ privacyAcknowledged: ev.target.checked }),
-            style: { flex: "none", width: "26px", height: "26px", margin: 0, accentColor: "var(--status-success-strong)", cursor: "pointer" }
-          }),
+        e("label", { style: { display: "flex", alignItems: "center", gap: "9px", minHeight: "58px", padding: "2px 2px 14px", cursor: "pointer" } },
+          e("span", { style: { position: "relative", flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center" } },
+            e("input", {
+              className: "pnq-checkbox-input",
+              type: "checkbox", checked,
+              onChange: (ev) => this.setState({ privacyAcknowledged: ev.target.checked }),
+              style: { position: "absolute", inset: 0, width: "44px", height: "44px", margin: 0, opacity: 0, cursor: "pointer" }
+            }),
+            e("span", {
+              className: "pnq-checkbox-visual", "aria-hidden": "true",
+              style: {
+                width: "26px", height: "26px", borderRadius: "var(--radius-check)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: checked ? "var(--status-success-strong)" : "var(--white)",
+                border: "var(--border-control) solid " + (checked ? "var(--status-success-strong)" : "var(--gray-600)")
+              }
+            }, checked ? e(DS.Icon, { name: "check", size: 15, color: "var(--white)", strokeWidth: 3.2 }) : null)),
           e("span", { style: { font: "500 14.5px/1.4 var(--font-text)", color: "var(--gray-800)" } },
             "I understand this is a research prototype and will not enter personal or health information.")),
         e(DS.Button, {
@@ -394,16 +485,16 @@ class App extends React.Component {
           "Enter a simulated", e("br"), "prescription ID"),
         e("div", { style: { marginTop: "14px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-secondary)" } },
           "This fictional ID frames the study experience. It is checked only on this screen and is never looked up."),
-        e(DS.TextField, {
-          label: "Simulated prescription ID",
-          "aria-label": "Simulated prescription ID",
-          value: this.state.onboardingInput,
-          onChange: (ev) => this.setState({ onboardingInput: ev.target.value }),
-          placeholder: DEMO_PRESCRIPTION_ID,
-          hint: "Prototype only. Use fictional study values.",
-          hintIcon: e(DS.Icon, { name: "lock", size: 16, color: "var(--gray-450)" }),
-          style: { marginTop: "30px" }
-        })),
+        e("div", { "data-simulated-field": "", style: { marginTop: "30px" } },
+          e(DS.TextField, {
+            label: "Simulated prescription ID",
+            "aria-label": "Simulated prescription ID",
+            value: this.state.onboardingInput,
+            onChange: (ev) => this.setState({ onboardingInput: ev.target.value }),
+            placeholder: DEMO_PRESCRIPTION_ID,
+            hint: "Prototype only. Use fictional study values.",
+            hintIcon: e(DS.Icon, { name: "lock", size: 16, color: "var(--gray-600)" })
+          }))),
       e("div", { key: "f", style: { flex: "none", padding: "8px 24px", background: "var(--interface-app)" } },
         e(DS.Button, {
           variant: "primary", size: "md", disabled: !ready,
@@ -436,7 +527,7 @@ class App extends React.Component {
               e(DS.IconTile, { size: "sm", tone: "blue" },
                 e(DS.Icon, { name: icon, size: 20, color: "var(--brand-blue-deep)" })),
               e("div", { style: { flex: 1, minWidth: 0 } },
-                e("div", { style: { font: font.label, color: "var(--text-label)", letterSpacing: ".08em", textTransform: "uppercase" } }, label),
+                e("div", { style: { font: font.label, color: "var(--text-secondary)", letterSpacing: ".08em", textTransform: "uppercase" } }, label),
                 e("div", { style: { marginTop: "3px", font: "600 16px var(--font-ui)", color: "var(--text-heading)" } }, value))))))),
       e("div", { key: "f", style: { flex: "none", padding: "8px 24px", background: "var(--interface-app)" } },
         e(DS.Button, {
@@ -482,6 +573,7 @@ class App extends React.Component {
         e("button", {
           type: "button",
           "aria-label": "New Session",
+          "data-dashboard-action": "",
           onClick: () => this.startNewSession(),
           style: {
             display: "block", width: "100%", padding: 0, border: "none",
@@ -493,7 +585,7 @@ class App extends React.Component {
           description: "Begin a new sound-matching session",
           style: { pointerEvents: "none" }
         })),
-        e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)", marginTop: "28px", marginBottom: "10px" } }, "EXPLORE PNQ"),
+        e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-secondary)", marginTop: "28px", marginBottom: "10px" } }, "EXPLORE PNQ"),
         e("div", { style: { display: "grid", gap: "10px" } },
           context.map((item) =>
             e(DS.Card, {
@@ -506,7 +598,7 @@ class App extends React.Component {
                 e(DS.Icon, { name: item.icon, size: 21, color: "var(--text-muted)" })),
               e("div", { style: { minWidth: 0 } },
                 e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, item.label),
-                e("div", { style: { marginTop: "2px", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-muted)" } }, item.copy)))))));
+                e("div", { style: { marginTop: "2px", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)" } }, item.copy)))))));
   }
 
   renderEar() {
@@ -519,7 +611,7 @@ class App extends React.Component {
         e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "18px" } },
           ["Left ear", "Right ear", "Both ears"].map((label) =>
             this.selectRowButton(label, label, st.ear === label, () => this.setEar(label)))),
-        st.earWarn ? e("div", { style: { marginTop: "14px" } }, e(DS.InlineAlert, { tone: "error" }, "Choose an ear to continue.")) : null),
+        st.earWarn ? e("div", { style: { marginTop: "14px" } }, this.alertBox("Choose an ear to continue.", false)) : null),
       this.bottomButton("Continue", () => st.ear ? this.goScreen("setup") : this.setState({ earWarn: true }), { disabled: !st.ear })
     ];
   }
@@ -542,7 +634,9 @@ class App extends React.Component {
           e("div", { style: { font: "400 14.5px/1.45 var(--font-text)", color: "var(--on-dark-60)", marginTop: "7px" } }, "A quick check before you begin.")),
         e("div", { style: { marginTop: "20px", background: "var(--interface-dark-raised)", border: "1px solid var(--interface-dark-border)", borderRadius: "16px", padding: "18px 16px" } },
           e("button", {
+            type: "button",
             onClick: () => this.setState((x) => ({ hp: !x.hp, setupWarn: false })),
+            "aria-pressed": st.hp ? "true" : "false",
             style: { display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "44px", border: "none", background: "transparent", padding: 0, cursor: "pointer", textAlign: "left" }
           },
             e(DS.Icon, { name: "headphones", size: 26, color: "var(--magenta-500)" }),
@@ -580,8 +674,10 @@ class App extends React.Component {
                   style: { position: "absolute", left: "-13px", right: "-13px", width: "calc(100% + 26px)", height: "44px", margin: 0, opacity: 0, cursor: "pointer", WebkitAppearance: "none", appearance: "none", background: "transparent" }
                 })),
               e(DS.Icon, { name: "volume", size: 17, color: "var(--on-dark-50)" })))),
-        e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--on-dark-50)", textAlign: "center", marginTop: "18px" } },
-          "You'll hear one or more sounds and compare them to the tinnitus you hear.")),
+        e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--text-on-dark-secondary)", textAlign: "center", marginTop: "18px" } },
+          "You'll hear one or more sounds and compare them to the tinnitus you hear."),
+        st.setupWarn ? e("div", { style: { marginTop: "14px" } },
+          this.alertBox("Connect headphones and set device volume to 100% to continue.", true)) : null),
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },
         e(DS.Button, {
           variant: "primary", size: "md", onDark: true, disabled: !(st.hp && ready),
@@ -709,7 +805,7 @@ class App extends React.Component {
         EDU.map((g) =>
           e("div", { key: g.cap, style: { marginTop: "16px" } },
             e(DS.Card, { variant: "section" },
-              e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
+              e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-secondary)" } }, g.cap),
               e("div", { style: { font: "600 15px/1.3 var(--font-ui)", color: "var(--text-heading)", marginTop: "7px" } }, g.title),
               e("div", { style: { font: "400 13.5px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "5px" } }, g.body),
               e("div", { style: { display: "flex", gap: "8px", marginTop: "13px" } },
@@ -1674,7 +1770,7 @@ class App extends React.Component {
           e("div", { style: { marginTop: "20px" } },
             e(DS.Card, { variant: "list" },
               done.rows.map((row) => e("div", { key: row.label, style: { padding: "13px 18px", borderTop: row.bt } },
-                e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)" } }, row.label),
+                e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-secondary)" } }, row.label),
                 e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
@@ -1738,32 +1834,41 @@ class App extends React.Component {
         { label: "Start screen", f: () => this.goScreen("launch") }
       ] }
     ];
-    return e("div", { "data-moderator-only": true, style: { position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column" } },
+    return e("div", {
+      id: "session-menu-dialog", ref: (node) => { this.menuDialog = node; },
+      "data-moderator-only": true, role: "dialog", "aria-modal": "true", "aria-label": "Session menu",
+      onKeyDown: (event) => this.onMenuKeyDown(event),
+      style: { position: "absolute", inset: 0, zIndex: 30, display: "flex", flexDirection: "column" }
+    },
       e("div", { style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .55 } }),
-      e("button", { onClick: () => this.setState({ menuOpen: false, jumpOpen: false }), "aria-label": "Close menu", style: { flex: 1, border: "none", background: "transparent", cursor: "pointer", minHeight: "60px", position: "relative" } }),
+      e("button", { type: "button", onClick: () => this.closeMenu(), "aria-label": "Close menu", style: { flex: 1, border: "none", background: "transparent", cursor: "pointer", minHeight: "60px", position: "relative" } }),
       e("div", { style: { flex: "none", maxHeight: "86%", overflowY: "auto", background: "var(--white)", borderRadius: "22px 22px 0 0", padding: "16px 18px 22px", position: "relative" } },
         e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" } },
           e("div", null,
-            e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, "SESSION MENU"),
+            e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-secondary)" } }, "SESSION MENU"),
             e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)", marginTop: "4px" } }, where)),
-          e("button", { onClick: () => this.setState({ menuOpen: false, jumpOpen: false }), "aria-label": "Close", style: { flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" } },
+          e("button", { type: "button", ref: (node) => { this.menuCloseButton = node; }, onClick: () => this.closeMenu(), "aria-label": "Close", style: { flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" } },
             e(DS.Icon, { name: "close", size: 20, color: "var(--gray-600)" }))),
         st.menuStopped ? e("div", { style: { font: "400 12.5px/1.45 var(--font-text)", color: "var(--text-muted)", marginTop: "6px" } }, "Sound stopped.") : null,
         e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px" } },
           actions.map((a) =>
             e("button", { key: a.label, onClick: a.f, style: { display: "flex", alignItems: "center", width: "100%", minHeight: "52px", padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-200)", background: "var(--white)", cursor: "pointer", textAlign: "left", font: "600 14.5px var(--font-ui)", color: "var(--text-heading)" } }, a.label))),
-        e("button", { onClick: () => this.setState((x) => ({ jumpOpen: !x.jumpOpen })), style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", minHeight: "52px", marginTop: "12px", padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-300)", background: "var(--gray-50)", cursor: "pointer", textAlign: "left", font: "600 14.5px var(--font-ui)", color: "var(--text-heading)" } },
+        e("button", {
+          type: "button", onClick: () => this.setState((x) => ({ jumpOpen: !x.jumpOpen })),
+          "aria-expanded": st.jumpOpen ? "true" : "false", "aria-controls": "session-menu-jumps",
+          style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", width: "100%", minHeight: "52px", marginTop: "12px", padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-300)", background: "var(--gray-50)", cursor: "pointer", textAlign: "left", font: "600 14.5px var(--font-ui)", color: "var(--text-heading)" }
+        },
           "Jump to a different section",
-          e("span", { style: { flex: "none", display: "block", width: "9px", height: "9px", borderRight: "2.2px solid var(--gray-600)", borderBottom: "2.2px solid var(--gray-600)", transform: "rotate(" + (st.jumpOpen ? "225deg" : "45deg") + ")", transition: "transform 200ms ease" } })),
-        st.jumpOpen ? e("div", { style: { marginTop: "12px", display: "flex", flexDirection: "column", gap: "16px" } },
+          e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "9px", height: "9px", borderRight: "2.2px solid var(--gray-600)", borderBottom: "2.2px solid var(--gray-600)", transform: "rotate(" + (st.jumpOpen ? "225deg" : "45deg") + ")", transition: "transform 200ms ease" } })),
+        st.jumpOpen ? e("div", { id: "session-menu-jumps", style: { marginTop: "12px", display: "flex", flexDirection: "column", gap: "16px" } },
           jumpGroups.map((g) =>
             e("div", { key: g.cap },
-              e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-label)" } }, g.cap),
+              e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-secondary)" } }, g.cap),
               e("div", { style: { display: "flex", flexWrap: "wrap", gap: "7px", marginTop: "9px" } },
                 g.items.map((it) =>
                   e("button", { key: it.label, onClick: it.f, style: { minHeight: "44px", padding: "9px 13px", borderRadius: "999px", border: "1.5px solid var(--gray-300)", background: "var(--white)", color: "var(--text-body)", font: "600 12.5px var(--font-ui)", cursor: "pointer" } }, it.label))))),
           e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
-            e("span", { style: { font: "500 13px var(--font-ui)", color: "var(--text-muted)" } }, "Technical values (Hz · dB)"),
+            e("span", { style: { font: "500 13px var(--font-ui)", color: "var(--text-secondary)" } }, "Technical values (Hz · dB)"),
             e("button", {
               onClick: () => this.setState((x) => ({ showTech: !x.showTech })),
               "aria-label": "Toggle technical values", "aria-pressed": st.showTech ? "true" : "false",
@@ -1827,7 +1932,7 @@ class App extends React.Component {
       },
         framed
           ? e(DS.StatusBar, { time: "9:41", onDark: statusOnDark, background: statusOnDark ? "var(--navy-800)" : chromeBg })
-          : e("div", { style: { flex: "none", height: "env(safe-area-inset-top)", background: chromeBg } }),
+          : e("div", { "data-safe-area": "top", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-top)", background: chromeBg } }),
         progShow ? e("div", { "data-progress": "", style: { flex: "none", padding: "10px 22px 12px", background: "var(--gray-50)", borderBottom: "1px solid var(--gray-200)" } },
           e("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" } },
             e("span", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, prog.lbl),
@@ -1844,13 +1949,14 @@ class App extends React.Component {
           st.screen === "dashboard"
             ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
             : e("button", {
-              onClick: () => { const was = this.state.playKey !== null; this.hardStop(); this.setState({ menuOpen: true, menuStopped: was }); },
-              "aria-label": "Session menu",
-              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
+              type: "button", ref: (node) => { this.menuButton = node; }, onClick: () => this.openMenu(),
+              "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
+              "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
+              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
             })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
-          : e("div", { style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
+          : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
   }
 }
 

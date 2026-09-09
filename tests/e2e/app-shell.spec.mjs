@@ -21,6 +21,91 @@ async function completeSetup(page) {
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 }
 
+async function completeOptionFromConfidence(page, optionLabel) {
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("button", { name: "Jump to a different section" }).click();
+  const group = page.getByText(optionLabel.toUpperCase(), { exact: true }).locator("..");
+  await group.getByRole("button", { name: "Confidence", exact: true }).click();
+  await page.getByRole("button", { name: "Very close", exact: true }).click();
+  await page.getByRole("button", { name: "Finish matching" }).click();
+  await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
+  await page.getByRole("button", { name: /Return to matching options|Finish session/ }).click();
+}
+
+async function visitShellScreens(page, audit) {
+  await page.goto("/");
+  await audit("Launch");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await audit("Privacy");
+  await page.getByRole("checkbox", { name: /research prototype/i }).check();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await audit("Create account · entry");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await audit("Create account · confirmation");
+  await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+  await audit("Dashboard");
+  await page.getByRole("button", { name: "New Session" }).click();
+  await audit("Setup · Ear");
+  await page.getByRole("button", { name: "Both ears", exact: true }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await audit("Setup · Headphones and volume");
+  await page.getByRole("button", { name: /Headphones/ }).click();
+  await page.getByLabel("Device volume").fill("100");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await audit("Shared · What to listen for");
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
+  await audit("Matching options");
+  await completeOptionFromConfidence(page, "Option 1");
+  await completeOptionFromConfidence(page, "Option 2");
+  await completeOptionFromConfidence(page, "Option 3");
+  await audit("Session complete");
+}
+
+async function expectContainedShell(page, expectedMode) {
+  const geometry = await page.locator("[data-device-frame]").evaluate((frame) => {
+    const screen = frame.querySelector("[data-screen]");
+    const frameRect = frame.getBoundingClientRect();
+    const screenRect = screen.getBoundingClientRect();
+    return {
+      frameWidth: frameRect.width,
+      frameHeight: frameRect.height,
+      frameCenterX: frameRect.left + frameRect.width / 2,
+      frameCenterY: frameRect.top + frameRect.height / 2,
+      screenInsideFrame: screenRect.left >= frameRect.left - 1
+        && screenRect.right <= frameRect.right + 1
+        && screenRect.top >= frameRect.top - 1
+        && screenRect.bottom <= frameRect.bottom + 1,
+      screenHasNoHorizontalOverflow: screen.scrollWidth <= screen.clientWidth + 1,
+      documentHasNoHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      screen: screen.getAttribute("data-screen"),
+      hasUsableScrollRegion: [...screen.querySelectorAll("*")].some((element) => {
+        const overflow = getComputedStyle(element).overflowY;
+        return (overflow === "auto" || overflow === "scroll") && element.clientHeight > 0;
+      }),
+      logicalWidth: parseFloat(getComputedStyle(frame).width),
+      logicalHeight: parseFloat(getComputedStyle(frame).height)
+    };
+  });
+
+  await expect(page.locator("[data-device-frame]")).toHaveAttribute("data-device-frame", expectedMode);
+  expect(geometry.screenInsideFrame).toBe(true);
+  expect(geometry.screenHasNoHorizontalOverflow).toBe(true);
+  expect(geometry.documentHasNoHorizontalOverflow).toBe(true);
+  if (geometry.screen !== "launch") expect(geometry.hasUsableScrollRegion).toBe(true);
+  if (expectedMode === "bare") {
+    expect(Math.round(geometry.frameWidth)).toBe(390);
+    expect(Math.round(geometry.frameHeight)).toBe(844);
+    await expect(page.locator('[data-safe-area="top"]')).toHaveCount(1);
+    await expect(page.locator('[data-safe-area="bottom"]')).toHaveCount(1);
+  } else {
+    expect(geometry.logicalWidth).toBe(390);
+    expect(geometry.logicalHeight).toBe(844);
+    expect(geometry.frameCenterX).toBeCloseTo((await page.evaluate(() => innerWidth)) / 2, 0);
+    expect(geometry.frameCenterY).toBeCloseTo((await page.evaluate(() => innerHeight)) / 2, 0);
+    await expect(page.locator("[data-safe-area]")).toHaveCount(0);
+  }
+}
+
 test.describe("app shell", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -106,6 +191,26 @@ test.describe("app shell", () => {
 });
 
 test.describe("app shell chrome", () => {
+  test("every shell screen is contained at 390 by 844 with safe-area chrome and no horizontal overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const visited = [];
+    await visitShellScreens(page, async (label) => {
+      visited.push(label);
+      await expectContainedShell(page, "bare");
+    });
+    expect(visited).toEqual([
+      "Launch", "Privacy", "Create account · entry", "Create account · confirmation",
+      "Dashboard", "Setup · Ear", "Setup · Headphones and volume",
+      "Shared · What to listen for", "Matching options", "Session complete"
+    ]);
+  });
+
+  test("every shell screen remains a centered logical 390 by 844 phone on desktop", async ({ page }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await visitShellScreens(page, async () => expectContainedShell(page, "framed"));
+  });
+
   test("app shell renders the framed device >=620px and bare fullscreen below, without state loss", async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 800 });
     await page.goto("/");
@@ -119,16 +224,35 @@ test.describe("app shell chrome", () => {
     const canvasBg = await page.evaluate(() => getComputedStyle(document.querySelector("#root > div")).backgroundColor);
     expect(canvasBg).toBe("rgb(233, 231, 226)"); // the documented #e9e7e2 canvas
 
-    // Navigate, then cross the breakpoint: same markup, state preserved.
-    await startSessionFromSplash(page);
-    await page.setViewportSize({ width: 390, height: 700 });
+    // Navigate, then cross the exact breakpoint: the draft and screen survive.
+    await page.getByRole("button", { name: "Get started" }).click();
+    await page.getByRole("checkbox", { name: /research prototype/i }).check();
+    await page.getByRole("button", { name: "Continue" }).click();
+    const input = page.getByRole("textbox", { name: "Simulated prescription ID" });
+    await input.fill("LOCAL-ONLY-DRAFT");
+    await page.setViewportSize({ width: 619, height: 900 });
     await expect(frame).toHaveAttribute("data-device-frame", "bare");
     await expect(page.getByText("9:41")).toHaveCount(0);
-    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Create account"]')).toBeVisible();
+    await expect(input).toHaveValue("LOCAL-ONLY-DRAFT");
     const bare = await frame.boundingBox();
-    expect(Math.round(bare.width)).toBe(390);
-    await page.setViewportSize({ width: 900, height: 900 });
+    expect(Math.round(bare.width)).toBe(619);
+    await page.setViewportSize({ width: 620, height: 900 });
     await expect(frame).toHaveAttribute("data-device-frame", "framed");
-    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Create account"]')).toBeVisible();
+    await expect(input).toHaveValue("LOCAL-ONLY-DRAFT");
+    expect(Math.round((await frame.boundingBox()).width)).toBe(390);
+  });
+
+  test("responsive web shell does not opt into installability or offline state", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
+    expect(await page.locator('script[src*="service"],script[src*="worker"],script[src*="sw."]').count()).toBe(0);
+    const registrations = await page.evaluate(async () => (
+      "serviceWorker" in navigator ? (await navigator.serviceWorker.getRegistrations()).length : 0
+    ));
+    const cacheKeys = await page.evaluate(async () => ("caches" in window ? (await caches.keys()).length : 0));
+    expect(registrations).toBe(0);
+    expect(cacheKeys).toBe(0);
   });
 });
