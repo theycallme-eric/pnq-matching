@@ -465,29 +465,48 @@ class App extends React.Component {
   }
 
   renderDashboard() {
-    const contextRows = [
-      ["message", "Messages", "No messages in this prototype"],
-      ["history", "Session history", "No sessions yet"]
+    const context = [
+      { icon: "sparkles", label: "Wellness resources", copy: "Ideas for everyday listening comfort" },
+      { icon: "headphones", label: "Listening tips", copy: "Simple ways to prepare your space" },
+      { icon: "prescription", label: "Help and support", copy: "Guidance for using PNQ Health" }
     ];
-    return [
-      e("div", { key: "h", style: { flex: "none", padding: "20px 24px 26px", background: "var(--gradient-navy-dashboard)", color: "var(--white)" } },
-        e("div", { style: { font: font.label, letterSpacing: ".14em", color: "var(--brand-blue-light)" } }, "PNQ HEALTH"),
-        e("div", { style: { marginTop: "12px", font: "700 29px/1.14 var(--font-ui)", letterSpacing: "-.018em" } }, "Welcome"),
-        e("div", { style: { marginTop: "9px", font: "400 15px/1.5 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
-          "Your prototype sound-matching session is ready.")),
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "22px 22px 12px", background: "var(--interface-app)" } },
-        e(DS.Button, { variant: "primary", size: "lg", onClick: () => this.startNewSession() }, "New Session"),
-        e(DS.SectionLabel, { rule: true, style: { margin: "28px 4px 14px" } }, "PNQ app context"),
-        e(DS.Card, { variant: "list" },
-          contextRows.map(([icon, label, sublabel], i) => e(React.Fragment, { key: label },
-            i ? e(DS.CardDivider) : null,
-            e("div", { style: { display: "flex", alignItems: "center", gap: "15px", padding: "17px 18px" } },
+    return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--interface-app)" } },
+      e("header", { style: { flex: "none", background: "var(--gradient-navy-dashboard)", color: "var(--text-on-dark)", padding: "18px 24px 28px" } },
+        e("div", { style: { display: "flex", alignItems: "center", gap: "9px" } },
+          e("img", { src: "assets/waveform-mark.svg", alt: "", style: { width: "28px", height: "28px" } }),
+          e("div", { style: { font: "700 17px var(--font-ui)", letterSpacing: "-.015em", color: "var(--text-on-dark)" } }, "pnq health")),
+        e("h1", { style: { margin: "22px 0 0", font: "700 29px/1.1 var(--font-ui)", letterSpacing: "-.02em", color: "var(--text-on-dark)" } }, "Welcome to PNQ"),
+        e("p", { style: { margin: "8px 0 0", maxWidth: "310px", font: "400 15px/1.4 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
+          "Your place for calm, guided listening support.")),
+      e("main", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "22px 22px 18px" } },
+        e("button", {
+          type: "button",
+          "aria-label": "New Session",
+          onClick: () => this.startNewSession(),
+          style: {
+            display: "block", width: "100%", padding: 0, border: "none",
+            borderRadius: "var(--radius-hero)", background: "transparent",
+            color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer"
+          }
+        }, e(DS.HeroActionCard, {
+          title: "New Session",
+          description: "Begin a new sound-matching session",
+          style: { pointerEvents: "none" }
+        })),
+        e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)", marginTop: "28px", marginBottom: "10px" } }, "EXPLORE PNQ"),
+        e("div", { style: { display: "grid", gap: "10px" } },
+          context.map((item) =>
+            e(DS.Card, {
+              key: item.label,
+              variant: "section",
+              "data-context-tile": "",
+              style: { display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", boxShadow: "var(--shadow-card-sm)", cursor: "default", pointerEvents: "none", userSelect: "none" }
+            },
               e(DS.IconTile, { size: "md", tone: "neutral" },
-                e(DS.Icon, { name: icon, size: 22, color: "var(--gray-500)" })),
-              e("div", null,
-                e("div", { style: { font: "600 16px var(--font-ui)", color: "var(--text-heading)" } }, label),
-                e("div", { style: { marginTop: "2px", font: "400 12.5px var(--font-text)", color: "var(--text-label)" } }, sublabel)))))))
-    ];
+                e(DS.Icon, { name: item.icon, size: 21, color: "var(--text-muted)" })),
+              e("div", { style: { minWidth: 0 } },
+                e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, item.label),
+                e("div", { style: { marginTop: "2px", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-muted)" } }, item.copy)))))));
   }
 
   renderEar() {
@@ -1737,6 +1756,7 @@ class App extends React.Component {
     const statusOnDark = dark || onboardingScreen;
     const indicatorOnDark = dark || st.screen === "launch";
     const chromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
+    const statusBg = statusOnDark ? "var(--navy-800)" : "var(--gray-50)";
     const chromeLine = dark ? "var(--interface-dark-border)" : "var(--gray-200)";
     const chromeFg = dark ? "var(--blue-300)" : "var(--blue-700)";
     const prog = shell.progress(c, s, st);
@@ -1797,11 +1817,13 @@ class App extends React.Component {
             ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
             : e("span", { style: { display: "block", width: "8px", height: "44px" } }),
-          e("button", {
-            onClick: () => { const was = this.state.playKey !== null; this.hardStop(); this.setState({ menuOpen: true, menuStopped: was }); },
-            "aria-label": "Session menu",
-            style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
-          })),
+          st.screen === "dashboard"
+            ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
+            : e("button", {
+              onClick: () => { const was = this.state.playKey !== null; this.hardStop(); this.setState({ menuOpen: true, menuStopped: was }); },
+              "aria-label": "Session menu",
+              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
+            })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
           : e("div", { style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
