@@ -158,6 +158,11 @@ class App extends React.Component {
     this.setState((s) => shell.goScreenState(s, screen, extra));
   }
 
+  startNewSession() {
+    this.hardStop();
+    this.setState((s) => shell.newSessionState(s));
+  }
+
   openOption(cid, stage, seed) {
     this.hardStop();
     this.setState((s) => shell.openOptionState(s, cid, stage, seed));
@@ -283,6 +288,51 @@ class App extends React.Component {
               e("span", { style: { font: "400 14.5px/1.45 var(--font-text)", color: "var(--text-body)" } }, t))))),
       this.bottomButton("Get started", () => this.goScreen("ear"))
     ];
+  }
+
+  renderDashboard() {
+    const context = [
+      { icon: "sparkles", label: "Wellness resources", copy: "Ideas for everyday listening comfort" },
+      { icon: "headphones", label: "Listening tips", copy: "Simple ways to prepare your space" },
+      { icon: "prescription", label: "Help and support", copy: "Guidance for using PNQ Health" }
+    ];
+    return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--interface-app)" } },
+      e("header", { style: { flex: "none", background: "var(--gradient-navy-dashboard)", color: "var(--text-on-dark)", padding: "18px 24px 28px" } },
+        e("div", { style: { display: "flex", alignItems: "center", gap: "9px" } },
+          e("img", { src: "assets/waveform-mark.svg", alt: "", style: { width: "28px", height: "28px" } }),
+          e("div", { style: { font: "700 17px var(--font-ui)", letterSpacing: "-.015em", color: "var(--text-on-dark)" } }, "pnq health")),
+        e("h1", { style: { margin: "22px 0 0", font: "700 29px/1.1 var(--font-ui)", letterSpacing: "-.02em", color: "var(--text-on-dark)" } }, "Welcome to PNQ"),
+        e("p", { style: { margin: "8px 0 0", maxWidth: "310px", font: "400 15px/1.4 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
+          "Your place for calm, guided listening support.")),
+      e("main", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "22px 22px 18px" } },
+        e("button", {
+          type: "button",
+          "aria-label": "New Session",
+          onClick: () => this.startNewSession(),
+          style: {
+            display: "block", width: "100%", padding: 0, border: "none",
+            borderRadius: "var(--radius-hero)", background: "transparent",
+            color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer"
+          }
+        }, e(DS.HeroActionCard, {
+          title: "New Session",
+          description: "Begin a new sound-matching session",
+          style: { pointerEvents: "none" }
+        })),
+        e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)", marginTop: "28px", marginBottom: "10px" } }, "EXPLORE PNQ"),
+        e("div", { style: { display: "grid", gap: "10px" } },
+          context.map((item) =>
+            e(DS.Card, {
+              key: item.label,
+              variant: "section",
+              "data-context-tile": "",
+              style: { display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", boxShadow: "var(--shadow-card-sm)", cursor: "default", pointerEvents: "none", userSelect: "none" }
+            },
+              e(DS.IconTile, { size: "md", tone: "neutral" },
+                e(DS.Icon, { name: item.icon, size: 21, color: "var(--text-muted)" })),
+              e("div", { style: { minWidth: 0 } },
+                e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, item.label),
+                e("div", { style: { marginTop: "2px", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-muted)" } }, item.copy)))))));
   }
 
   renderEar() {
@@ -1528,7 +1578,9 @@ class App extends React.Component {
   render() {
     const st = this.state, c = st.concept, s = st.stages[c];
     const framed = st.framed, dark = st.screen === "setup";
+    const statusOnDark = dark || st.screen === "dashboard";
     const chromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
+    const statusBg = statusOnDark ? "var(--navy-800)" : "var(--gray-50)";
     const chromeLine = dark ? "var(--interface-dark-border)" : "var(--gray-200)";
     const chromeFg = dark ? "var(--blue-300)" : "var(--blue-700)";
     const prog = shell.progress(c, s, st);
@@ -1538,6 +1590,7 @@ class App extends React.Component {
 
     const body = {
       launch: () => this.renderLaunch(),
+      dashboard: () => this.renderDashboard(),
       ear: () => this.renderEar(),
       setup: () => this.renderSetup(),
       home: () => this.renderHome(),
@@ -1570,8 +1623,8 @@ class App extends React.Component {
         }
       },
         framed
-          ? e(DS.StatusBar, { time: "9:41", onDark: dark })
-          : e("div", { style: { flex: "none", height: "env(safe-area-inset-top)", background: chromeBg } }),
+          ? e(DS.StatusBar, { time: "9:41", onDark: statusOnDark, background: statusBg })
+          : e("div", { style: { flex: "none", height: "env(safe-area-inset-top)", background: statusBg } }),
         progShow ? e("div", { "data-progress": "", style: { flex: "none", padding: "10px 22px 12px", background: "var(--gray-50)", borderBottom: "1px solid var(--gray-200)" } },
           e("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" } },
             e("span", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, prog.lbl),
@@ -1585,11 +1638,13 @@ class App extends React.Component {
             ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
             : e("span", { style: { display: "block", width: "8px", height: "44px" } }),
-          e("button", {
-            onClick: () => { const was = this.state.playKey !== null; this.hardStop(); this.setState({ menuOpen: true, menuStopped: was }); },
-            "aria-label": "Session menu",
-            style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
-          })),
+          st.screen === "dashboard"
+            ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
+            : e("button", {
+              onClick: () => { const was = this.state.playKey !== null; this.hardStop(); this.setState({ menuOpen: true, menuStopped: was }); },
+              "aria-label": "Session menu",
+              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "default" }
+            })),
         framed
           ? e(DS.HomeIndicator, { onDark: dark })
           : e("div", { style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
