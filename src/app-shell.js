@@ -399,18 +399,27 @@ export function doneData(st, specs) {
   };
 }
 
+// Predict the destination of the participant action on Match complete without
+// mutating progress. The open option counts once even when it was completed
+// before, so duplicate runs can never finish a session early.
+export function completionDestination(s) {
+  if (!OPTORDER.includes(s.concept)) return "home";
+  const optDone = { ...neutralOptionDone(s.optDone), [s.concept]: true };
+  return OPTORDER.every((cid) => optDone[cid] === true) ? "conclusion" : "home";
+}
+
 // Mark the open participant option with a neutral completion marker. The first
-// and second options return to the selector; the third reaches the stable final
-// conclusion. Confidence remains only in memory and is never copied here.
+// and second distinct options return to the selector; the third reaches the
+// stable final conclusion. Confidence remains only in memory and is never
+// copied here.
 export function completeOptionState(s) {
   const c = s.concept;
   if (!OPTORDER.includes(c)) return goScreenState(s, "home");
   const optDone = { ...neutralOptionDone(s.optDone), [c]: true };
   const priorOrder = completionOrder(s.optOrder, optDone);
   const optOrder = priorOrder.includes(c) ? priorOrder : [...priorOrder, c];
-  const target = OPTORDER.every((cid) => optDone[cid] === true) ? "conclusion" : "home";
   return {
-    ...goScreenState(s, target),
+    ...goScreenState(s, completionDestination(s)),
     optDone,
     optOrder
   };

@@ -28,7 +28,7 @@ test("completion data is derived from the final matched sound and participant st
   assert.match(done.tech, /dB/);
 });
 
-test("returning home records a neutral marker once and preserves completion order", () => {
+test("participant completion records a neutral marker once and preserves completion order", () => {
   const state = {
     ...shell.initialState(), screen: "flow", concept: "r", optDone: { n: true }, optOrder: ["n"],
     r: { ...shell.freshR(), conf: "Fairly close" }
@@ -38,4 +38,34 @@ test("returning home records a neutral marker once and preserves completion orde
   assert.equal(complete.optDone.r, true);
   assert.deepEqual(complete.optOrder, ["n", "r"]);
   assert.equal(complete.playKey, null);
+});
+
+test("only a third distinct completion concludes, in every option order", () => {
+  const orders = [
+    ["n", "r", "d"], ["n", "d", "r"],
+    ["r", "n", "d"], ["r", "d", "n"],
+    ["d", "n", "r"], ["d", "r", "n"]
+  ];
+
+  for (const order of orders) {
+    let state = { ...shell.initialState(), screen: "home" };
+    order.forEach((cid, index) => {
+      state = shell.completeOptionState(shell.openOptionState(state, cid));
+      assert.equal(state.screen, index === 2 ? "conclusion" : "home", order.join(" → "));
+      assert.deepEqual(state.optOrder, order.slice(0, index + 1));
+    });
+  }
+});
+
+test("repeating a completed option neither increments distinct progress nor concludes early", () => {
+  let state = { ...shell.initialState(), screen: "home" };
+  state = shell.completeOptionState(shell.openOptionState(state, "d"));
+  state = shell.completeOptionState(shell.openOptionState(state, "d"));
+  assert.equal(state.screen, "home");
+  assert.deepEqual(state.optDone, { d: true });
+  assert.deepEqual(state.optOrder, ["d"]);
+
+  state = shell.completeOptionState(shell.openOptionState(state, "n"));
+  assert.equal(state.screen, "home");
+  assert.deepEqual(state.optOrder, ["d", "n"]);
 });

@@ -25,6 +25,43 @@ async function reachReadyHub(page) {
   await expect(hub(page)).toBeVisible();
 }
 
+async function restoreReadyHub(page) {
+  await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
+    onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true, optDone: {}, optOrder: []
+  })));
+  await page.goto("/");
+  await expect(hub(page)).toBeVisible();
+}
+
+const optionCid = { 1: "n", 2: "r", 3: "d" };
+
+async function completeFromConfidence(page, n, concludes) {
+  await option(page, n).click();
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("button", { name: "Jump to a different section" }).click();
+  await page.getByRole("button", { name: "Confidence", exact: true }).nth(n - 1).click();
+  await page.getByText("Fairly close", { exact: true }).click();
+  await page.getByRole("button", { name: "Finish matching" }).click();
+
+  const completion = page.locator('[data-screen-label="Shared · Match complete"]');
+  await expect(completion).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+  await page.waitForTimeout(200);
+  await expect(completion).toBeVisible();
+
+  if (concludes) {
+    await page.evaluate(() => window.__pnqAudioEngine.play("completion-probe", [
+      { kind: "tone", pitch: 0.5, level: 0.3 }
+    ]));
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("completion-probe");
+  }
+  await page.getByRole("button", {
+    name: concludes ? "Finish session" : "Return to matching options"
+  }).click();
+  await expect(page.locator(`[data-screen-label="${concludes ? "Session complete" : "Matching options"}"]`)).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+}
+
 // Walks a flow to Match complete and returns to the hub. Each stage's
 // judgment is heard-gated (REQ-018), so play the sound before advancing.
 async function completeOption(page, n) {
@@ -155,6 +192,58 @@ test.describe("home hub", () => {
     expect(st.r.spread).toBe(.28);
     expect(st.optOrder).toEqual(["d", "n"]);
     expect(Object.keys(st.optDone).sort()).toEqual(["d", "n"]);
+  });
+
+  for (const order of [
+    [1, 2, 3], [1, 3, 2], [2, 1, 3],
+    [2, 3, 1], [3, 1, 2], [3, 2, 1]
+  ]) {
+    test(`the third distinct completion concludes in order ${order.join(" → ")}`, async ({ page }) => {
+      await restoreReadyHub(page);
+
+      for (const [index, n] of order.entries()) {
+        await completeFromConfidence(page, n, index === 2);
+        const expectedIds = order.slice(0, index + 1).map((number) => optionCid[number]);
+        const state = await page.evaluate(() => window.__pnqAppState());
+        expect(state.optOrder).toEqual(expectedIds);
+        expect(Object.keys(state.optDone).sort()).toEqual([...expectedIds].sort());
+        if (index < 2) {
+          for (const completed of order.slice(0, index + 1)) {
+            await expect(option(page, completed).getByText("Done", { exact: true })).toBeVisible();
+          }
+        }
+      }
+
+      const conclusion = page.locator('[data-screen-label="Session complete"]');
+      await expect(conclusion).toContainText("All three options are complete");
+      const conclusionText = await conclusion.innerText();
+      expect(conclusionText).not.toMatch(/winner|best match|rank|recommend|start treatment/i);
+      expect(auditParticipantStrings(conclusionText.split(/\n+/))).toEqual([]);
+      await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+      await page.waitForTimeout(300);
+      await expect(conclusion).toBeVisible();
+      expect(await page.evaluate(() => window.__pnqAppState().optOrder)).toEqual(order.map((n) => optionCid[n]));
+
+      await page.getByRole("button", { name: "Session menu" }).click();
+      await expect(page.getByRole("button", { name: "Reset the prototype" })).toBeVisible();
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await expect(conclusion).toBeVisible();
+      expect((await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")))).optOrder)
+        .toEqual(order.map((n) => optionCid[n]));
+    });
+  }
+
+  test("repeating a completed option does not add progress or conclude early", async ({ page }) => {
+    await restoreReadyHub(page);
+    await completeFromConfidence(page, 3, false);
+    await completeFromConfidence(page, 3, false);
+
+    const state = await page.evaluate(() => window.__pnqAppState());
+    expect(state.screen).toBe("home");
+    expect(state.optDone).toEqual({ d: true });
+    expect(state.optOrder).toEqual(["d"]);
+    await expect(page.locator('[data-screen-label="Session complete"]')).toHaveCount(0);
+    await expect(option(page, 3).getByText("Done", { exact: true })).toBeVisible();
   });
 
   test("home hub ear control re-routes the engine without leaving the hub", async ({ page }) => {
