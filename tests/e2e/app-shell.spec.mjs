@@ -16,8 +16,6 @@ async function completeSetup(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-  await page.getByRole("button", { name: "What to listen for" }).click();
   await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
   await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
@@ -73,9 +71,16 @@ test.describe("app shell", () => {
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(back).toBeVisible();
     await back.click();
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await page.getByRole("button", { name: "What to listen for" }).click();
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /Headphones Plug in/ }).click();
+    await page.getByLabel("Device volume").fill("100");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
     await back.click();
+    await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   });
 
@@ -85,7 +90,7 @@ test.describe("app shell", () => {
     await page.getByRole("button", { name: "What to listen for" }).click();
     await page.getByRole("button", { name: /A lower sound/ }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
-    await page.getByRole("button", { name: "Back" }).click();
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     // After the transition nothing is audible until a new play action.
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);

@@ -1,7 +1,7 @@
 /*
- * End-to-end tests for the home hub (REQ-005): the priming gate on the three
- * neutral Option rows, Done pills with completion-order tracking, and the ear
- * segmented control re-routing audio without leaving the hub.
+ * End-to-end tests for the home hub (REQ-005): arrival only after the shared
+ * session gates, neutral Option rows, Done pills with completion-order
+ * tracking, and ear re-routing without leaving the hub.
  */
 import { test, expect } from "@playwright/test";
 import { startSessionFromSplash } from "./onboarding-helpers.mjs";
@@ -10,27 +10,14 @@ const hub = (page) => page.locator('[data-screen-label="Matching options"]');
 // Substring name match: a completed row's accessible name is "Option N Done".
 const option = (page, n) => page.getByRole("button", { name: "Option " + n });
 
-async function reachUnprimedHub(page) {
+async function reachReadyHub(page) {
   await page.goto("/");
   await startSessionFromSplash(page);
   await page.getByText("Both ears", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
-  await page.getByRole("button", { name: "Back" }).click();
-  await expect(hub(page)).toBeVisible();
-}
-
-async function completeDeviceSetup(page) {
-  await page.getByRole("button", { name: "Headphones and volume" }).click();
-  await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(hub(page)).toBeVisible();
-}
-
-async function completeEdu(page) {
-  await page.getByRole("button", { name: "What to listen for" }).click();
   await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
   await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(hub(page)).toBeVisible();
@@ -76,40 +63,27 @@ async function completeOption(page, n, continues) {
 test.describe("home hub", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("home hub keeps the option rows aria-disabled until setupSeen and eduSeen are both true", async ({ page }) => {
-    await reachUnprimedHub(page);
-
-    // Locked: aria-disabled plus the non-interactive styling on all three rows.
-    for (const n of [1, 2, 3]) {
-      const row = option(page, n);
-      await expect(row).toHaveAttribute("aria-disabled", "true");
-      await expect(row).toHaveCSS("cursor", "not-allowed");
-      await expect(row).toHaveCSS("box-shadow", "none");
-    }
-    const lockedBg = await option(page, 1).evaluate((el) => getComputedStyle(el).backgroundColor);
-
-    // Clicking a locked row does not open its flow. force bypasses
-    // Playwright's own aria-disabled actionability check so the app's guard
-    // is what gets exercised.
-    await option(page, 1).click({ force: true });
+  test("home hub appears only after setup and education, with all option rows enabled", async ({ page }) => {
+    await page.goto("/");
+    await startSessionFromSplash(page);
+    await expect(hub(page)).toHaveCount(0);
+    await expect(option(page, 1)).toHaveCount(0);
+    await page.getByText("Both ears", { exact: true }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(hub(page)).toHaveCount(0);
+    await page.getByRole("button", { name: /Headphones Plug in/ }).click();
+    await page.getByLabel("Device volume").fill("100");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(hub(page)).toHaveCount(0);
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(hub(page)).toBeVisible();
-    expect(await page.evaluate(() => window.__pnqAppState().screen)).toBe("home");
-
-    // One flag alone is not enough: still locked after device setup only.
-    await completeDeviceSetup(page);
-    await expect(option(page, 2)).toHaveAttribute("aria-disabled", "true");
-    await option(page, 2).click({ force: true });
-    await expect(hub(page)).toBeVisible();
-
-    // Both flags true: aria-disabled drops and enabled styling flips in.
-    await completeEdu(page);
     for (const n of [1, 2, 3]) {
       const row = option(page, n);
       await expect(row).not.toHaveAttribute("aria-disabled", /.*/);
       await expect(row).toHaveCSS("cursor", "pointer");
       await expect(row).not.toHaveCSS("box-shadow", "none");
     }
-    expect(await option(page, 1).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(lockedBg);
 
     // An enabled row opens its flow.
     await option(page, 1).click();
@@ -117,7 +91,7 @@ test.describe("home hub", () => {
   });
 
   test("home hub shows only neutral participant-facing labels", async ({ page }) => {
-    await reachUnprimedHub(page);
+    await reachReadyHub(page);
     await expect(option(page, 1)).toBeVisible();
     await expect(option(page, 2)).toBeVisible();
     await expect(option(page, 3)).toBeVisible();
@@ -127,13 +101,10 @@ test.describe("home hub", () => {
   });
 
   test("home hub earns Done pills and tracks completion order", async ({ page }) => {
-    await reachUnprimedHub(page);
-    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    await reachReadyHub(page);
 
-    // Each setup row earns its gray check pill after being visited.
-    await completeDeviceSetup(page);
+    // Each completed session gate has its gray check pill on selector arrival.
     await expect(page.getByRole("button", { name: "Headphones and volume" }).getByText("Done")).toBeVisible();
-    await completeEdu(page);
     const eduRow = page.getByRole("button", { name: "What to listen for" });
     await expect(eduRow.getByText("Done")).toBeVisible();
     await expect(eduRow.locator("svg")).toHaveCount(2); // check pill + chevron
@@ -163,7 +134,7 @@ test.describe("home hub", () => {
         return p;
       };
     });
-    await reachUnprimedHub(page);
+    await reachReadyHub(page);
 
     const earControl = page.getByRole("group", { name: "Sound plays in" });
     await expect(earControl.getByRole("button", { name: "Both", exact: true })).toHaveAttribute("aria-pressed", "true");

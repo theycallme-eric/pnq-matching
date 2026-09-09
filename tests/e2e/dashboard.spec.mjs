@@ -80,8 +80,8 @@ test.describe("patient dashboard", () => {
     await expect(page.locator('[data-screen-label="Dashboard"]')).toBeVisible();
 
     // Opening the entry screen is not progress; an interrupted entry returns
-    // to the safe dashboard. Completing ear selection is session progress and
-    // therefore restores to the existing option selector contract.
+    // to the safe dashboard. Completing ear selection resumes at the next
+    // required gate and still cannot expose the option selector early.
     await page.getByRole("button", { name: "New Session", exact: true }).click();
     await page.reload();
     await expect(page.locator('[data-screen-label="Dashboard"]')).toBeVisible();
@@ -90,6 +90,7 @@ test.describe("patient dashboard", () => {
     await page.getByText("Both ears", { exact: true }).click();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.reload();
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Matching options"]')).toHaveCount(0);
   });
 });

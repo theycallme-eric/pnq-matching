@@ -144,8 +144,17 @@ export function restoreSession(raw) {
     optDone,
     optOrder
   };
-  const activeSession = restored.earSeen || restored.setupSeen || restored.eduSeen || Object.keys(optDone).length > 0 || optOrder.length > 0;
-  return { ...restored, screen: activeSession ? "home" : "dashboard", playKey: null };
+  // A current incomplete session resumes at its next required gate instead of
+  // exposing the selector early. Legacy progress predates the surrounding
+  // onboarding shell and keeps its established safe selector migration.
+  const laterProgress = restored.setupSeen || restored.eduSeen || Object.keys(optDone).length > 0 || optOrder.length > 0;
+  let screen = "dashboard";
+  if (legacyProgress) screen = "home";
+  else if (!restored.earSeen && laterProgress) screen = "ear";
+  else if (restored.earSeen && !restored.setupSeen) screen = "setup";
+  else if (restored.earSeen && restored.setupSeen && !restored.eduSeen) screen = "edu";
+  else if (restored.earSeen && restored.setupSeen && restored.eduSeen) screen = "home";
+  return { ...restored, screen, playKey: null };
 }
 
 /* ---------- chrome measurement (REQ-020) ---------- */
@@ -286,11 +295,13 @@ export function navShow(s) {
   return !noNav || s.screen === "setup" || s.screen === "edu";
 }
 
-// Back navigates as the prototype does: setup and edu return home, an
+// Before the session gates are complete, Back only steps to the preceding
+// gate; it cannot expose the option selector early. Once matching begins, an
 // option's first working stage returns home, deeper stages step back one, and
 // on the 2D field a zoom level steps out before a stage does.
 export function backTarget(s) {
-  if (s.screen === "setup" || s.screen === "edu") return { kind: "screen", screen: "home" };
+  if (s.screen === "setup") return { kind: "screen", screen: s.setupSeen && s.eduSeen ? "home" : "ear" };
+  if (s.screen === "edu") return { kind: "screen", screen: s.eduSeen ? "home" : "setup" };
   if (s.screen !== "flow") return { kind: "screen", screen: "home" };
   const c = s.concept, ss = s.stages[c];
   const lv = (s.d && s.d.level) || 0;
