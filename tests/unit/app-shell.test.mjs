@@ -1,6 +1,6 @@
 /*
- * Unit tests for src/app-shell.js (REQ-001, REQ-020): fresh factories,
- * persistence whitelist and reload behavior, resetAll, screen labels,
+ * Unit tests for src/app-shell.js (REQ-001, REQ-011, REQ-020): shell journey,
+ * persistence allowlist and safe reload behavior, resetAll, screen labels,
  * conditional Back, framed/bare measurement, and the playKey-null invariant
  * on every navigation reducer (paired with the engine hard stop).
  */
@@ -21,57 +21,135 @@ test("fresh factories seed the V5 values and never share state between runs", ()
   assert.equal(shell.freshN().pitch, .5, "each call returns a new object");
 });
 
-test("state machine covers the V5 screens, concepts and per-concept stages", () => {
-  assert.deepEqual(shell.SCREENS, ["launch", "ear", "setup", "home", "edu", "flow"]);
+test("initial state starts at the first-run splash with fresh shell and option state", () => {
+  assert.deepEqual(shell.SCREENS, ["launch", "privacy", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"]);
   assert.deepEqual(shell.CONCEPT_IDS, ["n", "r", "d", "f", "a", "l", "t"]);
   const st = shell.initialState();
   assert.equal(st.screen, "launch");
+  assert.equal(st.onboardingSeen, false);
+  assert.equal(st.earSeen, false);
+  assert.equal(st.onboardingInput, "");
   assert.deepEqual(st.stages, { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" });
   assert.equal(st.playKey, null);
+  assert.deepEqual(st.optDone, {});
+  assert.deepEqual(st.optOrder, []);
   for (const c of shell.CONCEPT_IDS) assert.ok(shell.STAGES[c].length > 0, c + " has stages");
 });
 
-test("persistShape stores only the whitelist - no identifiers, no per-answer data", () => {
+test("persistShape stores only non-identifying gates and neutral option completion", () => {
   const st = shell.initialState();
+  st.onboardingSeen = true;
+  st.earSeen = true;
+  st.ear = "Left ear";
+  st.hp = true;
+  st.vol = 100;
+  st.onboardingInput = "SIMULATED-RX-123";
   st.n.pitch = .77;
+  st.n.conf = "Very close";
   st.playKey = "main";
+  st.optDone = { n: "Very close", r: true, f: "research response" };
+  st.optOrder = ["n", "n", "bogus", "r", "d", "r"];
   const shape = shell.persistShape(st);
   assert.deepEqual(Object.keys(shape).sort(), [...shell.PERSIST_KEYS].sort());
-  assert.deepEqual(shell.PERSIST_KEYS, ["ear", "hp", "vol", "setupSeen", "eduSeen", "optDone", "optOrder"]);
+  assert.deepEqual(shell.PERSIST_KEYS, ["onboardingSeen", "earSeen", "setupSeen", "eduSeen", "optDone", "optOrder"]);
+  assert.deepEqual(shape.optDone, { n: true, r: true });
+  assert.deepEqual(shape.optOrder, ["n", "r"], "order contains completed option ids once");
   const raw = JSON.stringify(shape);
-  assert.ok(!raw.includes("playKey") && !raw.includes("pitch"), "no flow or playback state persisted");
+  for (const forbidden of ["Left ear", "hp", "vol", "SIMULATED-RX-123", "Very close", "pitch", "playKey", "research response"]) {
+    assert.ok(!raw.includes(forbidden), forbidden + " is not persisted");
+  }
 });
 
-test("reload mid-session restores setup/progress and lands on Matching options", () => {
-  const saved = JSON.stringify({ ear: "Left ear", hp: true, vol: 100, setupSeen: true, eduSeen: true, optDone: { n: "Very close" }, optOrder: ["n"] });
+test("reload chooses splash, dashboard, or option selector and never restores working state", () => {
+  const preOnboarding = shell.restoreSession(JSON.stringify({ onboardingSeen: false, setupSeen: true, optDone: { n: true } }));
+  assert.equal(preOnboarding.screen, "launch", "onboarding is the outer restore boundary");
+  assert.deepEqual(preOnboarding.optDone, {});
+
+  const dashboard = shell.restoreSession(JSON.stringify({ onboardingSeen: true }));
+  assert.equal(dashboard.screen, "dashboard", "onboarding without an active session returns to the dashboard");
+
+  const saved = JSON.stringify({ onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true, optDone: { n: "Very close" }, optOrder: ["n", "n"] });
   const r = shell.restoreSession(saved);
-  assert.equal(r.screen, "home", "mid-session reload returns to the hub, not the cover");
-  assert.equal(r.ear, "Left ear");
-  assert.equal(r.optDone.n, "Very close");
-  assert.ok(!("n" in r), "per-answer state is not restored; fresh factories reseed it");
+  assert.equal(r.screen, "home", "session progress returns to the option selector");
+  assert.equal(r.ear, "");
+  assert.equal(r.hp, false);
+  assert.equal(r.vol, 36);
+  assert.equal(r.playKey, null);
+  assert.deepEqual(r.optDone, { n: true });
+  assert.deepEqual(r.optOrder, ["n"]);
+  assert.deepEqual(r.n, shell.freshN(), "per-option working state is fresh");
   assert.equal(shell.restoreSession(null), null);
-  assert.equal(shell.restoreSession("{nope"), null);
-  assert.equal(shell.restoreSession(JSON.stringify({})).screen, "launch", "an untouched session still starts at Launch");
 });
 
-test("resetAll returns the app to first-run Launch state with fresh options", () => {
+test("malformed, unknown, and hostile stored values fail safely without audio", () => {
+  for (const raw of ["{nope", "null", "[]", JSON.stringify({ unknown: { playKey: "main" } })]) {
+    const restored = shell.restoreSession(raw);
+    assert.ok(restored === null || shell.SCREENS.includes(restored.screen));
+    if (restored) {
+      assert.equal(restored.screen, "launch");
+      assert.equal(restored.playKey, null);
+    }
+  }
+  const dirty = shell.restoreSession(JSON.stringify({
+    onboardingSeen: true, earSeen: "yes", setupSeen: 1, eduSeen: true,
+    optDone: { n: true, r: false, d: { confidence: "raw" }, __proto__: true },
+    optOrder: ["d", "n", "d", "f", null], playKey: "main", n: { pitch: .99 }
+  }));
+  assert.equal(dirty.screen, "home");
+  assert.equal(dirty.earSeen, false, "gate values require real booleans");
+  assert.equal(dirty.setupSeen, false);
+  assert.deepEqual(dirty.optDone, { n: true });
+  assert.deepEqual(dirty.optOrder, ["n"]);
+  assert.equal(dirty.playKey, null);
+  assert.deepEqual(dirty.n, shell.freshN());
+});
+
+test("resetAll returns every shell and option value to first-run splash state", () => {
   let st = shell.initialState();
   st = shell.openOptionState(st, "n");
   st = shell.stageState(st, "n", "p2", { pitch: .9 });
-  st = { ...st, setupSeen: true, eduSeen: true, hp: true, vol: 100, ear: "Left ear", playKey: "main" };
+  st = {
+    ...st, screen: "conclusion", onboardingSeen: true, earSeen: true, onboardingInput: "SIM-123",
+    setupSeen: true, eduSeen: true, hp: true, vol: 100, ear: "Left ear", playKey: "main",
+    menuOpen: true, jumpOpen: true, menuStopped: true, setupWarn: true, earWarn: true,
+    optDone: { n: true, r: true, d: true }, optOrder: ["n", "r", "d"]
+  };
   const r = shell.resetAllState(st);
-  assert.equal(r.screen, "launch");
-  assert.equal(r.playKey, null);
-  assert.equal(r.setupSeen, false);
-  assert.equal(r.eduSeen, false);
-  assert.deepEqual(r.optDone, {});
-  assert.deepEqual(r.optOrder, []);
-  assert.deepEqual(r.n, shell.freshN());
-  assert.deepEqual(r.a, shell.freshA());
-  assert.deepEqual(r.l, shell.freshL());
-  assert.deepEqual(r.t, shell.freshT());
-  assert.equal(r.stages.n, "vol");
+  assert.deepEqual(r, shell.initialState());
   assert.equal(shell.STORAGE_KEY, "pnq-mtp-v1");
+});
+
+test("shell journey covers privacy, simulated account, dashboard, setup, selector, flow, and conclusion", () => {
+  let st = shell.initialState();
+  st = shell.advanceShellState(st);
+  assert.equal(st.screen, "privacy");
+  st = shell.advanceShellState({ ...st, onboardingInput: "fictional-local-only" });
+  assert.equal(st.screen, "account");
+  st = shell.advanceShellState({ ...st, onboardingInput: "fictional-local-only" });
+  assert.equal(st.screen, "dashboard");
+  assert.equal(st.onboardingSeen, true);
+  assert.equal(st.onboardingInput, "");
+  st = shell.advanceShellState(st);
+  assert.equal(st.screen, "ear");
+  st = shell.advanceShellState({ ...st, ear: "Both ears" });
+  assert.equal(st.screen, "setup");
+  assert.equal(st.earSeen, true);
+  st = shell.advanceShellState({ ...st, hp: true, vol: 100 });
+  assert.equal(st.screen, "edu");
+  assert.equal(st.setupSeen, true);
+  st = shell.advanceShellState(st);
+  assert.equal(st.screen, "home");
+  assert.equal(st.eduSeen, true);
+  st = shell.openOptionState(st, "n");
+  assert.equal(st.screen, "flow");
+  st = shell.completeOptionState(st);
+  assert.equal(st.screen, "home");
+  st = shell.completeOptionState(shell.openOptionState(st, "r"));
+  assert.equal(st.screen, "home");
+  st = shell.completeOptionState(shell.openOptionState(st, "d"));
+  assert.equal(st.screen, "conclusion");
+  assert.deepEqual(st.optOrder, ["n", "r", "d"]);
+  assert.deepEqual(st.optDone, { n: true, r: true, d: true });
 });
 
 test("opening or restarting an option reseeds working state from its fresh factory", () => {
@@ -82,7 +160,7 @@ test("opening or restarting an option reseeds working state from its fresh facto
   st = shell.stageState(st, "n", "p3", { pitch: .91, extra: 2 });
   const again = shell.openOptionState(st, "n");
   assert.deepEqual(again.n, shell.freshN(), "restart never inherits a previous run's position");
-  assert.deepEqual(again.optOrder, ["n"], "optOrder records each option once");
+  assert.deepEqual(again.optOrder, [], "opening does not change completion order");
   const seeded = shell.openOptionState(st, "n", "p2", { ...shell.freshN(), center: .5, level: .44 });
   assert.equal(seeded.stages.n, "p2");
   assert.equal(seeded.n.level, .44);
@@ -117,21 +195,43 @@ test("moderator jump targets mirror V5's stage jumps plus its scenario presets",
   assert.deepEqual([edge.seed.heard, edge.seed.x, edge.seed.y], [true, .96, .06]);
 });
 
-test("every navigation reducer clears playKey so the hard stop leaves silence", () => {
-  const playing = { ...shell.initialState(), playKey: "main" };
-  assert.equal(shell.goScreenState(playing, "home").playKey, null);
-  assert.equal(shell.openOptionState(playing, "r").playKey, null);
-  assert.equal(shell.jumpState(playing, "t", "field", shell.freshT()).playKey, null);
-  assert.equal(shell.stageState(playing, "n", "p1").playKey, null);
-  assert.equal(shell.resetAllState(playing).playKey, null);
+test("every navigation reducer clears playback, menus, warnings, and transient flow state", () => {
+  const playing = {
+    ...shell.initialState(), playKey: "main", menuOpen: true, jumpOpen: true, menuStopped: true,
+    setupWarn: true, earWarn: true, heardStage: { old: true }, prKey: "pair", prHeardA: true, prHeardB: true
+  };
+  const results = [
+    shell.goScreenState(playing, "home", { playKey: "cannot-override" }),
+    shell.openOptionState(playing, "r"),
+    shell.jumpState(playing, "t", "field", shell.freshT()),
+    shell.stageState(playing, "n", "p1"),
+    shell.resetAllState(playing)
+  ];
+  for (const state of results) {
+    assert.equal(state.playKey, null);
+    assert.equal(state.menuOpen, false);
+    assert.equal(state.jumpOpen, false);
+    assert.equal(state.menuStopped, false);
+    assert.equal(state.setupWarn, false);
+    assert.equal(state.earWarn, false);
+    assert.equal(state.prKey, null);
+    assert.equal(state.prHeardA, false);
+    assert.equal(state.prHeardB, false);
+    assert.deepEqual(state.heardStage, {});
+  }
+  assert.deepEqual(results[0].n, shell.freshN(), "safe shell screens discard option working state");
 });
 
 test("screen roots carry the exact V5 data-screen-label values", () => {
   assert.equal(shell.screenLabelOf("launch"), "Launch");
+  assert.equal(shell.screenLabelOf("privacy"), "Privacy");
+  assert.equal(shell.screenLabelOf("account"), "Create account");
+  assert.equal(shell.screenLabelOf("dashboard"), "Dashboard");
   assert.equal(shell.screenLabelOf("ear"), "Setup · Ear");
   assert.equal(shell.screenLabelOf("setup"), "Setup · Headphones and volume");
   assert.equal(shell.screenLabelOf("home"), "Matching options");
   assert.equal(shell.screenLabelOf("edu"), "Shared · What to listen for");
+  assert.equal(shell.screenLabelOf("conclusion"), "Session complete");
   assert.equal(shell.screenLabelOf("flow", "n", "p2"), "Narrowing · Refinement pass");
   assert.equal(shell.screenLabelOf("flow", "d", "field"), "Field · Pitch and volume");
   assert.equal(shell.screenLabelOf("flow", "n", "intro"), "Narrowing · Prepare");

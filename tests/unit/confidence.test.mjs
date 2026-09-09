@@ -28,14 +28,14 @@ test("completion data is derived from the final matched sound and participant st
   assert.match(done.tech, /dB/);
 });
 
-test("returning home records the correct option once and preserves completion order", () => {
+test("returning home records a neutral marker once and preserves completion order", () => {
   const state = {
-    ...shell.initialState(), screen: "flow", concept: "r", optOrder: ["n", "r"],
+    ...shell.initialState(), screen: "flow", concept: "r", optDone: { n: true }, optOrder: ["n"],
     r: { ...shell.freshR(), conf: "Fairly close" }
   };
   const complete = shell.completeOptionState(state);
   assert.equal(complete.screen, "home");
-  assert.equal(complete.optDone.r, "Fairly close");
+  assert.equal(complete.optDone.r, true);
   assert.deepEqual(complete.optOrder, ["n", "r"]);
   assert.equal(complete.playKey, null);
 });

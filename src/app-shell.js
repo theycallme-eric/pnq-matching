@@ -1,5 +1,5 @@
 /*
- * PNQ Sound Matching - app shell state machine (REQ-001, REQ-020).
+ * PNQ Sound Matching - app shell state machine (REQ-001, REQ-011, REQ-020).
  *
  * Pure module, no DOM access: screens, per-concept stages, fresh-state
  * factories, the sessionStorage persistence shape, chrome measurement and
@@ -10,7 +10,10 @@
  * screen that started it.
  */
 
-export const SCREENS = ["launch", "ear", "setup", "home", "edu", "flow"];
+// `launch` and `home` remain the renderer-facing ids for the splash and option
+// selector. Keeping those stable lets the protected option flows stay wholly
+// independent of the surrounding patient-app journey.
+export const SCREENS = ["launch", "privacy", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"];
 export const CONCEPT_IDS = ["n", "r", "d", "f", "a", "l", "t"];
 
 // Participants only ever see Option 1/2/3. The internal ids stay out of the UI.
@@ -63,34 +66,86 @@ export function initialState() {
     showTech: false, muted: false, ear: "", playKey: null, framed: true, devScale: 1,
     hp: false, vol: 36, menuOpen: false, jumpOpen: false, menuStopped: false, optDone: {}, optOrder: [],
     setupWarn: false, earWarn: false,
+    // Only the completion booleans below are persisted. onboardingInput is a
+    // deliberately generic, local-only draft for the simulated account shell.
+    onboardingSeen: false, earSeen: false, onboardingInput: "",
     eduSeen: false, setupSeen: false, heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
     n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
   };
 }
 
 /* ---------- sessionStorage persistence ---------- */
-// Session-scoped, no identifiers: setup plus progress only. Nothing per-answer
-// is stored and nothing leaves the browser.
+// Session-scoped, no identifiers: completion gates plus neutral option
+// progress only. Raw ear/device values, onboarding drafts, confidence details,
+// per-option answers and audio state never enter the stored object.
 
 export const STORAGE_KEY = "pnq-mtp-v1";
-export const PERSIST_KEYS = ["ear", "hp", "vol", "setupSeen", "eduSeen", "optDone", "optOrder"];
+export const PERSIST_KEYS = ["onboardingSeen", "earSeen", "setupSeen", "eduSeen", "optDone", "optOrder"];
 
-export function persistShape(s) {
-  return { ear: s.ear, hp: s.hp, vol: s.vol, setupSeen: s.setupSeen, eduSeen: s.eduSeen, optDone: s.optDone, optOrder: s.optOrder };
+function neutralOptionDone(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const result = {};
+  for (const cid of OPTORDER) {
+    // Boolean true is the current marker. Strings are accepted only to safely
+    // migrate the previous confidence-valued storage shape.
+    if (source[cid] === true || typeof source[cid] === "string" && source[cid].length > 0) result[cid] = true;
+  }
+  return result;
 }
 
-// A mid-session reload returns to the Matching options hub instead of the
-// cover; per-answer flow state is never restored (the fresh factories reseed).
+function completionOrder(value, done) {
+  if (!Array.isArray(value)) return [];
+  const unique = [];
+  for (const cid of value) {
+    if (OPTORDER.includes(cid) && done[cid] === true && !unique.includes(cid)) unique.push(cid);
+  }
+  return unique;
+}
+
+export function persistShape(s) {
+  const optDone = neutralOptionDone(s.optDone);
+  return {
+    onboardingSeen: s.onboardingSeen === true,
+    earSeen: s.earSeen === true,
+    setupSeen: s.setupSeen === true,
+    eduSeen: s.eduSeen === true,
+    optDone,
+    optOrder: completionOrder(s.optOrder, optDone)
+  };
+}
+
+// Restore always chooses a safe shell location and starts from initialState(),
+// which guarantees fresh option answers and silence. The small legacy branch
+// recognizes the prior setup/progress shape without carrying its raw values
+// forward; the next persistence pass rewrites it to the allowlist above.
 export function restoreSession(raw) {
   if (!raw) return null;
   let v;
-  try { v = JSON.parse(raw) || {}; } catch (e) { return null; }
-  return {
-    ear: v.ear || "", hp: !!v.hp, vol: typeof v.vol === "number" ? v.vol : 36,
-    setupSeen: !!v.setupSeen, eduSeen: !!v.eduSeen,
-    optDone: v.optDone || {}, optOrder: v.optOrder || [],
-    screen: (v.setupSeen || v.eduSeen || (v.optOrder || []).length) ? "home" : "launch"
+  try { v = JSON.parse(raw); } catch (e) { return null; }
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+
+  const hasOnboardingFlag = Object.prototype.hasOwnProperty.call(v, "onboardingSeen");
+  const legacyProgress = !hasOnboardingFlag && (
+    v.setupSeen === true || v.eduSeen === true ||
+    Array.isArray(v.optOrder) && v.optOrder.length > 0 ||
+    v.optDone && typeof v.optDone === "object" && Object.keys(v.optDone).length > 0
+  );
+  const onboardingSeen = v.onboardingSeen === true || legacyProgress;
+  if (!onboardingSeen) return initialState();
+
+  const optDone = neutralOptionDone(v.optDone);
+  const optOrder = completionOrder(v.optOrder, optDone);
+  const restored = {
+    ...initialState(),
+    onboardingSeen: true,
+    earSeen: v.earSeen === true,
+    setupSeen: v.setupSeen === true,
+    eduSeen: v.eduSeen === true,
+    optDone,
+    optOrder
   };
+  const activeSession = restored.earSeen || restored.setupSeen || restored.eduSeen || Object.keys(optDone).length > 0 || optOrder.length > 0;
+  return { ...restored, screen: activeSession ? "home" : "dashboard", playKey: null };
 }
 
 /* ---------- chrome measurement (REQ-020) ---------- */
@@ -104,7 +159,8 @@ export function measure(w, h) {
 }
 
 /* ---------- screen labels ---------- */
-// Every screen root carries data-screen-label with the exact V5 label.
+// Every screen root carries a stable data-screen-label. Existing V5 flow
+// labels stay unchanged while the surrounding patient-app shell is extended.
 
 const FLOW_LABELS = {
   n: { intro: "Narrowing · Prepare", edu: "Shared · What to listen for", vol: "Narrowing · Refinement pass", p1: "Narrowing · Refinement pass", p2: "Narrowing · Refinement pass", p3: "Narrowing · Refinement pass", conf: "Shared · Confidence", done: "Shared · Match complete" },
@@ -118,10 +174,14 @@ const FLOW_LABELS = {
 
 export function screenLabelOf(screen, concept, stage) {
   if (screen === "launch") return "Launch";
+  if (screen === "privacy") return "Privacy";
+  if (screen === "account") return "Create account";
+  if (screen === "dashboard") return "Dashboard";
   if (screen === "ear") return "Setup · Ear";
   if (screen === "setup") return "Setup · Headphones and volume";
   if (screen === "home") return "Matching options";
   if (screen === "edu") return "Shared · What to listen for";
+  if (screen === "conclusion") return "Session complete";
   return (FLOW_LABELS[concept] || {})[stage] || "";
 }
 
@@ -129,43 +189,92 @@ export function screenLabelOf(screen, concept, stage) {
 // Every screen or stage change returns playKey: null; the renderer calls the
 // engine's hard stop alongside applying these.
 
+const INITIAL_STAGES = { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" };
+
+function freshWorkingState() {
+  return {
+    stages: { ...INITIAL_STAGES }, heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
+    n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
+  };
+}
+
+function clearedNavigationState() {
+  return {
+    playKey: null, menuOpen: false, jumpOpen: false, menuStopped: false,
+    setupWarn: false, earWarn: false, prKey: null, prHeardA: false, prHeardB: false
+  };
+}
+
 export function goScreenState(s, screen, extra) {
-  return { ...s, screen, playKey: null, menuOpen: false, jumpOpen: false, setupWarn: false, earWarn: false, ...(extra || {}) };
+  const legacyOnboarding = s.screen === "launch" && screen === "ear";
+  const completedEarGate = s.screen === "ear" && screen === "setup" && !!s.ear;
+  return {
+    ...s,
+    ...(screen === "flow" ? {} : freshWorkingState()),
+    onboardingSeen: legacyOnboarding ? true : s.onboardingSeen,
+    earSeen: completedEarGate ? true : s.earSeen,
+    onboardingInput: screen === "account" ? s.onboardingInput : "",
+    ...(extra || {}),
+    ...clearedNavigationState(),
+    screen
+  };
+}
+
+// Starts a new moderated session without retaining any prior setup, option, or
+// conclusion state. The completed patient-app onboarding remains in place.
+export function newSessionState(s) {
+  const fresh = initialState();
+  return {
+    ...fresh,
+    framed: s.framed,
+    devScale: s.devScale,
+    screen: "ear",
+    onboardingSeen: true
+  };
+}
+
+// Straight-through shell journey. Matching flow stage changes and option
+// selection remain participant-controlled through their focused reducers.
+export function advanceShellState(s) {
+  if (s.screen === "launch") return goScreenState(s, "privacy");
+  if (s.screen === "privacy") return goScreenState(s, "account");
+  if (s.screen === "account") return goScreenState(s, "dashboard", { onboardingSeen: true, onboardingInput: "" });
+  if (s.screen === "dashboard") return newSessionState(s);
+  if (s.screen === "ear") return goScreenState(s, "setup", { earSeen: !!s.ear });
+  if (s.screen === "setup") return goScreenState(s, "edu", { setupSeen: !!s.hp && s.vol >= 100 });
+  if (s.screen === "edu") return goScreenState(s, "home", { eduSeen: true });
+  return { ...s, ...clearedNavigationState() };
 }
 
 export function openOptionState(s, cid, stage, seed) {
   return {
-    ...s, screen: "flow", concept: cid, playKey: null, menuOpen: false, jumpOpen: false, heardStage: {},
+    ...s, ...clearedNavigationState(), screen: "flow", concept: cid, heardStage: {},
     [cid]: seed || freshFor(cid),
-    stages: { ...s.stages, [cid]: stage || OPTFIRST[cid] },
-    optOrder: s.optOrder.includes(cid) ? s.optOrder : [...s.optOrder, cid]
+    stages: { ...s.stages, [cid]: stage || OPTFIRST[cid] }
   };
 }
 
 export function jumpState(s, c, stage, conceptState) {
   return {
-    ...s, screen: "flow", playKey: null, concept: c,
+    ...s, ...clearedNavigationState(), screen: "flow", concept: c, heardStage: {},
     stages: { ...s.stages, [c]: stage },
     ...(conceptState ? { [c]: conceptState } : {})
   };
 }
 
 export function stageState(s, c, stage, obj) {
-  return { ...s, playKey: null, stages: { ...s.stages, [c]: stage }, [c]: { ...s[c], note: "", ...(obj || {}) } };
+  return {
+    ...s, ...clearedNavigationState(), heardStage: {},
+    stages: { ...s.stages, [c]: stage },
+    [c]: { ...s[c], note: "", ...(obj || {}) }
+  };
 }
 
 // Full reset for the moderator between participants: every option, the setup
 // steps and the screen return to their first-run state. The caller also clears
 // sessionStorage under STORAGE_KEY.
 export function resetAllState(s) {
-  return {
-    ...s, screen: "launch", concept: "n", menuOpen: false, jumpOpen: false, playKey: null,
-    stages: { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" },
-    ear: "", hp: false, vol: 36, setupSeen: false, eduSeen: false,
-    optDone: {}, optOrder: [], heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
-    setupWarn: false, earWarn: false, showTech: false,
-    n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
-  };
+  return initialState();
 }
 
 /* ---------- bottom bar: conditional Back ---------- */
@@ -272,15 +381,20 @@ export function doneData(st, specs) {
   };
 }
 
-// Return to matching options: mark the open option done with its recorded
-// answer, keep its completion order, and go back to the hub. Both keys are in
-// PERSIST_KEYS, so the renderer's persistence pass stores them.
+// Mark the open participant option with a neutral completion marker. The first
+// and second options return to the selector; the third reaches the stable final
+// conclusion. Confidence remains only in memory and is never copied here.
 export function completeOptionState(s) {
   const c = s.concept;
+  if (!OPTORDER.includes(c)) return goScreenState(s, "home");
+  const optDone = { ...neutralOptionDone(s.optDone), [c]: true };
+  const priorOrder = completionOrder(s.optOrder, optDone);
+  const optOrder = priorOrder.includes(c) ? priorOrder : [...priorOrder, c];
+  const target = OPTORDER.every((cid) => optDone[cid] === true) ? "conclusion" : "home";
   return {
-    ...goScreenState(s, "home"),
-    optDone: { ...s.optDone, [c]: (s[c] && s[c].conf) || "recorded" },
-    optOrder: s.optOrder.includes(c) ? s.optOrder : [...s.optOrder, c]
+    ...goScreenState(s, target),
+    optDone,
+    optOrder
   };
 }
 
