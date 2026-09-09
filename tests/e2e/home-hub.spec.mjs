@@ -1,14 +1,16 @@
 /*
- * End-to-end tests for the home hub (REQ-005): arrival only after the shared
- * session gates, neutral Option rows, Done pills with completion-order
+ * End-to-end tests for the home hub (REQ-005, REQ-006, REQ-013): arrival only
+ * after the shared session gates, exactly three neutral participant-controlled
+ * options, non-color-only Done state, fresh reopening, completion-order
  * tracking, and ear re-routing without leaving the hub.
  */
 import { test, expect } from "@playwright/test";
 import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { auditParticipantStrings } from "../../src/participant-copy.js";
 
 const hub = (page) => page.locator('[data-screen-label="Matching options"]');
-// Substring name match: a completed row's accessible name is "Option N Done".
-const option = (page, n) => page.getByRole("button", { name: "Option " + n });
+const selector = (page) => page.locator("[data-option-selector]");
+const option = (page, n) => selector(page).locator(`[data-option-id="${n}"]`);
 
 async function reachReadyHub(page) {
   await page.goto("/");
@@ -25,7 +27,7 @@ async function reachReadyHub(page) {
 
 // Walks a flow to Match complete and returns to the hub. Each stage's
 // judgment is heard-gated (REQ-018), so play the sound before advancing.
-async function completeOption(page, n, continues) {
+async function completeOption(page, n) {
   await option(page, n).click();
   await expect(hub(page)).toHaveCount(0);
   if (n === 2) {
@@ -47,10 +49,12 @@ async function completeOption(page, n, continues) {
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
     await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "This matches what I hear" }).click();
-  } else {
-    for (let i = 0; i < continues; i++) {
+  } else if (n === 3) {
+    // Option 3 keeps the same field screen while narrowing twice. Its final
+    // participant judgment has its own label rather than a generic Continue.
+    for (let level = 0; level < 3; level++) {
       await page.getByRole("button", { name: "Play the sound" }).click();
-      await page.getByRole("button", { name: "Continue" }).click();
+      await page.getByRole("button", { name: level < 2 ? "Look closely at this area" : "This sounds like my tinnitus" }).click();
     }
   }
   await page.getByText("Fairly close").click();
@@ -78,6 +82,8 @@ test.describe("home hub", () => {
     await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
     await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(hub(page)).toBeVisible();
+    await expect(selector(page).getByRole("button")).toHaveCount(3);
+    expect(await selector(page).locator("[data-option-label]").allTextContents()).toEqual(["Option 1", "Option 2", "Option 3"]);
     for (const n of [1, 2, 3]) {
       const row = option(page, n);
       await expect(row).not.toHaveAttribute("aria-disabled", /.*/);
@@ -97,10 +103,11 @@ test.describe("home hub", () => {
     await expect(option(page, 3)).toBeVisible();
     // No internal concept names or research language anywhere on the hub.
     const text = await page.locator("[data-device-frame]").innerText();
-    expect(text).not.toMatch(/Narrowing|Comparison|Adaptive|Families|2D|Field|Longitudinal|concept|hypothes|research/i);
+    expect(text).not.toMatch(/Narrowing|Comparison|Adaptive|Families|2D|Field|Longitudinal|concept|hypothes|method|approach|stage|winner|fallback|retry/i);
+    expect(auditParticipantStrings(text.split(/\n+/))).toEqual([]);
   });
 
-  test("home hub earns Done pills and tracks completion order", async ({ page }) => {
+  test("options complete out of order, return to the same selector, and reopen fresh with unique Done state", async ({ page }) => {
     await reachReadyHub(page);
 
     // Each completed session gate has its gray check pill on selector arrival.
@@ -109,18 +116,45 @@ test.describe("home hub", () => {
     await expect(eduRow.getByText("Done")).toBeVisible();
     await expect(eduRow.locator("svg")).toHaveCount(2); // check pill + chevron
 
-    // Complete Option 2 first, then Option 1: pills appear per option and
-    // optDone/optOrder record what completed, in order.
-    await completeOption(page, 2, 0); // r: dir -> comp -> conf
-    await expect(option(page, 2).getByText("Done")).toBeVisible();
+    // Complete Option 3 first. The app returns directly to this same selector,
+    // keeps every option selectable, and does not repeat any session gate.
+    await completeOption(page, 3); // d: field -> zoom -> conf
+    await expect(option(page, 3).getByText("Done")).toBeVisible();
+    await expect(option(page, 3).locator("[data-option-status] svg")).toHaveCount(1);
     await expect(option(page, 1).getByText("Done")).toHaveCount(0);
-    await completeOption(page, 1, 4); // n: vol -> p1 -> p2 -> p3 -> conf
-    await expect(option(page, 1).getByText("Done")).toBeVisible();
+    for (const n of [1, 2, 3]) await expect(option(page, n)).not.toHaveAttribute("aria-disabled", /.*/);
+    let st = await page.evaluate(() => window.__pnqAppState());
+    expect([st.earSeen, st.setupSeen, st.eduSeen]).toEqual([true, true, true]);
+    expect(st.optOrder).toEqual(["d"]);
 
-    const st = await page.evaluate(() => window.__pnqAppState());
-    expect(st.optOrder).toEqual(["r", "n"]);
-    expect(Object.keys(st.optDone).sort()).toEqual(["n", "r"]);
-    expect(st.optDone.r).toBe(true);
+    // A completed option remains selectable. Reopening it uses freshD and
+    // retains the session-level Done marker while no other option launches.
+    await option(page, 3).click();
+    st = await page.evaluate(() => window.__pnqAppState());
+    expect(st.concept).toBe("d");
+    expect(st.stages.d).toBe("field");
+    expect(st.d).toEqual({ x: .5, y: .5, cx: .5, cy: .5, level: 0, heard: false, zoomed: false, note: "", conf: null });
+    expect(st.optDone).toEqual({ d: true });
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(hub(page)).toBeVisible();
+
+    // Complete Option 1 second, then open the remaining Option 2. Each opens
+    // at its V5 initial state and completion order reflects participant action.
+    await completeOption(page, 1); // n: vol -> p1 -> p2 -> p3 -> conf
+    await expect(option(page, 1).getByText("Done")).toBeVisible();
+    await option(page, 1).click();
+    st = await page.evaluate(() => window.__pnqAppState());
+    expect(st.n).toEqual({ pitch: .5, level: .4, center: .5, lo: .34, hi: .66, extra: 0, widened: 0, note: "", conf: null, closeEnough: false });
+    expect(st.optOrder).toEqual(["d", "n"]);
+    await page.getByRole("button", { name: "Back" }).click();
+    await option(page, 2).click();
+    st = await page.evaluate(() => window.__pnqAppState());
+    expect(st.concept).toBe("r");
+    expect(st.stages.r).toBe("dir");
+    expect(st.r.phase).toBe("vol");
+    expect(st.r.spread).toBe(.28);
+    expect(st.optOrder).toEqual(["d", "n"]);
+    expect(Object.keys(st.optDone).sort()).toEqual(["d", "n"]);
   });
 
   test("home hub ear control re-routes the engine without leaving the hub", async ({ page }) => {

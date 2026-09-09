@@ -1,8 +1,8 @@
 /*
- * Unit tests for src/app-shell.js (REQ-001, REQ-011, REQ-020): shell journey,
- * persistence allowlist and safe reload behavior, resetAll, screen labels,
- * conditional Back, framed/bare measurement, and the playKey-null invariant
- * on every navigation reducer (paired with the engine hard stop).
+ * Unit tests for src/app-shell.js (REQ-001, REQ-006, REQ-011, REQ-020): shell
+ * journey, participant-controlled option selection, persistence allowlist and
+ * safe reload behavior, resetAll, screen labels, conditional Back,
+ * framed/bare measurement, and the playKey-null navigation invariant.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -34,6 +34,17 @@ test("initial state starts at the first-run splash with fresh shell and option s
   assert.deepEqual(st.optDone, {});
   assert.deepEqual(st.optOrder, []);
   for (const c of shell.CONCEPT_IDS) assert.ok(shell.STAGES[c].length > 0, c + " has stages");
+});
+
+test("the shared selector exposes exactly three neutral options only after every session gate", () => {
+  assert.deepEqual(shell.OPTORDER, ["n", "r", "d"]);
+  assert.deepEqual(shell.OPTORDER.map((cid) => shell.OPTLABEL[cid]), ["Option 1", "Option 2", "Option 3"]);
+
+  const state = shell.initialState();
+  assert.equal(shell.optionSelectionReady(state), false);
+  assert.equal(shell.optionSelectionReady({ ...state, setupSeen: true }), false);
+  assert.equal(shell.optionSelectionReady({ ...state, eduSeen: true }), false);
+  assert.equal(shell.optionSelectionReady({ ...state, setupSeen: true, eduSeen: true }), true);
 });
 
 test("persistShape stores only non-identifying gates and neutral option completion", () => {
@@ -124,7 +135,7 @@ test("resetAll returns every shell and option value to first-run splash state", 
   assert.equal(shell.STORAGE_KEY, "pnq-mtp-v1");
 });
 
-test("shell journey covers privacy, simulated account, dashboard, setup, selector, flow, and conclusion", () => {
+test("shell journey preserves participant-selected completion order without auto-advancing", () => {
   let st = shell.initialState();
   st = shell.advanceShellState(st);
   assert.equal(st.screen, "privacy");
@@ -145,27 +156,45 @@ test("shell journey covers privacy, simulated account, dashboard, setup, selecto
   st = shell.advanceShellState(st);
   assert.equal(st.screen, "home");
   assert.equal(st.eduSeen, true);
-  st = shell.openOptionState(st, "n");
-  assert.equal(st.screen, "flow");
-  st = shell.completeOptionState(st);
-  assert.equal(st.screen, "home");
+  for (const [cid, expectedOrder] of [["d", ["d"]], ["n", ["d", "n"]]]) {
+    st = shell.openOptionState(st, cid);
+    assert.equal(st.screen, "flow");
+    assert.equal(st.concept, cid);
+    st = shell.completeOptionState(st);
+    assert.equal(st.screen, "home", "an unfinished session returns to the shared selector");
+    assert.deepEqual(st.optOrder, expectedOrder);
+    assert.equal(st.optDone[cid], true);
+  }
   st = shell.completeOptionState(shell.openOptionState(st, "r"));
-  assert.equal(st.screen, "home");
-  st = shell.completeOptionState(shell.openOptionState(st, "d"));
   assert.equal(st.screen, "conclusion");
-  assert.deepEqual(st.optOrder, ["n", "r", "d"]);
+  assert.deepEqual(st.optOrder, ["d", "n", "r"]);
   assert.deepEqual(st.optDone, { n: true, r: true, d: true });
+
+  const completedAgain = shell.completeOptionState(shell.openOptionState(st, "d"));
+  assert.deepEqual(completedAgain.optOrder, ["d", "n", "r"], "recompletion never duplicates or reorders a marker");
 });
 
-test("opening or restarting an option reseeds working state from its fresh factory", () => {
-  let st = shell.initialState();
-  st = shell.openOptionState(st, "n");
-  assert.equal(st.screen, "flow");
-  assert.equal(st.stages.n, "vol", "opens at the option's first working stage");
-  st = shell.stageState(st, "n", "p3", { pitch: .91, extra: 2 });
-  const again = shell.openOptionState(st, "n");
-  assert.deepEqual(again.n, shell.freshN(), "restart never inherits a previous run's position");
-  assert.deepEqual(again.optOrder, [], "opening does not change completion order");
+test("opening or restarting each option resets only that option and retains Done state", () => {
+  const st = {
+    ...shell.initialState(), screen: "home",
+    optDone: { n: true, r: true, d: true }, optOrder: ["r", "d", "n"],
+    n: { ...shell.freshN(), pitch: .91, extra: 2 },
+    r: { ...shell.freshR(), spread: .05, round: 8 },
+    d: { ...shell.freshD(), x: .88, y: .12, zoomed: true }
+  };
+
+  for (const cid of shell.OPTORDER) {
+    const otherIds = shell.OPTORDER.filter((other) => other !== cid);
+    const again = shell.openOptionState(st, cid);
+    assert.equal(again.screen, "flow");
+    assert.equal(again.concept, cid);
+    assert.equal(again.stages[cid], shell.OPTFIRST[cid]);
+    assert.deepEqual(again[cid], shell.freshFor(cid), cid + " restarts from its current V5 factory");
+    for (const other of otherIds) assert.deepEqual(again[other], st[other], other + " is not reset");
+    assert.deepEqual(again.optDone, st.optDone);
+    assert.deepEqual(again.optOrder, st.optOrder);
+  }
+
   const seeded = shell.openOptionState(st, "n", "p2", { ...shell.freshN(), center: .5, level: .44 });
   assert.equal(seeded.stages.n, "p2");
   assert.equal(seeded.n.level, .44);
