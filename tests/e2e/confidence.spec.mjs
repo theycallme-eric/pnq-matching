@@ -54,7 +54,7 @@ test.describe("confidence and completion", () => {
     const option = page.getByRole("button", { name: /Option 1/ });
     await expect(option.getByText("Done", { exact: true })).toBeVisible();
     const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")));
-    expect(saved.optDone.n).toBe("Very close");
+    expect(saved.optDone.n).toBe(true);
     expect(saved.optOrder).toEqual(["n"]);
   });
 });

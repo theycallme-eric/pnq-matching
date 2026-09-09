@@ -148,7 +148,7 @@ test.describe("home hub", () => {
     const st = await page.evaluate(() => window.__pnqAppState());
     expect(st.optOrder).toEqual(["r", "n"]);
     expect(Object.keys(st.optDone).sort()).toEqual(["n", "r"]);
-    expect(st.optDone.r).toBe("Fairly close");
+    expect(st.optDone.r).toBe(true);
   });
 
   test("home hub ear control re-routes the engine without leaving the hub", async ({ page }) => {

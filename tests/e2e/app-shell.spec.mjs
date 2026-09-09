@@ -37,10 +37,12 @@ test.describe("app shell", () => {
 
     // Whitelist only: no per-answer data, no identifiers.
     const stored = await page.evaluate((k) => JSON.parse(sessionStorage.getItem(k)), key);
-    expect(Object.keys(stored).sort()).toEqual(["ear", "hp", "vol", "setupSeen", "eduSeen", "optDone", "optOrder"].sort());
+    expect(Object.keys(stored).sort()).toEqual(["onboardingSeen", "earSeen", "setupSeen", "eduSeen", "optDone", "optOrder"].sort());
+    expect(stored.onboardingSeen).toBe(true);
+    expect(stored.earSeen).toBe(true);
     expect(stored.setupSeen).toBe(true);
     expect(stored.eduSeen).toBe(true);
-    expect(stored.optOrder).toEqual(["n"]);
+    expect(stored.optOrder).toEqual([]);
 
     // Mid-flow reload lands on the hub and reseeds flow state from the factories.
     await page.reload();
