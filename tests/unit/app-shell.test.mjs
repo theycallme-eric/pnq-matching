@@ -60,13 +60,18 @@ test("persistShape stores only non-identifying gates and neutral option completi
   }
 });
 
-test("reload chooses splash, dashboard, or option selector and never restores working state", () => {
+test("reload chooses splash, dashboard, the next session gate, or the option selector and never restores working state", () => {
   const preOnboarding = shell.restoreSession(JSON.stringify({ onboardingSeen: false, setupSeen: true, optDone: { n: true } }));
   assert.equal(preOnboarding.screen, "launch", "onboarding is the outer restore boundary");
   assert.deepEqual(preOnboarding.optDone, {});
 
   const dashboard = shell.restoreSession(JSON.stringify({ onboardingSeen: true }));
   assert.equal(dashboard.screen, "dashboard", "onboarding without an active session returns to the dashboard");
+
+  const afterEar = shell.restoreSession(JSON.stringify({ onboardingSeen: true, earSeen: true }));
+  assert.equal(afterEar.screen, "setup", "ear completion resumes at device setup, not the selector");
+  const afterSetup = shell.restoreSession(JSON.stringify({ onboardingSeen: true, earSeen: true, setupSeen: true }));
+  assert.equal(afterSetup.screen, "edu", "device completion resumes at education, not the selector");
 
   const saved = JSON.stringify({ onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true, optDone: { n: "Very close" }, optOrder: ["n", "n"] });
   const r = shell.restoreSession(saved);
@@ -95,7 +100,7 @@ test("malformed, unknown, and hostile stored values fail safely without audio", 
     optDone: { n: true, r: false, d: { confidence: "raw" }, __proto__: true },
     optOrder: ["d", "n", "d", "f", null], playKey: "main", n: { pitch: .99 }
   }));
-  assert.equal(dirty.screen, "home");
+  assert.equal(dirty.screen, "ear", "inconsistent later progress cannot bypass the missing ear gate");
   assert.equal(dirty.earSeen, false, "gate values require real booleans");
   assert.equal(dirty.setupSeen, false);
   assert.deepEqual(dirty.optDone, { n: true });
@@ -252,8 +257,10 @@ test("Back renders only where the prototype shows it and targets what it targets
   assert.equal(shell.navShow(flowAt("n", "intro")), false, "no Back on Prepare");
   assert.equal(shell.navShow(flowAt("l", "ret")), false);
   assert.equal(shell.navShow(flowAt("n", "vol")), true);
-  assert.deepEqual(shell.backTarget({ ...st, screen: "setup" }), { kind: "screen", screen: "home" });
-  assert.deepEqual(shell.backTarget({ ...st, screen: "edu" }), { kind: "screen", screen: "home" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "setup" }), { kind: "screen", screen: "ear" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "edu" }), { kind: "screen", screen: "setup" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "setup", setupSeen: true, eduSeen: true }), { kind: "screen", screen: "home" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "edu", eduSeen: true }), { kind: "screen", screen: "home" });
   assert.deepEqual(shell.backTarget(flowAt("n", "vol")), { kind: "screen", screen: "home" }, "first working stage goes home");
   assert.deepEqual(shell.backTarget(flowAt("n", "p2")), { kind: "stage", stage: "p1" });
   const zoomed = { ...flowAt("d", "zoom"), d: { ...shell.freshD(), level: 1 } };

@@ -68,7 +68,7 @@ test.describe("onboarding", () => {
     await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
   });
 
-  test("Setup · Headphones and volume gates Continue, updates live, and persists setupSeen as Done on the hub", async ({ page }) => {
+  test("Setup · Headphones and volume gates Continue, updates live, and persists setupSeen through education", async ({ page }) => {
     await page.goto("/");
     await startSessionFromSplash(page);
     await page.getByText("Both ears", { exact: true }).click();
@@ -104,14 +104,16 @@ test.describe("onboarding", () => {
     await expect(setup.getByText("/ 100%")).toHaveCount(0);
     await expect(cont).not.toHaveAttribute("aria-disabled", "true");
 
-    // Completing marks setupSeen, persists it, and shows Done on the hub.
+    // Completing marks setupSeen, persists it, and advances directly to education.
     await cont.click();
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    const row = page.getByRole("button", { name: /Headphones and volume/ });
-    await expect(row.getByText("Done")).toBeVisible();
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Matching options"]')).toHaveCount(0);
     const stored = await page.evaluate((k) => JSON.parse(sessionStorage.getItem(k)), key);
     expect(stored.setupSeen).toBe(true);
 
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
+    const row = page.getByRole("button", { name: /Headphones and volume/ });
+    await expect(row.getByText("Done")).toBeVisible();
     await page.reload();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Headphones and volume/ }).getByText("Done")).toBeVisible();

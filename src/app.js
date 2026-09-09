@@ -585,7 +585,7 @@ class App extends React.Component {
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },
         e(DS.Button, {
           variant: "primary", size: "md", onDark: true, disabled: !(st.hp && ready),
-          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("home", { setupSeen: true }) : this.setState({ setupWarn: true })
+          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("edu", { setupSeen: true }) : this.setState({ setupWarn: true })
         }, "Continue"),
         e("div", { style: { height: "9px" } }))
     ];
@@ -622,8 +622,9 @@ class App extends React.Component {
       { key: "setup", label: "Headphones and volume", sub: "", subShow: false, done: st.setupSeen, open: () => this.goScreen("setup") },
       { key: "edu", label: "What to listen for", sub: "", subShow: false, done: st.eduSeen, open: () => this.goScreen("edu") }
     ];
-    // The three options stay locked until both setupSeen and eduSeen are true,
-    // so every participant gets identical priming. The open handler re-checks
+    // The three options stay locked until the session setup and education are
+    // complete. Ordinary navigation reaches this screen only after the ear
+    // gate too. The open handler re-checks
     // live state: aria-disabled does not block clicks by itself.
     const optionRows = shell.OPTORDER.map((cid) => ({
       key: cid, label: shell.OPTLABEL[cid], sub: "", subShow: false,
