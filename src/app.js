@@ -657,6 +657,25 @@ class App extends React.Component {
     ];
   }
 
+  renderConclusion() {
+    return [
+      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "44px 26px 18px", background: "var(--interface-app)" } },
+        e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
+          e(DS.IconTile, { size: "xl", tone: "success" },
+            e(DS.Icon, { name: "check", size: 30 })),
+          e("h1", { style: { margin: "20px 0 0", font: "700 29px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } },
+            "Your matching session is complete"),
+          e("p", { style: { margin: "13px 0 0", font: "500 16px/1.5 var(--font-text)", color: "var(--text-body)" } },
+            "All three options are complete."),
+          e(DS.Card, { variant: "section", style: { width: "100%", marginTop: "28px", textAlign: "left" } },
+            e(DS.SectionLabel, null, "TAKE YOUR TIME"),
+            e("p", { style: { margin: "9px 0 0", font: "400 14.5px/1.55 var(--font-text)", color: "var(--text-body)" } },
+              "You can stay here while you talk through and compare what you noticed across the options.")))),
+      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)" } },
+        e("div", { style: { height: "9px" } }))
+    ];
+  }
+
   // One shared education step (REQ-006): example play buttons per the V5
   // prototype's edu cards. Rendered by the top-level screen and the in-flow
   // step alike; only the completion handler differs.
@@ -1645,6 +1664,7 @@ class App extends React.Component {
     }
     if (s === "done") {
       const done = shell.doneData(st, mainSpecs(st));
+      const finishesSession = shell.completionDestination(st) === "conclusion";
       return [
         e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "26px 22px 10px" } },
           e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
@@ -1659,7 +1679,7 @@ class App extends React.Component {
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
           e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginBottom: "1px" } }, "This exploration ends at matching. Treatment isn't part of this prototype."),
-          e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, "Return to matching options"),
+          e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, finishesSession ? "Finish session" : "Return to matching options"),
           e("div", { style: { height: "9px" } }))
       ];
     }
@@ -1688,7 +1708,7 @@ class App extends React.Component {
   renderMenu() {
     const st = this.state, c = st.concept;
     const where = st.screen === "flow" ? shell.OPTLABEL[c] || "Preserved flow"
-      : { launch: "Start", ear: "Ear", setup: "Headphones and volume", edu: "What to listen for", home: "Matching options" }[st.screen];
+      : { launch: "Start", ear: "Ear", setup: "Headphones and volume", edu: "What to listen for", home: "Matching options", conclusion: "Session complete" }[st.screen];
     const actions = [
       ...(st.screen !== "home" ? [{ label: "Return to matching options", f: () => this.goScreen("home") }] : []),
       { label: "Reset the prototype", f: () => this.resetAll() }
@@ -1776,7 +1796,8 @@ class App extends React.Component {
       setup: () => this.renderSetup(),
       home: () => this.renderHome(),
       edu: () => this.renderEdu(() => this.goScreen("home", { eduSeen: true })),
-      flow: () => this.renderFlow()
+      flow: () => this.renderFlow(),
+      conclusion: () => this.renderConclusion()
     }[st.screen]();
 
     const screenRoot = e("div", {
