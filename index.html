@@ -21,8 +21,42 @@ body { background: var(--interface-app); }
 * { box-sizing: border-box; }
 #root { height: 100dvh; }
 /* REQ-022: every participant control keeps at least a 44px touch target. */
-[data-screen] button { min-width: 44px !important; min-height: 44px !important; }
-[data-screen] input[type="range"] { min-height: 44px !important; height: 44px !important; }
+[data-device-frame] button { min-width: 44px !important; min-height: 44px !important; }
+[data-device-frame] input[type="range"] { min-height: 44px !important; height: 44px !important; }
+/* REQ-012: focus remains visible when a vendored component supplies its
+   resting shadow inline. */
+[data-device-frame] button:focus-visible,
+[data-device-frame] input:focus-visible {
+  outline: 3px solid var(--focus-border) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--focus-ring) !important;
+}
+.pnq-checkbox-input:focus-visible + .pnq-checkbox-visual {
+  outline: 3px solid var(--focus-border) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--focus-ring) !important;
+}
+/* Keep the approved action token while pairing it with brand-navy text so
+   this shell meets its stricter 4.5:1 text contract. */
+[data-pnq-variant="primary"][data-pnq-disabled="false"] {
+  background: var(--action-primary) !important;
+  color: var(--brand-navy) !important;
+}
+[data-pnq-disabled="true"] {
+  background: var(--interface-disabled) !important;
+  color: var(--gray-800) !important;
+  border: var(--border-selected) dashed var(--gray-600) !important;
+  box-shadow: none !important;
+}
+[data-pnq-disabled="true"][data-pnq-on-dark="true"] {
+  background: var(--interface-disabled-dark) !important;
+  color: var(--white) !important;
+  border-color: var(--text-on-dark-secondary) !important;
+}
+[data-dashboard-action] > div { background: var(--action-primary) !important; }
+[data-dashboard-action] > div div { color: var(--brand-navy) !important; }
+[data-simulated-field] label,
+[data-simulated-field] input + div { color: var(--text-body) !important; }
 @keyframes pnqRing { 0% { transform: scale(.72); opacity: .75; } 100% { transform: scale(1.5); opacity: 0; } }
 </style>
 <script src="vendor/react.production.min.js"></script>
