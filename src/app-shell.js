@@ -75,7 +75,7 @@ export function initialState() {
     setupWarn: false, earWarn: false,
     // Only the completion booleans below are persisted. onboardingInput is a
     // deliberately generic, local-only draft for the account shell.
-    onboardingSeen: false, earSeen: false, onboardingInput: "",
+    onboardingSeen: false, earSeen: false, onboardingInput: "", educationReturn: null,
     eduSeen: false, setupSeen: false, heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
     n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
   };
@@ -223,6 +223,9 @@ function clearedNavigationState() {
 export function goScreenState(s, screen, extra) {
   const legacyOnboarding = s.screen === "launch" && screen === "ear";
   const completedEarGate = s.screen === "ear" && screen === "setup" && !!s.ear;
+  const educationReturn = screen === "edu" && extra && extra.educationReturn === "dashboard"
+    ? "dashboard"
+    : null;
   return {
     ...s,
     ...(screen === "flow" ? {} : freshWorkingState()),
@@ -230,6 +233,7 @@ export function goScreenState(s, screen, extra) {
     earSeen: completedEarGate ? true : s.earSeen,
     onboardingInput: screen === "account" ? s.onboardingInput : "",
     ...(extra || {}),
+    educationReturn,
     ...clearedNavigationState(),
     screen
   };
@@ -307,7 +311,10 @@ export function navShow(s) {
 export function backTarget(s) {
   if (s.screen === "ear") return { kind: "screen", screen: "dashboard" };
   if (s.screen === "setup") return { kind: "screen", screen: s.setupSeen && s.eduSeen ? "home" : "ear" };
-  if (s.screen === "edu") return { kind: "screen", screen: s.eduSeen ? "home" : "setup" };
+  if (s.screen === "edu") {
+    if (s.educationReturn === "dashboard") return { kind: "screen", screen: "dashboard" };
+    return { kind: "screen", screen: s.eduSeen ? "home" : "setup" };
+  }
   if (s.screen !== "flow") return { kind: "screen", screen: "home" };
   const c = s.concept, ss = s.stages[c];
   const lv = (s.d && s.d.level) || 0;

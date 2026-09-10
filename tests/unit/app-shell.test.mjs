@@ -29,6 +29,7 @@ test("initial state starts at the first-run splash with fresh shell and option s
   assert.equal(st.onboardingSeen, false);
   assert.equal(st.earSeen, false);
   assert.equal(st.onboardingInput, "");
+  assert.equal(st.educationReturn, null);
   assert.deepEqual(st.stages, { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" });
   assert.equal(st.playKey, null);
   assert.deepEqual(st.optDone, {});
@@ -290,6 +291,7 @@ test("Back renders only on the established screens and targets what it targets",
   assert.deepEqual(shell.backTarget({ ...st, screen: "edu" }), { kind: "screen", screen: "setup" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "setup", setupSeen: true, eduSeen: true }), { kind: "screen", screen: "home" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "edu", eduSeen: true }), { kind: "screen", screen: "home" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "edu", educationReturn: "dashboard" }), { kind: "screen", screen: "dashboard" });
   assert.deepEqual(shell.backTarget(flowAt("n", "vol")), { kind: "screen", screen: "home" }, "first working stage goes home");
   assert.deepEqual(shell.backTarget(flowAt("n", "p2")), { kind: "stage", stage: "p1" });
   const zoomed = { ...flowAt("d", "zoom"), d: { ...shell.freshD(), level: 1 } };
@@ -303,6 +305,14 @@ test("Back renders only on the established screens and targets what it targets",
     { screen: "dashboard", onboardingSeen: true, ear: "Right ear", hp: true, vol: 72 },
     "Back retains the active setup session"
   );
+
+  const dashboard = { ...st, screen: "dashboard", optDone: { n: true }, optOrder: ["n"] };
+  const education = shell.goScreenState(dashboard, "edu", { educationReturn: "dashboard" });
+  assert.equal(education.educationReturn, "dashboard");
+  const returnedHome = shell.goScreenState(education, "dashboard");
+  assert.equal(returnedHome.educationReturn, null, "leaving education clears its return target");
+  assert.deepEqual(returnedHome.optDone, { n: true });
+  assert.deepEqual(returnedHome.optOrder, ["n"], "the Home round trip keeps unrelated progress");
 });
 
 test("measure(): >=620px is the framed 390x844 device, narrower is bare fullscreen", () => {
