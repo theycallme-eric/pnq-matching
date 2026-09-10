@@ -297,14 +297,15 @@ export function navShow(s) {
   const inFlow = s.screen === "flow";
   const stage = s.stages[s.concept];
   const noNav = !inFlow || stage === "intro" || stage === "ret";
-  return !noNav || s.screen === "setup" || s.screen === "edu";
+  return !noNav || s.screen === "ear" || s.screen === "setup" || s.screen === "edu";
 }
 
-// Before the session gates are complete, Back only steps to the preceding
-// gate; it cannot expose the option selector early. Once matching begins, an
-// option's first working stage returns home, deeper stages step back one, and
-// on the 2D field a zoom level steps out before a stage does.
+// Before the session gates are complete, Back only steps to the immediately
+// preceding screen; it cannot expose the option selector early. Once matching
+// begins, an option's first working stage returns home, deeper stages step back
+// one, and on the 2D field a zoom level steps out before a stage does.
 export function backTarget(s) {
+  if (s.screen === "ear") return { kind: "screen", screen: "dashboard" };
   if (s.screen === "setup") return { kind: "screen", screen: s.setupSeen && s.eduSeen ? "home" : "ear" };
   if (s.screen === "edu") return { kind: "screen", screen: s.eduSeen ? "home" : "setup" };
   if (s.screen !== "flow") return { kind: "screen", screen: "home" };
