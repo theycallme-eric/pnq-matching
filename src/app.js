@@ -394,6 +394,29 @@ class App extends React.Component {
     }, action);
   }
 
+  // REQ-014: steppers use one paired action region above the shell footer.
+  // Previous is deliberately wired to the local sequence callback instead of
+  // the footer's Back dispatcher; the first step remains present but inert.
+  stepActionRegion({ canPrevious, onPrevious, nextLabel, canNext, onNext, size = "sm" }) {
+    return this.primaryActionRegion(
+      e("div", {
+        "data-step-actions": "",
+        style: {
+          display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: "10px", alignItems: "stretch"
+        }
+      },
+        e(DS.Button, {
+          variant: "outline", size, disabled: !canPrevious,
+          "data-step-action": "previous", onClick: canPrevious ? onPrevious : undefined
+        }, "Previous step"),
+        e(DS.Button, {
+          variant: "primary", size, disabled: !canNext,
+          "data-step-action": "next", onClick: onNext
+        }, nextLabel))
+    );
+  }
+
   alertBox(text, onDark) {
     return e("div", {
       role: "alert",
@@ -957,6 +980,14 @@ class App extends React.Component {
       const res = nar.advance(x.stages.n, x.n);
       this.go("n", res.stage, res.obj);
     };
+    const previous = () => {
+      const x = this.state, stage = x.stages.n;
+      if (stage === "p3" && x.n.extra > 0) {
+        return this.go("n", "p3", { extra: x.n.extra - 1 });
+      }
+      const previousStage = { p1: "vol", p2: "p1", p3: "p2" }[stage];
+      if (previousStage) this.go("n", previousStage);
+    };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, nar.passTitle(s, n)),
@@ -994,9 +1025,10 @@ class App extends React.Component {
         n.note ? this.noteBox(n.note, "14px") : null,
         s === "p3" ? e("div", { style: { marginTop: "10px" } },
           e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning")) : null),
-      this.primaryActionRegion(
-        e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s])
-      )
+      this.stepActionRegion({
+        canPrevious: s !== "vol", onPrevious: previous,
+        nextLabel: nar.PRIMARY[s], canNext: heard, onNext: signOff
+      })
     ];
   }
 
@@ -1465,6 +1497,13 @@ class App extends React.Component {
       if (res.kind === "zoom") return this.go("d", "zoom", res.obj);
       return this.go("d", "conf");
     };
+    const previous = () => {
+      const level = this.state.d.level || 0;
+      if (!level) return;
+      this.go("d", level === 1 ? "field" : "zoom", {
+        level: level - 1, heard: false, note: field.zoomOutNote(level)
+      });
+    };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, v.title),
@@ -1519,13 +1558,14 @@ class App extends React.Component {
         d.note ? this.noteBox(d.note, "12px") : null,
         e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
           this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())))),
-      this.primaryActionRegion(
-        // The step-forward action stays in place and goes gray until the sound
-        // has been played once, so nobody advances on a marker they have never
-        // heard. Confirming the last level is the participant's call (REQ-009).
-        e(DS.Button, { variant: "primary", size: "md", disabled: !d.heard, onClick: advance },
-          v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus")
-      )
+      this.stepActionRegion({
+        canPrevious: v.level > 0, onPrevious: previous,
+        // The step-forward action stays in place and goes solid gray until the
+        // sound has been played once. Confirming the last level remains the
+        // participant's call (REQ-009).
+        nextLabel: v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus",
+        canNext: d.heard, onNext: advance, size: "md"
+      })
     ];
   }
 
