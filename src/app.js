@@ -2063,31 +2063,39 @@ class App extends React.Component {
         onboardingScreen ? null : e("div", {
           "data-shell-footer": "",
           style: {
+            // REQ-013: reserve independent left, center, and right hit regions
+            // even when one of the visible footer controls is absent.
             flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 56px minmax(0, 1fr)",
             alignItems: "center", columnGap: "8px", padding: "2px 8px 4px",
+            width: "100%", boxSizing: "border-box",
             background: chromeBg, borderTop: "1px solid " + chromeLine
           }
         },
           nav
-            ? e("button", { type: "button", onClick: () => this.onBack(), style: { ...footerControlStyle, justifySelf: "start" } },
+            ? e("button", {
+              type: "button", "data-footer-region": "back", onClick: () => this.onBack(),
+              style: { ...footerControlStyle, gridColumn: "1", justifySelf: "start" }
+            },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
-            : e("span", { "aria-hidden": "true", style: { display: "block", height: "44px" } }),
+            : e("span", { "data-footer-region": "back", "aria-hidden": "true", style: { display: "block", gridColumn: "1", height: "44px" } }),
           st.screen === "dashboard"
-            ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
+            ? e("span", { "data-footer-region": "session-menu", "aria-hidden": "true", style: { display: "block", gridColumn: "2", justifySelf: "center", width: "56px", height: "44px" } })
             : e("button", {
               type: "button", ref: (node) => { this.menuButton = node; }, onClick: () => this.openMenu(),
+              "data-footer-region": "session-menu",
               "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
               "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
-              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
+              style: { gridColumn: "2", justifySelf: "center", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
             }),
           helpActions.length
             ? e("button", {
               type: "button", ref: (node) => { this.helpButton = node; }, onClick: () => this.openHelp(),
+              "data-footer-region": "help",
               "aria-haspopup": "dialog", "aria-expanded": st.helpOpen ? "true" : "false",
               "aria-controls": st.helpOpen ? "contextual-help-dialog" : undefined,
-              style: { ...footerControlStyle, justifySelf: "end" }
+              style: { ...footerControlStyle, gridColumn: "3", justifySelf: "end" }
             }, "Help")
-            : e("span", { "aria-hidden": "true", style: { display: "block", height: "44px" } })),
+            : e("span", { "data-footer-region": "help", "aria-hidden": "true", style: { display: "block", gridColumn: "3", height: "44px" } })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
           : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
