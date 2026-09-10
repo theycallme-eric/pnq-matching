@@ -309,6 +309,21 @@ class App extends React.Component {
       e("div", { style: { height: "9px" } }));
   }
 
+  // REQ-011: matching screens reserve one shared strip for their primary
+  // action. Supporting choices and notes live in the independently scrolling
+  // content above it, so neither content growth nor answer state can move the
+  // primary action toward the shell footer.
+  primaryActionRegion(action) {
+    return e("div", {
+      key: "primary-action-region",
+      "data-primary-action-region": "",
+      style: {
+        flex: "none", height: "121px", padding: "8px 22px 0",
+        background: "var(--gray-50)", overflow: "hidden"
+      }
+    }, action);
+  }
+
   alertBox(text, onDark) {
     return e("div", {
       role: "alert",
@@ -906,13 +921,15 @@ class App extends React.Component {
         // The prototype computes this note but its display block sits dormant
         // in the Field · Prepare markup; escapes must reassure (REQ-016), so
         // it renders here on the pass screen instead.
-        n.note ? this.noteBox(n.note, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-        e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s]),
-        s === "p3" ? e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning") : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          isVol ? null : this.escapeLink("Wider range", () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }),
-          this.escapeLink("Can't hear this", () => this.pat("n", nar.noHear(this.state.n)))))
+        n.note ? this.noteBox(n.note, "14px") : null,
+        e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "10px" } },
+          s === "p3" ? e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning") : null,
+          e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
+            isVol ? null : this.escapeLink("Wider range", () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }),
+            this.escapeLink("Can't hear this", () => this.pat("n", nar.noHear(this.state.n)))))),
+      this.primaryActionRegion(
+        e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s])
+      )
     ];
   }
 
@@ -981,10 +998,16 @@ class App extends React.Component {
           e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "11px" } },
             chips.map(([label, tag]) =>
               e(DS.Button, { key: label, variant: "outline", size: "sm", disabled: !heard, onClick: answer(tag) }, label))),
-          e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
-            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(c === "a" && o.phase === "pitch" ? "close" : "right") }, settle))),
-        o.msg ? this.noteBox(o.msg, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          c === "a" ? e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(o.phase === "pitch" ? "close" : "right") }, settle)) : null),
+        o.msg ? this.noteBox(o.msg, "14px") : null,
+        c === "r" ? e("div", { style: { display: "flex", justifyContent: "center", marginTop: "10px" } },
+          this.escapeLink("Can't hear this", () => this.rDir("nohear"))) : null),
+      c === "r"
+        ? this.primaryActionRegion(
+          e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle)
+        )
+        : e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
         c === "a" && o.suggest
           ? this.noteBox("Nothing nearby has beaten this sound for a while. One final check and we're done, or keep refining if you're not sure.")
           : null,
@@ -993,7 +1016,7 @@ class App extends React.Component {
         c === "a" && o.suggest
           ? e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.go("a", "chal") }, "Do the final check")
           : null,
-        c === "a" && o.responded
+          c === "a" && o.responded
           ? e(DS.Button, { variant: "ghost", onClick: () => this.go("a", "conf", { stop: "patient" }) }, "This is close enough")
           : null)
     ];
@@ -1430,16 +1453,17 @@ class App extends React.Component {
         // The prototype computes this note but its display block sits stranded
         // in the Families intro markup; escapes must reassure (REQ-016), so it
         // renders here on the field screen instead.
-        d.note ? this.noteBox(d.note, "12px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+        d.note ? this.noteBox(d.note, "12px") : null,
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
+          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())),
+          this.escapeLink("Can't hear this", () => this.pat("d", field.noHear())))),
+      this.primaryActionRegion(
         // The step-forward action stays in place and goes gray until the sound
         // has been played once, so nobody advances on a marker they have never
         // heard. Confirming the last level is the participant's call (REQ-009).
         e(DS.Button, { variant: "primary", size: "md", disabled: !d.heard, onClick: advance },
-          v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus"),
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())),
-          this.escapeLink("Can't hear this", () => this.pat("d", field.noHear()))))
+          v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus")
+      )
     ];
   }
 
@@ -1735,13 +1759,14 @@ class App extends React.Component {
           e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
               this.selectRowButton(label, label, conf === label, () => choose(label)))),
-          notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null),
-        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null,
+          notClose ? e("div", { style: { marginTop: "9px" } },
+            e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway")) : null),
+        this.primaryActionRegion(
           notClose
             ? e(DS.Button, { variant: "primary", size: "sm", onClick: keepRefining }, "Keep refining")
-            : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching"),
-          e("div", { style: { minHeight: "52px", display: "flex", flexDirection: "column" } },
-            notClose ? e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway") : null))
+            : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching")
+        )
       ];
     }
     if (s === "done") {
@@ -1925,7 +1950,7 @@ class App extends React.Component {
             e("div", { style: { height: "100%", background: "var(--control-accent)", borderRadius: "3px", transition: "width 420ms cubic-bezier(.4,0,.2,1)", width: prog.w } }))) : null,
         screenRoot,
         st.menuOpen ? this.renderMenu() : null,
-        onboardingScreen ? null : e("div", { style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
+        onboardingScreen ? null : e("div", { "data-shell-footer": "", style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
           nav
             ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
