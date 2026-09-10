@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { startMatchingOption } from "./onboarding-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -31,7 +32,7 @@ test.describe("field (Option 3)", () => {
   test("field broad pass: dragging steers pitch and volume live, capped at the ceiling", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 3" }).click();
+    await startMatchingOption(page, 3);
     await expect(page.locator('[data-screen-label="Field · Pitch and volume"]')).toBeVisible();
     await expect(page.getByText("Move around and listen")).toBeVisible();
 
@@ -102,7 +103,8 @@ test.describe("field (Option 3)", () => {
     await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
     await page.getByRole("button", { name: "Return to matching options" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: /Option 3/ }).getByText("Done")).toBeVisible();
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Option 3" })).toBeEnabled();
   });
 
   test("field escapes reassure and leave a runnable stage", async ({ page }) => {

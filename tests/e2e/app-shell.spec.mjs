@@ -3,7 +3,7 @@
  * persistence, framed vs bare chrome, conditional Back, and audio hard stop.
  */
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const key = "pnq-mtp-v1";
 
@@ -113,7 +113,7 @@ test.describe("app shell", () => {
     await completeSetup(page);
 
     // Options unlock only after setupSeen && eduSeen; open Option 1.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
     await expect(page.locator("[data-progress]")).toBeVisible();
 
@@ -133,7 +133,7 @@ test.describe("app shell", () => {
     expect(n.pitch).toBe(0.5);
 
     // Reopening the option reseeds again from freshN.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
 
     // resetAll (session menu) clears storage and returns to Launch.
@@ -170,7 +170,9 @@ test.describe("app shell", () => {
   test("app shell hard-stops audio on every screen and stage transition", async ({ page }) => {
     await page.goto("/");
     await completeSetup(page);
-    await page.getByRole("button", { name: "What to listen for" }).click();
+    await page.getByRole("button", { name: "Session menu" }).click();
+    await page.getByRole("button", { name: "Jump to a different section" }).click();
+    await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
     await page.getByRole("button", { name: /A lower sound/ }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
     await page.getByRole("button", { name: "I'm ready to start" }).click();
@@ -180,7 +182,7 @@ test.describe("app shell", () => {
     expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
 
     // Stage transition inside a flow stops the main voice too.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await page.getByText("Start Sound", { exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
     await page.getByRole("button", { name: "The volume is about right" }).click();

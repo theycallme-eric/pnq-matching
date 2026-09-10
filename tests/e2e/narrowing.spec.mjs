@@ -4,6 +4,7 @@
  * the widen / can't-hear escapes.
  */
 import { test, expect } from "@playwright/test";
+import { startMatchingOption } from "./onboarding-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -29,7 +30,7 @@ test.describe("narrowing (Option 1)", () => {
   test("stage order runs volume then three tightening pitch passes into shared confidence", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
 
     // Volume first: the sign-off is heard-gated and the header says VOLUME.
@@ -147,7 +148,7 @@ test.describe("narrowing (Option 1)", () => {
   test("can't hear this raises the level, reassures, and never leaves the stage", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
 
     await page.getByRole("button", { name: "Can't hear this" }).click();
     await expect(page.getByText("That’s okay. We made the sound a little easier to hear. Press play and try again.")).toBeVisible();

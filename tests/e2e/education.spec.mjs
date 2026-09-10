@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 async function reachEducation(page) {
   await page.goto("/");
@@ -36,7 +36,7 @@ test.describe("education", () => {
   test("working-stage judgment stays in place and gray until playback", async ({ page }) => {
     await reachEducation(page);
     await page.getByRole("button", { name: "I'm ready to start" }).click();
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
 
     const advance = page.getByRole("button", { name: "The volume is about right" });
     await expect(advance).toBeVisible();

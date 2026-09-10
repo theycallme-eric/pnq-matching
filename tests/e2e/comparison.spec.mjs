@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { startMatchingOption } from "./onboarding-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -21,7 +22,7 @@ test.describe("comparison (Option 2)", () => {
   test("directional answers adjust level then pitch with halving steps into A/B", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 2" }).click();
+    await startMatchingOption(page, 2);
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
 
     const louder = page.getByRole("button", { name: "Mine is louder" });

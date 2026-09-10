@@ -12,6 +12,7 @@ import * as nar from "./narrowing.js";
 import * as fam from "./family-flow.js";
 import * as pres from "./preserved.js";
 import * as field from "./field.js";
+import * as matchingOptions from "./matching-options.js";
 
 const DSBase = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -65,7 +66,10 @@ class App extends React.Component {
     super(props);
     this.state = {
       ...shell.initialState(),
-      accountConfirmation: false
+      accountConfirmation: false,
+      matchingOptions: matchingOptions.openMatchingOptions(),
+      matchingContext: "dashboard",
+      matchingContextData: null
     };
     this.aud = null;
     this.skipNextPersist = false;
@@ -176,7 +180,16 @@ class App extends React.Component {
 
   goScreen(screen, extra) {
     this.hardStop();
-    this.setState((s) => shell.goScreenState(s, screen, extra));
+    this.setState((s) => {
+      const next = shell.goScreenState(s, screen, extra);
+      if (screen !== "home") return next;
+      return {
+        ...next,
+        matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingContext: s.screen === "edu" ? "education" : s.screen === "setup" ? "setup" : s.matchingContext,
+        matchingContextData: null
+      };
+    });
   }
 
   startOnboarding() {
@@ -205,6 +218,21 @@ class App extends React.Component {
   openOption(cid, stage, seed) {
     this.hardStop();
     this.setState((s) => shell.openOptionState(s, cid, stage, seed));
+  }
+
+  finishOption() {
+    this.hardStop();
+    this.setState((s) => {
+      const contextData = shell.doneData(s, mainSpecs(s));
+      const next = shell.completeOptionState(s);
+      if (next.screen !== "home") return next;
+      return {
+        ...next,
+        matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingContext: "completion",
+        matchingContextData: contextData
+      };
+    });
   }
 
   jump(c, stage, conceptState) {
@@ -619,69 +647,95 @@ class App extends React.Component {
     ];
   }
 
-  // One hub row, prototype markup: title with optional one-line subtitle,
-  // check "Done" pill, chevron. Locked rows keep aria-disabled plus the
-  // non-interactive styling but stay in the layout so nothing shifts.
-  homeRow(row) {
-    const locked = !!row.locked;
-    return e("button", {
-      key: row.key, onClick: row.open, "aria-disabled": locked ? "true" : undefined,
-      ...(row.optionId ? { "data-option-id": row.optionId, "data-option-state": row.done ? "done" : "available" } : {}),
-      style: {
-        display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "72px", padding: "16px 16px",
-        borderRadius: "16px", border: "1.5px solid var(--gray-200)",
-        background: locked ? "var(--gray-100)" : "var(--white)",
-        boxShadow: locked ? "none" : "var(--shadow-card-sm)",
-        cursor: locked ? "not-allowed" : "pointer", textAlign: "left"
-      }
+  renderMatchingContext() {
+    const st = this.state;
+    if (st.matchingContext === "education") {
+      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } }, this.renderEdu(() => {}));
+    }
+    if (st.matchingContext === "setup") {
+      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--navy-900)" } }, this.renderSetup());
+    }
+    if (st.matchingContext === "completion" && st.matchingContextData) {
+      const done = st.matchingContextData;
+      return e("div", { style: { flex: 1, minHeight: 0, padding: "26px 22px 10px", overflowY: "auto" } },
+        e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
+          e(DS.IconTile, { size: "xl", tone: "success" }, e(DS.Icon, { name: "check", size: 30 })),
+          e("div", { style: { font: font.heading(26), color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "16px" } }, done.title)),
+        e("div", { style: { marginTop: "20px" } },
+          e(DS.Card, { variant: "list" },
+            done.rows.map((row) => e("div", { key: row.label, style: { padding: "13px 18px", borderTop: row.bt } },
+              e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-secondary)" } }, row.label),
+              e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))));
+    }
+    return this.renderDashboard();
+  }
+
+  chooseMatchingOption(optionId) {
+    this.setState((s) => ({
+      matchingOptions: matchingOptions.selectMatchingOption(s.matchingOptions, optionId)
+    }));
+  }
+
+  confirmMatchingOption() {
+    const optionId = matchingOptions.confirmMatchingOption(this.state.matchingOptions);
+    if (optionId) this.openOption(optionId);
+  }
+
+  renderMatchingOptionsSheet() {
+    const selection = this.state.matchingOptions || matchingOptions.openMatchingOptions();
+    const selectedOption = selection.selectedOption;
+    return e("div", {
+      "data-matching-options-layer": "",
+      style: { position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "flex-end" }
     },
-      e("span", { style: { flex: 1 } },
-        e("span", { ...(row.optionId ? { "data-option-label": "" } : {}), style: { display: "block", font: "700 17px var(--font-ui)", color: locked ? "var(--gray-400)" : "var(--text-heading)" } }, row.label),
-        row.subShow ? e("span", { style: { display: "block", font: "400 13px/1.4 var(--font-text)", color: "var(--text-muted)", marginTop: "3px" } }, row.sub) : null),
-      row.done ? e("span", { "data-option-status": row.optionId ? "done" : undefined, style: { flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--gray-100)", borderRadius: "999px", padding: "5px 10px 5px 7px" } },
-        e(DS.Icon, { name: "check", size: 13, color: "var(--gray-600)", strokeWidth: 3.2 }),
-        e("span", { style: { font: "600 11.5px var(--font-ui)", color: "var(--gray-600)" } }, "Done")) : null,
-      e(DS.Icon, { name: "chevronRight", size: 20, color: "var(--gray-400)" }));
+      e("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .48 } }),
+      e("section", {
+        role: "dialog", "aria-modal": "true", "aria-labelledby": "matching-options-title",
+        "data-matching-options-sheet": "",
+        style: {
+          position: "relative", width: "100%", maxHeight: "calc(100% - 20px)", overflowY: "auto",
+          borderRadius: "var(--radius-hero) var(--radius-hero) 0 0", background: "var(--white)",
+          boxShadow: "var(--shadow-device)", padding: "10px 20px 18px"
+        }
+      },
+        e("div", { "aria-hidden": "true", style: { width: "42px", height: "4px", margin: "0 auto", borderRadius: "var(--radius-full)", background: "var(--gray-300)" } }),
+        e("h1", { id: "matching-options-title", style: { margin: "14px 0 0", font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Choose a matching option"),
+        e("p", { style: { margin: "6px 0 0", font: "400 14px/1.4 var(--font-text)", color: "var(--text-body)" } }, "Select one, then continue."),
+        e("div", {
+          "data-option-selector": "", role: "group", "aria-label": "Matching options",
+          style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "15px" }
+        }, matchingOptions.MATCHING_OPTIONS.map((option, index) => {
+          const selected = selectedOption === option.id;
+          return e("button", {
+            key: option.id, type: "button", onClick: () => this.chooseMatchingOption(option.id),
+            "aria-pressed": selected ? "true" : "false",
+            "data-option-id": String(index + 1),
+            "data-option-state": selected ? "selected" : "available",
+            style: {
+              display: "block", width: "100%", padding: 0, border: "none",
+              borderRadius: "var(--radius-card)", background: "transparent", color: "inherit",
+              font: "inherit", textAlign: "left", cursor: "pointer"
+            }
+          }, e(DS.SelectRow, {
+            label: option.label, selected,
+            style: { minHeight: "58px", padding: "14px 16px", pointerEvents: "none" }
+          }));
+        })),
+        e("div", { style: { marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+          e(DS.Button, {
+            variant: "primary", size: "md", disabled: !selectedOption,
+            onClick: () => this.confirmMatchingOption()
+          }, "Continue"))));
   }
 
   renderHome() {
-    const st = this.state;
-    const ready = shell.optionSelectionReady(st);
-    const setupRows = [
-      { key: "setup", label: "Headphones and volume", sub: "", subShow: false, done: st.setupSeen, open: () => this.goScreen("setup") },
-      { key: "edu", label: "What to listen for", sub: "", subShow: false, done: st.eduSeen, open: () => this.goScreen("edu") }
-    ];
-    // The three options stay locked until the session setup and education are
-    // complete. Ordinary navigation reaches this screen only after the ear
-    // gate too. The open handler re-checks
-    // live state: aria-disabled does not block clicks by itself.
-    const optionRows = shell.OPTORDER.map((cid, index) => ({
-      key: cid, label: shell.OPTLABEL[cid], sub: "", subShow: false,
-      optionId: String(index + 1),
-      done: !!st.optDone[cid], locked: !ready,
-      open: () => {
-        const x = this.state;
-        if (!shell.optionSelectionReady(x)) return;
-        this.openOption(cid);
-      }
-    }));
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
-        e(DS.SectionLabel, null, "SOUND PLAYS IN"),
-        e("div", { style: { marginTop: "11px" } },
-          this.segmentedControl(
-            "Sound plays in",
-            ["Left", "Right", "Both"],
-            { "Left ear": "Left", "Right ear": "Right", "Both ears": "Both" }[st.ear] || "Both",
-            (v) => this.setEar({ Left: "Left ear", Right: "Right ear", Both: "Both ears" }[v] || "Both ears")
-          )),
-        e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "GETTING SET UP")),
-        e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
-          setupRows.map((row) => this.homeRow(row))),
-        e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "MATCHING")),
-        e("div", { "data-option-selector": "", role: "group", "aria-label": "Matching options", style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
-          optionRows.map((row) => this.homeRow(row)))),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)" } }, e("div", { style: { height: "9px" } }))
+      e("div", {
+        key: "context", "data-matching-options-context": this.state.matchingContext || "dashboard",
+        "aria-hidden": "true", inert: "",
+        style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", pointerEvents: "none" }
+      }, this.renderMatchingContext()),
+      this.renderMatchingOptionsSheet()
     ];
   }
 
@@ -1706,7 +1760,7 @@ class App extends React.Component {
                 e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-          e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, finishesSession ? "Finish session" : "Return to matching options"),
+          e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.finishOption() }, finishesSession ? "Finish session" : "Return to matching options"),
           e("div", { style: { height: "9px" } }))
       ];
     }
@@ -1839,7 +1893,7 @@ class App extends React.Component {
       "data-screen": st.screen,
       "data-screen-label": label,
       ...(st.screen === "account" ? { "data-account-step": st.accountConfirmation ? "confirmation" : "entry" } : {}),
-      style: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark || st.screen === "launch" ? "var(--navy-900)" : undefined }
+      style: { position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark || st.screen === "launch" ? "var(--navy-900)" : undefined }
     }, body);
 
     return e("div", {
