@@ -33,8 +33,8 @@ test.describe("onboarding", () => {
     await startSessionFromSplash(page);
     const ear = page.locator('[data-screen-label="Setup · Ear"]');
     await expect(ear).toBeVisible();
-    await expect(ear.getByText("Which ear would you like to work with?")).toBeVisible();
-    await expect(ear.getByText("Sound plays only in the ear you choose. If you hear it in both, pick the side where it is strongest, or choose both ears.")).toBeVisible();
+    await expect(ear.getByText("Select which ear(s)", { exact: true })).toBeVisible();
+    await expect(ear.getByText("Which ear(s) would you like to treat?", { exact: true })).toBeVisible();
 
     // Three SelectRow choices; none selected yet, so Continue is disabled.
     for (const label of ["Left ear", "Right ear", "Both ears"]) {
@@ -67,6 +67,23 @@ test.describe("onboarding", () => {
 
     await cont.click();
     await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+  });
+
+  test("Setup · Ear Back returns to the preceding screen without clearing the setup session", async ({ page }) => {
+    await page.goto("/");
+    await startSessionFromSplash(page);
+    const ear = page.locator('[data-screen-label="Setup · Ear"]');
+    await ear.getByText("Right ear", { exact: true }).click();
+
+    const beforeBack = await page.evaluate(() => window.__pnqAppState());
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+
+    await expect(page.locator('[data-screen-label="Dashboard"]')).toBeVisible();
+    const afterBack = await page.evaluate(() => window.__pnqAppState());
+    expect(afterBack.ear).toBe("Right ear");
+    expect(afterBack.hp).toBe(beforeBack.hp);
+    expect(afterBack.vol).toBe(beforeBack.vol);
+    expect(afterBack.onboardingSeen).toBe(true);
   });
 
   test("Setup · Headphones and volume gates Continue, updates live, and persists setupSeen through education", async ({ page }) => {
