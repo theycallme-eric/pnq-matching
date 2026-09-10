@@ -97,11 +97,15 @@ test("two uncertain answers in a row return to the directional phase", () => {
   assert.match(second.obj.msg, /back to simple directions/);
 });
 
-test("the comparison escape raises the level, reassures, and never leaves the stage", () => {
-  const res = comparison.compNoHear({ ...freshR(), level: .46 });
+test("comparison contextual help raises only the level, reassures, and never leaves the pair", () => {
+  const r = { ...freshR(), level: .46, center: .63, spread: .17, round: 6, uncertain: 1 };
+  const before = structuredClone(r);
+  const res = comparison.compNoHear(r);
   assert.equal(res.kind, "patch");
+  assert.deepEqual(Object.keys(res.patch).sort(), ["level", "note"]);
   close(res.patch.level, .58);
-  assert.match(res.patch.note, /easier to hear/);
+  assert.equal(res.patch.note, "We made the sounds a little easier to hear. Check your headphones, then replay.");
+  assert.deepEqual(r, before, "opening comparison assistance does not mutate pair progress");
 });
 
 test("the fatigue note appears from round 10 unless an answer just set one", () => {

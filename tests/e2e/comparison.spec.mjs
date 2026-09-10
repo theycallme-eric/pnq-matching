@@ -160,7 +160,7 @@ test.describe("comparison (Option 2)", () => {
   test("audibility escapes raise the level, reassure, and never dead-end", async ({ page }) => {
     await seed(page);
     await jumpTo(page, "A/B comparisons");
-    await page.getByRole("button", { name: "I can't hear these sounds" }).click();
+    await chooseHelpAction(page, "Can't hear these sounds");
     await expect(page.locator('[data-screen-label="Shared · Two-sound comparison"]')).toBeVisible();
     await expect(page.getByText(/made the sounds a little easier to hear/)).toBeVisible();
     expect((await rState(page)).level).toBeCloseTo(.58, 6);
