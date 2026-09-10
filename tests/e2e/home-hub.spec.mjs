@@ -32,6 +32,14 @@ async function restoreReadyOptions(page) {
   await expect(sheet(page)).toBeVisible();
 }
 
+async function restorePatientHome(page) {
+  await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
+    onboardingSeen: true
+  })));
+  await page.goto("/");
+  return page.locator('[data-screen-label="Dashboard"]');
+}
+
 async function chooseOption(page, number) {
   await option(page, number).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -85,6 +93,63 @@ async function completeOption(page, number) {
   await page.getByRole("button", { name: "Return to matching options" }).click();
   await expect(sheet(page)).toBeVisible();
 }
+
+test.describe("Explore PNQ on Home", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("groups all five approved rows in one aligned card and keeps presentation-only rows inert", async ({ page }) => {
+    const home = await restorePatientHome(page);
+    await expect(home).toBeVisible();
+
+    const card = home.locator('[data-explore-pnq-card]');
+    const rows = card.locator('[data-explore-row]');
+    await expect(card).toHaveCount(1);
+    await expect(rows).toHaveCount(5);
+    expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute("data-explore-row"))))
+      .toEqual(["messages", "forms", "history", "profile", "education"]);
+    await expect(rows.locator("svg")).toHaveCount(10); // one leading icon and one chevron per row
+
+    const geometry = await card.evaluate((node) => {
+      const cardBox = node.getBoundingClientRect();
+      return {
+        noOverflow: node.scrollWidth <= node.clientWidth + 1,
+        rowsInside: [...node.querySelectorAll("[data-explore-row]")].every((row) => {
+          const box = row.getBoundingClientRect();
+          return box.left >= cardBox.left - 1 && box.right <= cardBox.right + 1
+            && row.scrollWidth <= row.clientWidth + 1;
+        })
+      };
+    });
+    expect(geometry).toEqual({ noOverflow: true, rowsInside: true });
+
+    const before = await page.evaluate(() => window.__pnqAppState());
+    for (const key of ["messages", "forms", "history", "profile"]) {
+      await card.locator(`[data-explore-row="${key}"]`).click();
+      await expect(home).toBeVisible();
+      expect(await page.evaluate(() => window.__pnqAppState())).toEqual(before);
+    }
+  });
+
+  test("What to listen for opens once and visible Back restores Home with progress unchanged", async ({ page }) => {
+    const home = await restorePatientHome(page);
+    const storedBefore = await page.evaluate(() => sessionStorage.getItem("pnq-mtp-v1"));
+
+    await home.getByRole("button", { name: "What to listen for", exact: true }).click();
+    const education = page.locator('[data-screen-label="Shared · What to listen for"]');
+    await expect(education).toHaveCount(1);
+    await expect(education).toBeVisible();
+
+    const back = page.getByRole("button", { name: "Back", exact: true });
+    await expect(back).toBeVisible();
+    await back.click();
+
+    await expect(home).toBeVisible();
+    await expect(home.locator('[data-explore-pnq-card] [data-explore-row]')).toHaveCount(5);
+    expect(await page.evaluate(() => sessionStorage.getItem("pnq-mtp-v1"))).toBe(storedBefore);
+    expect(await page.evaluate(() => window.__pnqAppState().onboardingSeen)).toBe(true);
+    expect(await page.evaluate(() => window.__pnqAppState().optOrder)).toEqual([]);
+  });
+});
 
 test.describe("matching options route", () => {
   test.use({ viewport: { width: 390, height: 844 } });

@@ -624,10 +624,15 @@ class App extends React.Component {
   }
 
   renderDashboard() {
-    const context = [
-      { icon: "sparkles", label: "Wellness resources", copy: "Ideas for everyday listening comfort" },
-      { icon: "headphones", label: "Listening tips", copy: "Simple ways to prepare your space" },
-      { icon: "prescription", label: "Help and support", copy: "Guidance for using PNQ Health" }
+    const exploreRows = [
+      { key: "messages", icon: "message", label: "Messages", sublabel: "No messages yet", tone: "neutral" },
+      { key: "forms", icon: "forms", label: "Forms & Assessments", sublabel: "Complete after your first session", tone: "blue" },
+      { key: "history", icon: "history", label: "Session History", sublabel: "Your sessions will appear here", tone: "neutral" },
+      { key: "profile", icon: "user", label: "Profile", sublabel: null, tone: "blue" },
+      {
+        key: "education", icon: "ear", label: "What to listen for", sublabel: null, tone: "blue",
+        open: () => this.goScreen("edu", { educationReturn: "dashboard" })
+      }
     ];
     return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--interface-app)" } },
       e("header", { style: { flex: "none", background: "var(--gradient-navy-dashboard)", color: "var(--text-on-dark)", padding: "18px 24px 28px" } },
@@ -654,19 +659,32 @@ class App extends React.Component {
           style: { pointerEvents: "none" }
         })),
         e("div", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-secondary)", marginTop: "28px", marginBottom: "10px" } }, "EXPLORE PNQ"),
-        e("div", { style: { display: "grid", gap: "10px" } },
-          context.map((item) =>
-            e(DS.Card, {
-              key: item.label,
-              variant: "section",
-              "data-context-tile": "",
-              style: { display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", boxShadow: "var(--shadow-card-sm)", cursor: "default", pointerEvents: "none", userSelect: "none" }
-            },
-              e(DS.IconTile, { size: "md", tone: "neutral" },
-                e(DS.Icon, { name: item.icon, size: 21, color: "var(--text-muted)" })),
-              e("div", { style: { minWidth: 0 } },
-                e("div", { style: { font: "600 15px var(--font-ui)", color: "var(--text-heading)" } }, item.label),
-                e("div", { style: { marginTop: "2px", font: "400 12.5px/1.4 var(--font-text)", color: "var(--text-secondary)" } }, item.copy)))))));
+        e(DS.Card, {
+          variant: "list", "data-explore-pnq-card": "", role: "group", "aria-label": "Explore PNQ"
+        }, exploreRows.map((item, index) => {
+          const row = e(DS.ListRow, {
+            icon: e(DS.IconTile, { size: "md", tone: item.tone },
+              e(DS.Icon, {
+                name: item.icon, size: 22,
+                color: item.tone === "blue" ? "var(--brand-blue-deep)" : "var(--text-muted)"
+            })),
+            label: item.label,
+            sublabel: item.sublabel
+              ? e("span", { style: { color: "var(--text-secondary)" } }, item.sublabel)
+              : null,
+            style: item.open ? { pointerEvents: "none", minWidth: 0 } : { minWidth: 0 }
+          });
+          const content = item.open
+            ? e("button", {
+              type: "button", "data-explore-row": item.key, "aria-label": item.label, onClick: item.open,
+              style: {
+                display: "block", width: "100%", padding: 0, border: "none", background: "transparent",
+                color: "inherit", font: "inherit", textAlign: "left", cursor: "pointer"
+              }
+            }, row)
+            : e("div", { "data-explore-row": item.key }, row);
+          return e(React.Fragment, { key: item.key }, index ? e(DS.CardDivider) : null, content);
+        }))));
   }
 
   renderEar() {
@@ -2058,7 +2076,9 @@ class App extends React.Component {
       ear: () => this.renderEar(),
       setup: () => this.renderSetup(),
       home: () => this.renderHome(),
-      edu: () => this.renderEdu(() => this.goScreen("home", { eduSeen: true })),
+      edu: () => this.renderEdu(() => st.educationReturn === "dashboard"
+        ? this.goScreen("dashboard")
+        : this.goScreen("home", { eduSeen: true })),
       flow: () => this.renderFlow(),
       conclusion: () => this.renderConclusion()
     }[st.screen]();

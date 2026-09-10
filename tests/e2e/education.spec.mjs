@@ -17,6 +17,26 @@ async function reachEducation(page) {
 test.describe("education", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  test("Home education has a visible Back control that returns to the unchanged Explore PNQ card", async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
+      onboardingSeen: true
+    })));
+    await page.goto("/");
+
+    const home = page.locator('[data-screen-label="Dashboard"]');
+    const card = home.locator('[data-explore-pnq-card]');
+    await expect(card.locator('[data-explore-row]')).toHaveCount(5);
+    await home.getByRole("button", { name: "What to listen for", exact: true }).click();
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(home).toBeVisible();
+    await expect(card.locator('[data-explore-row]')).toHaveCount(5);
+    expect(await page.evaluate(() => window.__pnqAppState().onboardingSeen)).toBe(true);
+    expect(await page.evaluate(() => window.__pnqAppState().optDone)).toEqual({});
+    expect(await page.evaluate(() => window.__pnqAppState().optOrder)).toEqual([]);
+  });
+
   test("shared examples toggle through the audio engine and completion persists", async ({ page }) => {
     await reachEducation(page);
     await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
