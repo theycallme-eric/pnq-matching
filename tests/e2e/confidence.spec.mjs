@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { primaryActionTop } from "./action-region-helpers.mjs";
 
 async function openConfidence(page, optionNumber = 1) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -14,6 +15,21 @@ async function openConfidence(page, optionNumber = 1) {
 
 test.describe("confidence and completion", () => {
   test.use({ viewport: { width: 390, height: 844 } });
+
+  test("confidence primary action stays in the bottom region across answer states", async ({ page }) => {
+    await openConfidence(page);
+
+    const initialTop = await primaryActionTop(page, "Finish matching");
+    await expect(page.getByRole("button", { name: "Finish matching" })).toBeDisabled();
+
+    await page.getByText("Very close", { exact: true }).click();
+    await expect(page.getByRole("button", { name: "Finish matching" })).toBeEnabled();
+    expect(await primaryActionTop(page, "Finish matching")).toBe(initialTop);
+
+    await page.getByText("Not close yet", { exact: true }).click();
+    await expect(page.getByText(/keep refining, or finish now/)).toBeVisible();
+    expect(await primaryActionTop(page, "Keep refining")).toBe(initialTop);
+  });
 
   test("confidence replays the match and switches to the refinement footer", async ({ page }) => {
     await openConfidence(page);
@@ -32,7 +48,7 @@ test.describe("confidence and completion", () => {
     expect(await page.evaluate(() => window.__pnqAppState().n.conf)).toBe(null);
   });
 
-  test("finishing shows the summary and returns a persisted Done option to the hub", async ({ page }) => {
+  test("finishing shows the summary and returns every option without a completion marker", async ({ page }) => {
     await openConfidence(page);
     await page.getByText("Very close", { exact: true }).click();
     await page.getByRole("button", { name: "Finish matching" }).click();
@@ -56,8 +72,8 @@ test.describe("confidence and completion", () => {
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("completion-probe");
     await page.getByRole("button", { name: "Return to matching options" }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
-    const option = page.getByRole("button", { name: /Option 1/ });
-    await expect(option.getByText("Done", { exact: true })).toBeVisible();
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Option 1" })).toBeEnabled();
     const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")));
     expect(saved.optDone.n).toBe(true);
     expect(saved.optOrder).toEqual(["n"]);

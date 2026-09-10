@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { primaryActionTop } from "./action-region-helpers.mjs";
+import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -28,10 +31,27 @@ async function drag(page, toX, toY) {
 test.describe("field (Option 3)", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  test("field primary action stays in the bottom region across note and enablement states", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "Whole field");
+
+    const label = "Look closely at this area";
+    const initialTop = await primaryActionTop(page, label);
+    await expect(page.getByRole("button", { name: label })).toBeDisabled();
+
+    await chooseHelpAction(page, "Can't hear this");
+    await expect(page.getByText(/worth telling us/)).toBeVisible();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+
+    await page.getByRole("button", { name: "Play the sound" }).click();
+    await expect(page.getByRole("button", { name: label })).toBeEnabled();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+  });
+
   test("field broad pass: dragging steers pitch and volume live, capped at the ceiling", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 3" }).click();
+    await startMatchingOption(page, 3);
     await expect(page.locator('[data-screen-label="Field · Pitch and volume"]')).toBeVisible();
     await expect(page.getByText("Move around and listen")).toBeVisible();
 
@@ -102,7 +122,8 @@ test.describe("field (Option 3)", () => {
     await expect(page.locator('[data-screen-label="Shared · Match complete"]')).toBeVisible();
     await page.getByRole("button", { name: "Return to matching options" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: /Option 3/ }).getByText("Done")).toBeVisible();
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Option 3" })).toBeEnabled();
   });
 
   test("field escapes reassure and leave a runnable stage", async ({ page }) => {
@@ -110,7 +131,7 @@ test.describe("field (Option 3)", () => {
     await jumpTo(page, "Closer look");
     await expect(page.getByText(/Same idea, a smaller area/)).toBeVisible();
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/okay, and worth telling us/)).toBeVisible();
     await expect(page.getByText(/moving the marker higher/)).toBeVisible();
     // Still on the same runnable stage with audio available.

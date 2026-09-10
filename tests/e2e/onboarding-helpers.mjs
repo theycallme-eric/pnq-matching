@@ -8,3 +8,9 @@ export async function startSessionFromSplash(page) {
   await reachDashboardFromSplash(page);
   await page.getByRole("button", { name: "New Session" }).click();
 }
+
+export async function startMatchingOption(page, option) {
+  const label = typeof option === "number" ? `Option ${option}` : option;
+  await page.getByRole("button", { name: label, exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+}

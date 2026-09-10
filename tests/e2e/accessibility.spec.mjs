@@ -199,8 +199,6 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones Plug in/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
-    await auditScreen("Education");
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await auditScreen("Matching options");
 
     expect(problems).toEqual([]);
@@ -236,8 +234,6 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
-    await audit("Education");
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await audit("Matching options");
     await page.getByRole("button", { name: "Session menu" }).click();
     await page.getByRole("button", { name: "Jump to a different section" }).click();
@@ -304,22 +300,22 @@ test.describe("accessibility and participant copy", () => {
     await volume.press("End");
     await expect(volume).toHaveValue("100");
     await page.getByRole("button", { name: "Continue" }).press("Enter");
-    await page.getByRole("button", { name: "I'm ready to start" }).press("Enter");
-
-    const selectedEar = page.getByRole("button", { name: "Both", exact: true });
-    await expect(selectedEar).toHaveAttribute("aria-pressed", "true");
-    await expect(selectedEar.locator("svg")).toBeVisible();
 
     const option = page.getByRole("button", { name: "Option 1" });
     await expectVisibleFocus(option);
     await option.press("Enter");
+    await expect(option).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    const matchingContinue = page.getByRole("button", { name: "Continue", exact: true });
+    await expectVisibleFocus(matchingContinue);
+    await matchingContinue.press("Enter");
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
     await page.getByRole("button", { name: "Back" }).press("Enter");
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 
     await finishOptionWithKeyboard(page, "OPTION 1");
-    await expect(page.locator('[data-option-id="1"]')).toHaveAttribute("data-option-state", "done");
-    await expect(page.locator('[data-option-id="1"] [data-option-status="done"]')).toContainText("Done");
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    await expect(page.locator('[data-option-id="1"]')).toHaveAttribute("data-option-state", "available");
     await finishOptionWithKeyboard(page, "OPTION 2");
     await finishOptionWithKeyboard(page, "OPTION 3");
     await expect(page.locator('[data-screen-label="Session complete"]')).toBeVisible();
@@ -370,7 +366,7 @@ test.describe("accessibility and participant copy", () => {
     for (const option of REQUIRED_COPY.options) expect(allCopy.some((text) => text.includes(option))).toBe(true);
   });
 
-  test("accessibility: locked options expose aria-disabled and do not navigate", async ({ page }) => {
+  test("accessibility: every option remains selectable whenever the sheet opens", async ({ page }) => {
     await page.addInitScript(() => sessionStorage.clear());
     await page.goto("/");
     await page.evaluate(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -386,8 +382,12 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: "Session menu" }).click();
     await page.getByRole("button", { name: "Return to matching options" }).click();
     const option = page.getByRole("button", { name: "Option 1" });
-    await expect(option).toHaveAttribute("aria-disabled", "true");
+    await expect(option).not.toHaveAttribute("aria-disabled", /.*/);
+    await expect(option).toHaveAttribute("aria-pressed", "false");
     await option.evaluate((element) => element.click());
     await expect(page.locator('[data-screen="home"]')).toBeVisible();
+    await expect(option).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 async function reachEducation(page) {
   await page.goto("/");
@@ -9,6 +9,9 @@ async function reachEducation(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("button", { name: "Jump to a different section" }).click();
+  await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
 }
 
 test.describe("education", () => {
@@ -56,7 +59,7 @@ test.describe("education", () => {
   test("working-stage judgment stays in place and gray until playback", async ({ page }) => {
     await reachEducation(page);
     await page.getByRole("button", { name: "I'm ready to start" }).click();
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
 
     const advance = page.getByRole("button", { name: "The volume is about right" });
     await expect(advance).toBeVisible();

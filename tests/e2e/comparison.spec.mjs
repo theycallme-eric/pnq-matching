@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { primaryActionTop } from "./action-region-helpers.mjs";
+import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -18,10 +21,27 @@ const rState = (page) => page.evaluate(() => window.__pnqAppState().r);
 test.describe("comparison (Option 2)", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
+  test("directional primary action stays in the bottom region across content and enablement states", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "Directional · volume");
+
+    const label = "The volume is set, move on";
+    const initialTop = await primaryActionTop(page, label);
+    await expect(page.getByRole("button", { name: label })).toBeDisabled();
+
+    await chooseHelpAction(page, "Can't hear this");
+    await expect(page.getByText(/made it a little easier to hear/)).toBeVisible();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+
+    await page.getByText("Start Sound", { exact: true }).click();
+    await expect(page.getByRole("button", { name: label })).toBeEnabled();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+  });
+
   test("directional answers adjust level then pitch with halving steps into A/B", async ({ page }) => {
     await seed(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Option 2" }).click();
+    await startMatchingOption(page, 2);
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
 
     const louder = page.getByRole("button", { name: "Mine is louder" });
@@ -147,7 +167,7 @@ test.describe("comparison (Option 2)", () => {
 
     await jumpTo(page, "Directional · volume");
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/made it a little easier to hear/)).toBeVisible();
     expect((await rState(page)).level).toBeCloseTo(.52, 6);
   });

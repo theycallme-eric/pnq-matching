@@ -12,6 +12,7 @@ import * as nar from "./narrowing.js";
 import * as fam from "./family-flow.js";
 import * as pres from "./preserved.js";
 import * as field from "./field.js";
+import * as matchingOptions from "./matching-options.js";
 
 const DSBase = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
@@ -65,7 +66,11 @@ class App extends React.Component {
     super(props);
     this.state = {
       ...shell.initialState(),
-      accountConfirmation: false
+      accountConfirmation: false,
+      helpOpen: false,
+      matchingOptions: matchingOptions.openMatchingOptions(),
+      matchingContext: "dashboard",
+      matchingContextData: null
     };
     this.aud = null;
     this.skipNextPersist = false;
@@ -176,7 +181,16 @@ class App extends React.Component {
 
   goScreen(screen, extra) {
     this.hardStop();
-    this.setState((s) => shell.goScreenState(s, screen, extra));
+    this.setState((s) => {
+      const next = shell.goScreenState(s, screen, extra);
+      if (screen !== "home") return next;
+      return {
+        ...next,
+        matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingContext: s.screen === "edu" ? "education" : s.screen === "setup" ? "setup" : s.matchingContext,
+        matchingContextData: null
+      };
+    });
   }
 
   startOnboarding() {
@@ -204,7 +218,28 @@ class App extends React.Component {
 
   openOption(cid, stage, seed) {
     this.hardStop();
-    this.setState((s) => shell.openOptionState(s, cid, stage, seed));
+    // Keep the completed summary underneath the two-step sheet while the
+    // participant considers or changes a selection. Once Continue confirms
+    // the next option, the fresh flow replaces that completed context.
+    this.setState((s) => ({
+      ...shell.openOptionState(s, cid, stage, seed),
+      matchingContextData: null
+    }));
+  }
+
+  finishOption() {
+    this.hardStop();
+    this.setState((s) => {
+      const contextData = shell.doneData(s, mainSpecs(s));
+      const next = shell.completeOptionState(s);
+      if (next.screen !== "home") return next;
+      return {
+        ...next,
+        matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingContext: "completion",
+        matchingContextData: contextData
+      };
+    });
   }
 
   jump(c, stage, conceptState) {
@@ -236,6 +271,69 @@ class App extends React.Component {
     this.setState({ menuOpen: false, jumpOpen: false }, () => {
       if (this.menuButton) this.menuButton.focus();
     });
+  }
+
+  // REQ-012: footer Help is driven by the active matching context, so a
+  // screen can expose only the assistance actions it previously owned.
+  contextualHelpActions() {
+    const st = this.state;
+    if (st.screen !== "flow") return [];
+    const c = st.concept, s = st.stages[c];
+    if (c === "n" && ["vol", "p1", "p2", "p3"].includes(s)) {
+      return [
+        ...(s === "vol" ? [] : [{
+          label: "Wider range",
+          f: () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }
+        }]),
+        { label: "Can't hear this", f: () => this.pat("n", nar.noHear(this.state.n)) }
+      ];
+    }
+    if (c === "r" && s === "dir") {
+      return [{ label: "Can't hear this", f: () => this.rDir("nohear") }];
+    }
+    if (c === "a" && s === "listen") {
+      return [{ label: "Can't hear this", f: () => this.aResp("nohear") }];
+    }
+    if (c === "d" && (s === "field" || s === "zoom")) {
+      return [{ label: "Can't hear this", f: () => this.pat("d", field.noHear()) }];
+    }
+    return [];
+  }
+
+  openHelp() {
+    this.setState({ helpOpen: true }, () => {
+      if (this.helpCloseButton) this.helpCloseButton.focus();
+    });
+  }
+
+  closeHelp() {
+    this.setState({ helpOpen: false }, () => {
+      if (this.helpButton) this.helpButton.focus();
+    });
+  }
+
+  runHelpAction(action) {
+    this.setState({ helpOpen: false }, action.f);
+  }
+
+  onHelpKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.closeHelp();
+      return;
+    }
+    if (event.key !== "Tab" || !this.helpDialog) return;
+    const controls = [...this.helpDialog.querySelectorAll("button,[tabindex]")]
+      .filter((control) => control.tabIndex >= 0 && control.getClientRects().length);
+    if (!controls.length) return;
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   onMenuKeyDown(event) {
@@ -279,6 +377,44 @@ class App extends React.Component {
     return e("div", { style: { flex: "none", padding: "8px 22px 0", background: (opts && opts.bg) || "var(--gray-50)" } },
       e(DS.Button, { variant: "primary", size: "md", disabled: !!(opts && opts.disabled), onDark: !!(opts && opts.onDark), onClick }, label),
       e("div", { style: { height: "9px" } }));
+  }
+
+  // REQ-011: matching screens reserve one shared strip for their primary
+  // action. Supporting choices and notes live in the independently scrolling
+  // content above it, so neither content growth nor answer state can move the
+  // primary action toward the shell footer.
+  primaryActionRegion(action) {
+    return e("div", {
+      key: "primary-action-region",
+      "data-primary-action-region": "",
+      style: {
+        flex: "none", height: "121px", padding: "8px 22px 0",
+        background: "var(--gray-50)", overflow: "hidden"
+      }
+    }, action);
+  }
+
+  // REQ-014: steppers use one paired action region above the shell footer.
+  // Previous is deliberately wired to the local sequence callback instead of
+  // the footer's Back dispatcher; the first step remains present but inert.
+  stepActionRegion({ canPrevious, onPrevious, nextLabel, canNext, onNext, size = "sm" }) {
+    return this.primaryActionRegion(
+      e("div", {
+        "data-step-actions": "",
+        style: {
+          display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gap: "10px", alignItems: "stretch"
+        }
+      },
+        e(DS.Button, {
+          variant: "outline", size, disabled: !canPrevious,
+          "data-step-action": "previous", onClick: canPrevious ? onPrevious : undefined
+        }, "Previous step"),
+        e(DS.Button, {
+          variant: "primary", size, disabled: !canNext,
+          "data-step-action": "next", onClick: onNext
+        }, nextLabel))
+    );
   }
 
   alertBox(text, onDark) {
@@ -631,75 +767,101 @@ class App extends React.Component {
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },
         e(DS.Button, {
           variant: "primary", size: "md", onDark: true, disabled: !(st.hp && ready),
-          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("edu", { setupSeen: true }) : this.setState({ setupWarn: true })
+          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("home", { setupSeen: true }) : this.setState({ setupWarn: true })
         }, "Continue"),
         e("div", { style: { height: "9px" } }))
     ];
   }
 
-  // One hub row, prototype markup: title with optional one-line subtitle,
-  // check "Done" pill, chevron. Locked rows keep aria-disabled plus the
-  // non-interactive styling but stay in the layout so nothing shifts.
-  homeRow(row) {
-    const locked = !!row.locked;
-    return e("button", {
-      key: row.key, onClick: row.open, "aria-disabled": locked ? "true" : undefined,
-      ...(row.optionId ? { "data-option-id": row.optionId, "data-option-state": row.done ? "done" : "available" } : {}),
-      style: {
-        display: "flex", alignItems: "center", gap: "13px", width: "100%", minHeight: "72px", padding: "16px 16px",
-        borderRadius: "16px", border: "1.5px solid var(--gray-200)",
-        background: locked ? "var(--gray-100)" : "var(--white)",
-        boxShadow: locked ? "none" : "var(--shadow-card-sm)",
-        cursor: locked ? "not-allowed" : "pointer", textAlign: "left"
-      }
+  renderMatchingContext() {
+    const st = this.state;
+    if (st.matchingContext === "education") {
+      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } }, this.renderEdu(() => {}));
+    }
+    if (st.matchingContext === "setup") {
+      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--navy-900)" } }, this.renderSetup());
+    }
+    if (st.matchingContext === "completion" && st.matchingContextData) {
+      const done = st.matchingContextData;
+      return e("div", { style: { flex: 1, minHeight: 0, padding: "26px 22px 10px", overflowY: "auto" } },
+        e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" } },
+          e(DS.IconTile, { size: "xl", tone: "success" }, e(DS.Icon, { name: "check", size: 30 })),
+          e("div", { style: { font: font.heading(26), color: "var(--text-heading)", letterSpacing: "-.015em", marginTop: "16px" } }, done.title)),
+        e("div", { style: { marginTop: "20px" } },
+          e(DS.Card, { variant: "list" },
+            done.rows.map((row) => e("div", { key: row.label, style: { padding: "13px 18px", borderTop: row.bt } },
+              e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-secondary)" } }, row.label),
+              e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))));
+    }
+    return this.renderDashboard();
+  }
+
+  chooseMatchingOption(optionId) {
+    this.setState((s) => ({
+      matchingOptions: matchingOptions.selectMatchingOption(s.matchingOptions, optionId)
+    }));
+  }
+
+  confirmMatchingOption() {
+    const optionId = matchingOptions.confirmMatchingOption(this.state.matchingOptions);
+    if (optionId) this.openOption(optionId);
+  }
+
+  renderMatchingOptionsSheet() {
+    const selection = this.state.matchingOptions || matchingOptions.openMatchingOptions();
+    const selectedOption = selection.selectedOption;
+    return e("div", {
+      "data-matching-options-layer": "",
+      style: { position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "flex-end" }
     },
-      e("span", { style: { flex: 1 } },
-        e("span", { ...(row.optionId ? { "data-option-label": "" } : {}), style: { display: "block", font: "700 17px var(--font-ui)", color: locked ? "var(--gray-400)" : "var(--text-heading)" } }, row.label),
-        row.subShow ? e("span", { style: { display: "block", font: "400 13px/1.4 var(--font-text)", color: "var(--text-muted)", marginTop: "3px" } }, row.sub) : null),
-      row.done ? e("span", { "data-option-status": row.optionId ? "done" : undefined, style: { flex: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--gray-100)", borderRadius: "999px", padding: "5px 10px 5px 7px" } },
-        e(DS.Icon, { name: "check", size: 13, color: "var(--gray-600)", strokeWidth: 3.2 }),
-        e("span", { style: { font: "600 11.5px var(--font-ui)", color: "var(--gray-600)" } }, "Done")) : null,
-      e(DS.Icon, { name: "chevronRight", size: 20, color: "var(--gray-400)" }));
+      e("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .48 } }),
+      e("section", {
+        role: "dialog", "aria-modal": "true", "aria-labelledby": "matching-options-title",
+        "data-matching-options-sheet": "",
+        style: {
+          position: "relative", width: "100%", maxHeight: "calc(100% - 20px)", overflowY: "auto",
+          borderRadius: "var(--radius-hero) var(--radius-hero) 0 0", background: "var(--white)",
+          boxShadow: "var(--shadow-device)", padding: "10px 20px 18px"
+        }
+      },
+        e("div", { "aria-hidden": "true", style: { width: "42px", height: "4px", margin: "0 auto", borderRadius: "var(--radius-full)", background: "var(--gray-300)" } }),
+        e("h1", { id: "matching-options-title", style: { margin: "14px 0 0", font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Choose a matching option"),
+        e("p", { style: { margin: "6px 0 0", font: "400 14px/1.4 var(--font-text)", color: "var(--text-body)" } }, "Select one, then continue."),
+        e("div", {
+          "data-option-selector": "", role: "group", "aria-label": "Matching options",
+          style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "15px" }
+        }, matchingOptions.MATCHING_OPTIONS.map((option, index) => {
+          const selected = selectedOption === option.id;
+          return e("button", {
+            key: option.id, type: "button", onClick: () => this.chooseMatchingOption(option.id),
+            "aria-pressed": selected ? "true" : "false",
+            "data-option-id": String(index + 1),
+            "data-option-state": selected ? "selected" : "available",
+            style: {
+              display: "block", width: "100%", padding: 0, border: "none",
+              borderRadius: "var(--radius-card)", background: "transparent", color: "inherit",
+              font: "inherit", textAlign: "left", cursor: "pointer"
+            }
+          }, e(DS.SelectRow, {
+            label: option.label, selected,
+            style: { minHeight: "58px", padding: "14px 16px", pointerEvents: "none" }
+          }));
+        })),
+        e("div", { style: { marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+          e(DS.Button, {
+            variant: "primary", size: "md", disabled: !selectedOption,
+            onClick: () => this.confirmMatchingOption()
+          }, "Continue"))));
   }
 
   renderHome() {
-    const st = this.state;
-    const ready = shell.optionSelectionReady(st);
-    const setupRows = [
-      { key: "setup", label: "Headphones and volume", sub: "", subShow: false, done: st.setupSeen, open: () => this.goScreen("setup") },
-      { key: "edu", label: "What to listen for", sub: "", subShow: false, done: st.eduSeen, open: () => this.goScreen("edu") }
-    ];
-    // The three options stay locked until the session setup and education are
-    // complete. Ordinary navigation reaches this screen only after the ear
-    // gate too. The open handler re-checks
-    // live state: aria-disabled does not block clicks by itself.
-    const optionRows = shell.OPTORDER.map((cid, index) => ({
-      key: cid, label: shell.OPTLABEL[cid], sub: "", subShow: false,
-      optionId: String(index + 1),
-      done: !!st.optDone[cid], locked: !ready,
-      open: () => {
-        const x = this.state;
-        if (!shell.optionSelectionReady(x)) return;
-        this.openOption(cid);
-      }
-    }));
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
-        e(DS.SectionLabel, null, "SOUND PLAYS IN"),
-        e("div", { style: { marginTop: "11px" } },
-          this.segmentedControl(
-            "Sound plays in",
-            ["Left", "Right", "Both"],
-            { "Left ear": "Left", "Right ear": "Right", "Both ears": "Both" }[st.ear] || "Both",
-            (v) => this.setEar({ Left: "Left ear", Right: "Right ear", Both: "Both ears" }[v] || "Both ears")
-          )),
-        e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "GETTING SET UP")),
-        e("div", { style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
-          setupRows.map((row) => this.homeRow(row))),
-        e("div", { style: { marginTop: "26px" } }, e(DS.SectionLabel, null, "MATCHING")),
-        e("div", { "data-option-selector": "", role: "group", "aria-label": "Matching options", style: { display: "flex", flexDirection: "column", gap: "11px", marginTop: "11px" } },
-          optionRows.map((row) => this.homeRow(row)))),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)" } }, e("div", { style: { height: "9px" } }))
+      e("div", {
+        key: "context", "data-matching-options-context": this.state.matchingContext || "dashboard",
+        "aria-hidden": "true", inert: "",
+        style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", pointerEvents: "none" }
+      }, this.renderMatchingContext()),
+      this.renderMatchingOptionsSheet()
     ];
   }
 
@@ -836,6 +998,14 @@ class App extends React.Component {
       const res = nar.advance(x.stages.n, x.n);
       this.go("n", res.stage, res.obj);
     };
+    const previous = () => {
+      const x = this.state, stage = x.stages.n;
+      if (stage === "p3" && x.n.extra > 0) {
+        return this.go("n", "p3", { extra: x.n.extra - 1 });
+      }
+      const previousStage = { p1: "vol", p2: "p1", p3: "p2" }[stage];
+      if (previousStage) this.go("n", previousStage);
+    };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, nar.passTitle(s, n)),
@@ -870,13 +1040,13 @@ class App extends React.Component {
         // The prototype computes this note but its display block sits dormant
         // in the Field · Prepare markup; escapes must reassure (REQ-016), so
         // it renders here on the pass screen instead.
-        n.note ? this.noteBox(n.note, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-        e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s]),
-        s === "p3" ? e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning") : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          isVol ? null : this.escapeLink("Wider range", () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }),
-          this.escapeLink("Can't hear this", () => this.pat("n", nar.noHear(this.state.n)))))
+        n.note ? this.noteBox(n.note, "14px") : null,
+        s === "p3" ? e("div", { style: { marginTop: "10px" } },
+          e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning")) : null),
+      this.stepActionRegion({
+        canPrevious: s !== "vol", onPrevious: previous,
+        nextLabel: nar.PRIMARY[s], canNext: heard, onNext: signOff
+      })
     ];
   }
 
@@ -945,19 +1115,21 @@ class App extends React.Component {
           e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "11px" } },
             chips.map(([label, tag]) =>
               e(DS.Button, { key: label, variant: "outline", size: "sm", disabled: !heard, onClick: answer(tag) }, label))),
-          e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
-            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(c === "a" && o.phase === "pitch" ? "close" : "right") }, settle))),
+          c === "a" ? e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
+            e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(o.phase === "pitch" ? "close" : "right") }, settle)) : null),
         o.msg ? this.noteBox(o.msg, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+      c === "r"
+        ? this.primaryActionRegion(
+          e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle)
+        )
+        : e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
         c === "a" && o.suggest
           ? this.noteBox("Nothing nearby has beaten this sound for a while. One final check and we're done, or keep refining if you're not sure.")
           : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          this.escapeLink("Can't hear this", () => c === "a" ? this.aResp("nohear") : this.rDir("nohear"))),
         c === "a" && o.suggest
           ? e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.go("a", "chal") }, "Do the final check")
           : null,
-        c === "a" && o.responded
+          c === "a" && o.responded
           ? e(DS.Button, { variant: "ghost", onClick: () => this.go("a", "conf", { stop: "patient" }) }, "This is close enough")
           : null)
     ];
@@ -1343,6 +1515,13 @@ class App extends React.Component {
       if (res.kind === "zoom") return this.go("d", "zoom", res.obj);
       return this.go("d", "conf");
     };
+    const previous = () => {
+      const level = this.state.d.level || 0;
+      if (!level) return;
+      this.go("d", level === 1 ? "field" : "zoom", {
+        level: level - 1, heard: false, note: field.zoomOutNote(level)
+      });
+    };
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, v.title),
@@ -1394,16 +1573,17 @@ class App extends React.Component {
         // The prototype computes this note but its display block sits stranded
         // in the Families intro markup; escapes must reassure (REQ-016), so it
         // renders here on the field screen instead.
-        d.note ? this.noteBox(d.note, "12px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-        // The step-forward action stays in place and goes gray until the sound
-        // has been played once, so nobody advances on a marker they have never
-        // heard. Confirming the last level is the participant's call (REQ-009).
-        e(DS.Button, { variant: "primary", size: "md", disabled: !d.heard, onClick: advance },
-          v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus"),
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())),
-          this.escapeLink("Can't hear this", () => this.pat("d", field.noHear()))))
+        d.note ? this.noteBox(d.note, "12px") : null,
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
+          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())))),
+      this.stepActionRegion({
+        canPrevious: v.level > 0, onPrevious: previous,
+        // The step-forward action stays in place and goes solid gray until the
+        // sound has been played once. Confirming the last level remains the
+        // participant's call (REQ-009).
+        nextLabel: v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus",
+        canNext: d.heard, onNext: advance, size: "md"
+      })
     ];
   }
 
@@ -1699,13 +1879,14 @@ class App extends React.Component {
           e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
               this.selectRowButton(label, label, conf === label, () => choose(label)))),
-          notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null),
-        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null,
+          notClose ? e("div", { style: { marginTop: "9px" } },
+            e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway")) : null),
+        this.primaryActionRegion(
           notClose
             ? e(DS.Button, { variant: "primary", size: "sm", onClick: keepRefining }, "Keep refining")
-            : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching"),
-          e("div", { style: { minHeight: "52px", display: "flex", flexDirection: "column" } },
-            notClose ? e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway") : null))
+            : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching")
+        )
       ];
     }
     if (s === "done") {
@@ -1724,7 +1905,7 @@ class App extends React.Component {
                 e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-          e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, finishesSession ? "Finish session" : "Return to matching options"),
+          e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.finishOption() }, finishesSession ? "Finish session" : "Return to matching options"),
           e("div", { style: { height: "9px" } }))
       ];
     }
@@ -1749,6 +1930,46 @@ class App extends React.Component {
   }
 
   /* ---------- chrome ---------- */
+
+  renderHelp() {
+    const actions = this.contextualHelpActions();
+    return e("div", {
+      id: "contextual-help-dialog", ref: (node) => { this.helpDialog = node; },
+      role: "dialog", "aria-modal": "true", "aria-labelledby": "contextual-help-title",
+      "data-contextual-help": "", onKeyDown: (event) => this.onHelpKeyDown(event),
+      style: { position: "absolute", inset: 0, zIndex: 31, display: "flex", flexDirection: "column" }
+    },
+      e("div", { style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .55 } }),
+      e("button", {
+        type: "button", onClick: () => this.closeHelp(), "aria-label": "Dismiss help",
+        style: { flex: 1, border: "none", background: "transparent", cursor: "pointer", minHeight: "60px", position: "relative" }
+      }),
+      e("div", {
+        style: {
+          flex: "none", background: "var(--white)", borderRadius: "22px 22px 0 0",
+          padding: "16px 18px 22px", position: "relative"
+        }
+      },
+        e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" } },
+          e("div", null,
+            e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-secondary)" } }, "MATCHING ASSISTANCE"),
+            e("div", { id: "contextual-help-title", style: { font: "600 18px var(--font-ui)", color: "var(--text-heading)", marginTop: "4px" } }, "Help")),
+          e("button", {
+            type: "button", ref: (node) => { this.helpCloseButton = node; },
+            onClick: () => this.closeHelp(), "aria-label": "Close help",
+            style: { flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" }
+          }, e(DS.Icon, { name: "close", size: 20, color: "var(--gray-600)" }))),
+        e("div", { "data-help-actions": "", style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px" } },
+          actions.map((action) => e("button", {
+            key: action.label, type: "button", onClick: () => this.runHelpAction(action),
+            style: {
+              display: "flex", alignItems: "center", width: "100%", minHeight: "52px",
+              padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-200)",
+              background: "var(--white)", cursor: "pointer", textAlign: "left",
+              font: "600 14.5px var(--font-ui)", color: "var(--text-heading)"
+            }
+          }, action.label)))));
+  }
 
   renderMenu() {
     const st = this.state, c = st.concept;
@@ -1828,7 +2049,8 @@ class App extends React.Component {
 
   render() {
     const st = this.state, c = st.concept, s = st.stages[c];
-    const framed = st.framed, dark = st.screen === "setup";
+    const framed = st.framed;
+    const dark = st.screen === "setup" || st.screen === "home" && st.matchingContext === "setup";
     const onboardingScreen = ["launch", "account", "dashboard"].includes(st.screen);
     const statusOnDark = dark || onboardingScreen;
     const indicatorOnDark = dark || st.screen === "launch";
@@ -1840,6 +2062,12 @@ class App extends React.Component {
     const progShow = st.screen === "flow" && prog.show;
     const nav = shell.navShow(st);
     const label = shell.screenLabelOf(st.screen, c, s);
+    const helpActions = this.contextualHelpActions();
+    const footerControlStyle = {
+      display: "flex", alignItems: "center", gap: "6px", minHeight: "44px",
+      padding: "0 8px", border: "none", background: "transparent", color: chromeFg,
+      font: "600 15px var(--font-ui)", cursor: "pointer"
+    };
 
     const body = {
       launch: () => this.renderLaunch(),
@@ -1859,7 +2087,7 @@ class App extends React.Component {
       "data-screen": st.screen,
       "data-screen-label": label,
       ...(st.screen === "account" ? { "data-account-step": st.accountConfirmation ? "confirmation" : "entry" } : {}),
-      style: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark || st.screen === "launch" ? "var(--navy-900)" : undefined }
+      style: { position: "relative", flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: dark || st.screen === "launch" ? "var(--navy-900)" : undefined }
     }, body);
 
     return e("div", {
@@ -1891,19 +2119,43 @@ class App extends React.Component {
             e("div", { style: { height: "100%", background: "var(--control-accent)", borderRadius: "3px", transition: "width 420ms cubic-bezier(.4,0,.2,1)", width: prog.w } }))) : null,
         screenRoot,
         st.menuOpen ? this.renderMenu() : null,
-        onboardingScreen ? null : e("div", { style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
+        st.helpOpen && helpActions.length ? this.renderHelp() : null,
+        onboardingScreen ? null : e("div", {
+          "data-shell-footer": "",
+          style: {
+            // REQ-013: reserve independent left, center, and right hit regions
+            // even when one of the visible footer controls is absent.
+            flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 56px minmax(0, 1fr)",
+            alignItems: "center", columnGap: "8px", padding: "2px 8px 4px",
+            width: "100%", boxSizing: "border-box",
+            background: chromeBg, borderTop: "1px solid " + chromeLine
+          }
+        },
           nav
-            ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
+            ? e("button", {
+              type: "button", "data-footer-region": "back", onClick: () => this.onBack(),
+              style: { ...footerControlStyle, gridColumn: "1", justifySelf: "start" }
+            },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
-            : e("span", { style: { display: "block", width: "8px", height: "44px" } }),
+            : e("span", { "data-footer-region": "back", "aria-hidden": "true", style: { display: "block", gridColumn: "1", height: "44px" } }),
           st.screen === "dashboard"
-            ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
+            ? e("span", { "data-footer-region": "session-menu", "aria-hidden": "true", style: { display: "block", gridColumn: "2", justifySelf: "center", width: "56px", height: "44px" } })
             : e("button", {
               type: "button", ref: (node) => { this.menuButton = node; }, onClick: () => this.openMenu(),
+              "data-footer-region": "session-menu",
               "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
               "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
-              style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
-            })),
+              style: { gridColumn: "2", justifySelf: "center", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
+            }),
+          helpActions.length
+            ? e("button", {
+              type: "button", ref: (node) => { this.helpButton = node; }, onClick: () => this.openHelp(),
+              "data-footer-region": "help",
+              "aria-haspopup": "dialog", "aria-expanded": st.helpOpen ? "true" : "false",
+              "aria-controls": st.helpOpen ? "contextual-help-dialog" : undefined,
+              style: { ...footerControlStyle, gridColumn: "3", justifySelf: "end" }
+            }, "Help")
+            : e("span", { "data-footer-region": "help", "aria-hidden": "true", style: { display: "block", gridColumn: "3", height: "44px" } })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
           : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));

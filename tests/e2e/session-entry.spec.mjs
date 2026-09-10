@@ -1,10 +1,10 @@
 /*
  * Focused browser coverage for the session-level setup sequence (REQ-005):
- * New Session -> ear -> headphones/volume -> education -> option selector,
- * followed by direct returns to that selector after Options 1 and 2.
+ * New Session -> ear -> headphones/volume -> option selector, followed by
+ * direct returns to that selector after Options 1 and 2.
  */
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const storageKey = "pnq-mtp-v1";
 const screen = (page, label) => page.locator(`[data-screen-label="${label}"]`);
@@ -23,7 +23,7 @@ async function expectNoPrematureSelector(page) {
 }
 
 async function finishOption1(page) {
-  await page.getByRole("button", { name: "Option 1" }).click();
+  await startMatchingOption(page, 1);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "The volume is about right" }).click();
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
@@ -37,7 +37,7 @@ async function finishOption1(page) {
 }
 
 async function finishOption2(page) {
-  await page.getByRole("button", { name: "Option 2" }).click();
+  await startMatchingOption(page, 2);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "The volume is set, move on" }).click();
   await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
@@ -87,27 +87,19 @@ test.describe("session entry", () => {
     await page.getByLabel("Device volume").fill("100");
     await setupContinue.click();
 
-    // Device completion goes straight to the unchanged education, never via the selector.
-    const education = screen(page, "Shared · What to listen for");
-    await expect(education).toBeVisible();
-    await expectNoPrematureSelector(page);
+    // Device completion opens the selector over the retained setup context.
+    await expect(selector(page)).toBeVisible();
+    await expect(page.locator('[data-matching-options-context="setup"]')).toBeVisible();
     await expectSilent(page);
     state = await page.evaluate(() => window.__pnqAppState());
     expect({ earSeen: state.earSeen, setupSeen: state.setupSeen, eduSeen: state.eduSeen })
       .toEqual({ earSeen: true, setupSeen: true, eduSeen: false });
-
-    // Education audio is participant-triggered and its completion transition hard-stops it.
-    await page.getByRole("button", { name: /A lower sound/ }).click();
-    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
-    await expect(selector(page)).toBeVisible();
-    await expectSilent(page);
     for (const n of [1, 2, 3]) await expect(page.getByRole("button", { name: `Option ${n}` })).toBeEnabled();
 
     const stored = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), storageKey);
     expect(Object.keys(stored).sort()).toEqual(["onboardingSeen", "earSeen", "setupSeen", "eduSeen", "optDone", "optOrder"].sort());
     expect({ earSeen: stored.earSeen, setupSeen: stored.setupSeen, eduSeen: stored.eduSeen })
-      .toEqual({ earSeen: true, setupSeen: true, eduSeen: true });
+      .toEqual({ earSeen: true, setupSeen: true, eduSeen: false });
 
     // Returning from each of the first two real option completions bypasses all session gates.
     await finishOption1(page);

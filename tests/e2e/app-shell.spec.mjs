@@ -3,7 +3,7 @@
  * persistence, framed vs bare chrome, conditional Back, and audio hard stop.
  */
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const key = "pnq-mtp-v1";
 
@@ -16,8 +16,6 @@ async function completeSetup(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
-  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 }
 
@@ -49,8 +47,6 @@ async function visitShellScreens(page, audit) {
   await page.getByRole("button", { name: /Headphones/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await audit("Shared · What to listen for");
-  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await audit("Matching options");
   await completeOptionFromConfidence(page, "Option 1");
   await completeOptionFromConfidence(page, "Option 2");
@@ -112,8 +108,8 @@ test.describe("app shell", () => {
     await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
     await completeSetup(page);
 
-    // Options unlock only after setupSeen && eduSeen; open Option 1.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    // Options unlock as soon as the headphone check completes; open Option 1.
+    await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
     await expect(page.locator("[data-progress]")).toBeVisible();
 
@@ -123,7 +119,7 @@ test.describe("app shell", () => {
     expect(stored.onboardingSeen).toBe(true);
     expect(stored.earSeen).toBe(true);
     expect(stored.setupSeen).toBe(true);
-    expect(stored.eduSeen).toBe(true);
+    expect(stored.eduSeen).toBe(false);
     expect(stored.optOrder).toEqual([]);
 
     // Mid-flow reload lands on the hub and reseeds flow state from the factories.
@@ -133,7 +129,7 @@ test.describe("app shell", () => {
     expect(n.pitch).toBe(0.5);
 
     // Reopening the option reseeds again from freshN.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
 
     // resetAll (session menu) clears storage and returns to Launch.
@@ -159,18 +155,30 @@ test.describe("app shell", () => {
     await page.getByRole("button", { name: /Headphones Plug in/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(back).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Session menu" }).click();
+    await page.getByRole("button", { name: "Jump to a different section" }).click();
+    await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
     await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
     await back.click();
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+
+    await page.getByRole("button", { name: "Session menu" }).click();
+    await page.getByRole("button", { name: "Jump to a different section" }).click();
+    await page.getByRole("button", { name: "Headphone setup", exact: true }).click();
     await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
+    await back.click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   });
 
   test("app shell hard-stops audio on every screen and stage transition", async ({ page }) => {
     await page.goto("/");
     await completeSetup(page);
-    await page.getByRole("button", { name: "What to listen for" }).click();
+    await page.getByRole("button", { name: "Session menu" }).click();
+    await page.getByRole("button", { name: "Jump to a different section" }).click();
+    await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
     await page.getByRole("button", { name: /A lower sound/ }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
     await page.getByRole("button", { name: "I'm ready to start" }).click();
@@ -180,7 +188,7 @@ test.describe("app shell", () => {
     expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
 
     // Stage transition inside a flow stops the main voice too.
-    await page.getByRole("button", { name: "Option 1" }).click();
+    await startMatchingOption(page, 1);
     await page.getByText("Start Sound", { exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
     await page.getByRole("button", { name: "The volume is about right" }).click();
@@ -199,7 +207,7 @@ test.describe("app shell chrome", () => {
     expect(visited).toEqual([
       "Launch", "Create account · entry", "Create account · confirmation",
       "Dashboard", "Setup · Ear", "Setup · Headphones and volume",
-      "Shared · What to listen for", "Matching options", "Session complete"
+      "Matching options", "Session complete"
     ]);
   });
 

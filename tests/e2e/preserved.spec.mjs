@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
 async function boot(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -86,7 +87,7 @@ test.describe("preserved flows (adaptive, longitudinal, education)", () => {
   test("adaptive: escapes raise the level and the patient-owned exit reaches Confidence", async ({ page }) => {
     await boot(page);
     await jumpTo(page, "ADAPTIVE REFINEMENT (PRESERVED)", "Broad start");
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText("We made it a little easier to hear. Try again.")).toBeVisible();
     expect((await appState(page, "a")).level).toBeCloseTo(.57, 6);
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
