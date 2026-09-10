@@ -9,6 +9,9 @@ async function reachEducation(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Session menu" }).click();
+  await page.getByRole("button", { name: "Jump to a different section" }).click();
+  await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
 }
 
 test.describe("education", () => {

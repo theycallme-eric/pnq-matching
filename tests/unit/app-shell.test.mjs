@@ -36,13 +36,13 @@ test("initial state starts at the first-run splash with fresh shell and option s
   for (const c of shell.CONCEPT_IDS) assert.ok(shell.STAGES[c].length > 0, c + " has stages");
 });
 
-test("the shared selector exposes exactly three neutral options only after every session gate", () => {
+test("the shared selector exposes exactly three neutral options after headphone setup", () => {
   assert.deepEqual(shell.OPTORDER, ["n", "r", "d"]);
   assert.deepEqual(shell.OPTORDER.map((cid) => shell.OPTLABEL[cid]), ["Option 1", "Option 2", "Option 3"]);
 
   const state = shell.initialState();
   assert.equal(shell.optionSelectionReady(state), false);
-  assert.equal(shell.optionSelectionReady({ ...state, setupSeen: true }), false);
+  assert.equal(shell.optionSelectionReady({ ...state, setupSeen: true }), true);
   assert.equal(shell.optionSelectionReady({ ...state, eduSeen: true }), false);
   assert.equal(shell.optionSelectionReady({ ...state, setupSeen: true, eduSeen: true }), true);
 });
@@ -82,7 +82,7 @@ test("reload chooses splash, dashboard, the next session gate, or the option sel
   const afterEar = shell.restoreSession(JSON.stringify({ onboardingSeen: true, earSeen: true }));
   assert.equal(afterEar.screen, "setup", "ear completion resumes at device setup, not the selector");
   const afterSetup = shell.restoreSession(JSON.stringify({ onboardingSeen: true, earSeen: true, setupSeen: true }));
-  assert.equal(afterSetup.screen, "edu", "device completion resumes at education, not the selector");
+  assert.equal(afterSetup.screen, "home", "device completion resumes at the matching-options sheet");
 
   const saved = JSON.stringify({ onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true, optDone: { n: "Very close" }, optOrder: ["n", "n"] });
   const r = shell.restoreSession(saved);
@@ -149,11 +149,11 @@ test("shell journey preserves participant-selected completion order without auto
   assert.equal(st.screen, "setup");
   assert.equal(st.earSeen, true);
   st = shell.advanceShellState({ ...st, hp: true, vol: 100 });
-  assert.equal(st.screen, "edu");
-  assert.equal(st.setupSeen, true);
-  st = shell.advanceShellState(st);
   assert.equal(st.screen, "home");
-  assert.equal(st.eduSeen, true);
+  assert.equal(st.setupSeen, true);
+  assert.equal(st.eduSeen, false);
+  assert.equal(st.hp, true);
+  assert.equal(st.vol, 100);
   for (const [cid, expectedOrder] of [["d", ["d"]], ["n", ["d", "n"]]]) {
     st = shell.openOptionState(st, cid);
     assert.equal(st.screen, "flow");
@@ -288,6 +288,8 @@ test("Back renders only on the established screens and targets what it targets",
   assert.deepEqual(shell.backTarget({ ...st, screen: "ear" }), { kind: "screen", screen: "dashboard" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "setup" }), { kind: "screen", screen: "ear" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "edu" }), { kind: "screen", screen: "setup" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "setup", setupSeen: true }), { kind: "screen", screen: "home" });
+  assert.deepEqual(shell.backTarget({ ...st, screen: "edu", setupSeen: true }), { kind: "screen", screen: "home" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "setup", setupSeen: true, eduSeen: true }), { kind: "screen", screen: "home" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "edu", eduSeen: true }), { kind: "screen", screen: "home" });
   assert.deepEqual(shell.backTarget(flowAt("n", "vol")), { kind: "screen", screen: "home" }, "first working stage goes home");
