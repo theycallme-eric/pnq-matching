@@ -199,8 +199,6 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones Plug in/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
-    await auditScreen("Education");
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await auditScreen("Matching options");
 
     expect(problems).toEqual([]);
@@ -236,8 +234,6 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
-    await audit("Education");
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await audit("Matching options");
     await page.getByRole("button", { name: "Session menu" }).click();
     await page.getByRole("button", { name: "Jump to a different section" }).click();
@@ -304,7 +300,6 @@ test.describe("accessibility and participant copy", () => {
     await volume.press("End");
     await expect(volume).toHaveValue("100");
     await page.getByRole("button", { name: "Continue" }).press("Enter");
-    await page.getByRole("button", { name: "I'm ready to start" }).press("Enter");
 
     const option = page.getByRole("button", { name: "Option 1" });
     await expectVisibleFocus(option);
