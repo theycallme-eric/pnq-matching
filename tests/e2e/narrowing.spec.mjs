@@ -5,6 +5,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { primaryActionTop } from "./action-region-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -26,6 +27,26 @@ const progressPhase = (page) => page.locator("[data-progress]").innerText();
 
 test.describe("narrowing (Option 1)", () => {
   test.use({ viewport: { width: 390, height: 844 } });
+
+  test("narrowing primary action stays in the bottom region across pass states", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "Volume");
+
+    const volumeLabel = "The volume is about right";
+    const initialTop = await primaryActionTop(page, volumeLabel);
+    await expect(page.getByRole("button", { name: volumeLabel })).toBeDisabled();
+
+    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await expect(page.getByText(/made the sound a little easier to hear/)).toBeVisible();
+    expect(await primaryActionTop(page, volumeLabel)).toBe(initialTop);
+
+    await page.getByText("Start Sound", { exact: true }).click();
+    await expect(page.getByRole("button", { name: volumeLabel })).toBeEnabled();
+    expect(await primaryActionTop(page, volumeLabel)).toBe(initialTop);
+
+    await jumpTo(page, "Pitch · fine");
+    expect(await primaryActionTop(page, "This matches what I hear")).toBe(initialTop);
+  });
 
   test("stage order runs volume then three tightening pitch passes into shared confidence", async ({ page }) => {
     await seed(page);

@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { primaryActionTop } from "./action-region-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -28,6 +29,23 @@ async function drag(page, toX, toY) {
 
 test.describe("field (Option 3)", () => {
   test.use({ viewport: { width: 390, height: 844 } });
+
+  test("field primary action stays in the bottom region across note and enablement states", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "Whole field");
+
+    const label = "Look closely at this area";
+    const initialTop = await primaryActionTop(page, label);
+    await expect(page.getByRole("button", { name: label })).toBeDisabled();
+
+    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await expect(page.getByText(/worth telling us/)).toBeVisible();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+
+    await page.getByRole("button", { name: "Play the sound" }).click();
+    await expect(page.getByRole("button", { name: label })).toBeEnabled();
+    expect(await primaryActionTop(page, label)).toBe(initialTop);
+  });
 
   test("field broad pass: dragging steers pitch and volume live, capped at the ceiling", async ({ page }) => {
     await seed(page);
