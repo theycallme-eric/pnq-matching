@@ -13,7 +13,7 @@
 // `launch` and `home` remain the renderer-facing ids for the splash and option
 // selector. Keeping those stable lets the protected option flows stay wholly
 // independent of the surrounding patient-app journey.
-export const SCREENS = ["launch", "privacy", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"];
+export const SCREENS = ["launch", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"];
 export const CONCEPT_IDS = ["n", "r", "d", "f", "a", "l", "t"];
 
 // Participants only ever see Option 1/2/3. The internal ids stay out of the UI.
@@ -74,7 +74,7 @@ export function initialState() {
     hp: false, vol: 36, menuOpen: false, jumpOpen: false, menuStopped: false, optDone: {}, optOrder: [],
     setupWarn: false, earWarn: false,
     // Only the completion booleans below are persisted. onboardingInput is a
-    // deliberately generic, local-only draft for the simulated account shell.
+    // deliberately generic, local-only draft for the account shell.
     onboardingSeen: false, earSeen: false, onboardingInput: "",
     eduSeen: false, setupSeen: false, heardStage: {}, prKey: null, prHeardA: false, prHeardB: false,
     n: freshN(), f: freshF(), r: freshR(), d: freshD(), a: freshA(), l: freshL(), t: freshT()
@@ -190,7 +190,6 @@ const FLOW_LABELS = {
 
 export function screenLabelOf(screen, concept, stage) {
   if (screen === "launch") return "Launch";
-  if (screen === "privacy") return "Privacy";
   if (screen === "account") return "Create account";
   if (screen === "dashboard") return "Dashboard";
   if (screen === "ear") return "Setup · Ear";
@@ -252,8 +251,7 @@ export function newSessionState(s) {
 // Straight-through shell journey. Matching flow stage changes and option
 // selection remain participant-controlled through their focused reducers.
 export function advanceShellState(s) {
-  if (s.screen === "launch") return goScreenState(s, "privacy");
-  if (s.screen === "privacy") return goScreenState(s, "account");
+  if (s.screen === "launch") return goScreenState(s, "account");
   if (s.screen === "account") return goScreenState(s, "dashboard", { onboardingSeen: true, onboardingInput: "" });
   if (s.screen === "dashboard") return newSessionState(s);
   if (s.screen === "ear") return goScreenState(s, "setup", { earSeen: !!s.ear });

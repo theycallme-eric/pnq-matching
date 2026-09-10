@@ -22,7 +22,7 @@ test("fresh factories seed the V5 values and never share state between runs", ()
 });
 
 test("initial state starts at the first-run splash with fresh shell and option state", () => {
-  assert.deepEqual(shell.SCREENS, ["launch", "privacy", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"]);
+  assert.deepEqual(shell.SCREENS, ["launch", "account", "dashboard", "ear", "setup", "edu", "home", "flow", "conclusion"]);
   assert.deepEqual(shell.CONCEPT_IDS, ["n", "r", "d", "f", "a", "l", "t"]);
   const st = shell.initialState();
   assert.equal(st.screen, "launch");
@@ -138,10 +138,8 @@ test("resetAll returns every shell and option value to first-run splash state", 
 test("shell journey preserves participant-selected completion order without auto-advancing", () => {
   let st = shell.initialState();
   st = shell.advanceShellState(st);
-  assert.equal(st.screen, "privacy");
-  st = shell.advanceShellState({ ...st, onboardingInput: "fictional-local-only" });
   assert.equal(st.screen, "account");
-  st = shell.advanceShellState({ ...st, onboardingInput: "fictional-local-only" });
+  st = shell.advanceShellState({ ...st, onboardingInput: "PNQ-RX-4821" });
   assert.equal(st.screen, "dashboard");
   assert.equal(st.onboardingSeen, true);
   assert.equal(st.onboardingInput, "");
@@ -256,9 +254,9 @@ test("every navigation reducer clears playback, menus, warnings, and transient f
   assert.deepEqual(results[0].n, shell.freshN(), "safe shell screens discard option working state");
 });
 
-test("screen roots carry the exact V5 data-screen-label values", () => {
+test("screen roots carry the established data-screen-label values without Privacy", () => {
   assert.equal(shell.screenLabelOf("launch"), "Launch");
-  assert.equal(shell.screenLabelOf("privacy"), "Privacy");
+  assert.equal(shell.screenLabelOf("privacy"), "");
   assert.equal(shell.screenLabelOf("account"), "Create account");
   assert.equal(shell.screenLabelOf("dashboard"), "Dashboard");
   assert.equal(shell.screenLabelOf("ear"), "Setup · Ear");
@@ -276,7 +274,7 @@ test("screen roots carry the exact V5 data-screen-label values", () => {
   assert.equal(shell.screenLabelOf("flow", "l", "ret"), "Longitudinal · Welcome back");
 });
 
-test("Back renders only where the prototype shows it and targets what it targets", () => {
+test("Back renders only on the established screens and targets what it targets", () => {
   const st = shell.initialState();
   assert.equal(shell.navShow({ ...st, screen: "launch" }), false);
   assert.equal(shell.navShow({ ...st, screen: "home" }), false);

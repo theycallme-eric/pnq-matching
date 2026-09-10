@@ -14,6 +14,7 @@ export const APPLICATION_BANNED_COPY_PATTERNS = Object.freeze([
   // The protected rule owns the original hyphenated spelling. These shell
   // variants retain the broader separator coverage added by the option hub.
   { label: "internal concept name", pattern: /\b2D Pitch(?:[–—]|\s)Volume Field\b/i },
+  { label: "prototype or fictional framing", pattern: /\b(?:prototype|fictional)\b/i },
   { label: "prototype implementation terminology", pattern: /\b(?:algorithm|implementation detail|state machine|internal (?:id|identifier)|prototype code)\b/i },
   { label: "technical audio value", pattern: /\b(?:\d+(?:\.\d+)?\s*)?(?:k?hz|db)\b/i },
   {
@@ -34,12 +35,11 @@ export const APPLICATION_STRUCTURAL_OVERLINES = Object.freeze(new Set([
   "EXPLORE PNQ", "TAKE YOUR TIME"
 ]));
 
-// Fixed fictional values in the onboarding shell are identifiers, not prose.
-const SIMULATED_IDENTIFIER = /^(?:DEMO PARTICIPANT \d+|DEMO-RX-\d+|FICTIONAL-\d+)$/;
+const PRESCRIPTION_IDENTIFIER = /^PNQ(?:-RX)?-[A-Z0-9-]+$/;
 const UPPERCASE_ISSUE_PREFIX = "uppercase is not a registered structural label: ";
 
 function applicationAllowsUppercase(text) {
-  return APPLICATION_STRUCTURAL_OVERLINES.has(text) || SIMULATED_IDENTIFIER.test(text);
+  return APPLICATION_STRUCTURAL_OVERLINES.has(text) || PRESCRIPTION_IDENTIFIER.test(text);
 }
 
 export function auditApplicationParticipantStrings(values) {

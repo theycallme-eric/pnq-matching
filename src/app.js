@@ -29,7 +29,7 @@ const DS = {
     });
   }
 };
-const DEMO_PRESCRIPTION_ID = "DEMO-RX-4821";
+const DEFAULT_PRESCRIPTION_ID = "PNQ-4821-LK";
 
 // Onboarding examples: loudness holds pitch constant and pitch holds loudness
 // constant, so neither word gets defined by the other.
@@ -65,7 +65,6 @@ class App extends React.Component {
     super(props);
     this.state = {
       ...shell.initialState(),
-      privacyAcknowledged: false,
       accountConfirmation: false
     };
     this.aud = null;
@@ -85,7 +84,6 @@ class App extends React.Component {
       const restored = shell.restoreSession(sessionStorage.getItem(shell.STORAGE_KEY));
       if (restored) this.setState({
         ...restored,
-        privacyAcknowledged: false,
         accountConfirmation: false
       });
     } catch (err) {}
@@ -182,34 +180,15 @@ class App extends React.Component {
   }
 
   startOnboarding() {
-    this.goScreen("privacy", {
-      privacyAcknowledged: false,
-      accountConfirmation: false,
-      onboardingInput: ""
-    });
-  }
-
-  openAccountEntry() {
-    if (!this.state.privacyAcknowledged) return;
     this.goScreen("account", {
-      privacyAcknowledged: false,
       accountConfirmation: false,
-      onboardingInput: DEMO_PRESCRIPTION_ID
-    });
-  }
-
-  returnToPrivacy() {
-    this.goScreen("privacy", {
-      privacyAcknowledged: false,
-      accountConfirmation: false,
-      onboardingInput: ""
+      onboardingInput: DEFAULT_PRESCRIPTION_ID
     });
   }
 
   showAccountConfirmation() {
     if (this.state.onboardingInput.trim().length < 3) return;
     this.goScreen("account", {
-      privacyAcknowledged: false,
       accountConfirmation: true,
       onboardingInput: ""
     });
@@ -219,7 +198,6 @@ class App extends React.Component {
     this.hardStop();
     this.setState((s) => ({
       ...shell.newSessionState(s),
-      privacyAcknowledged: false,
       accountConfirmation: false
     }));
   }
@@ -412,13 +390,11 @@ class App extends React.Component {
           e("span", null, "pnq"),
           e("span", { style: { marginLeft: "4px", fontWeight: 500, color: "var(--brand-blue-light)" } }, "health")),
         e("div", { style: { maxWidth: "270px", marginTop: "18px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-on-dark-secondary)" } },
-          "A guided sound-matching study experience."),
-        e("div", { style: { marginTop: "12px", font: font.label, letterSpacing: ".14em", color: "var(--text-on-dark-secondary)" } },
-          "Research prototype")),
+          "A guided sound-matching experience.")),
       e("div", { key: "f", style: { flex: "none", padding: "8px 24px 12px", background: "var(--navy-600)" } },
         e(DS.Button, { variant: "primary", size: "md", onDark: true, onClick: () => this.startOnboarding() }, "Get started"),
         e("div", { style: { marginTop: "14px", textAlign: "center", font: "400 13.5px var(--font-text)", color: "var(--text-on-dark-secondary)" } },
-          "Prepared for this research session"))
+          "Prescribed by your clinician"))
     ];
   }
 
@@ -432,67 +408,25 @@ class App extends React.Component {
         "Back"));
   }
 
-  renderPrivacy() {
-    const checked = this.state.privacyAcknowledged;
-    return [
-      this.onboardingBack(() => this.goScreen("launch", {
-        privacyAcknowledged: false,
-        accountConfirmation: false,
-        onboardingInput: ""
-      })),
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "24px 26px 12px", background: "var(--white)" } },
-        e("div", { style: { font: "700 28px/1.15 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Privacy for this prototype"),
-        e("div", { style: { marginTop: "18px", font: "700 15px var(--font-ui)", color: "var(--text-heading)" } }, "Before you continue"),
-        e("p", { style: { margin: "8px 0 0", font: "400 14.5px/1.62 var(--font-text)", color: "var(--text-body)" } },
-          "This research prototype does not collect or send personal, health, or treatment information."),
-        e("p", { style: { margin: "14px 0 0", font: "400 14.5px/1.62 var(--font-text)", color: "var(--text-body)" } },
-          "Your progress stays in this browser for the current study session. This acknowledgment is a prototype step and is not legal consent.")),
-      e("div", { key: "f", style: { flex: "none", padding: "14px 24px 8px", background: "var(--white)", borderTop: "1px solid var(--interface-divider)" } },
-        e("label", { style: { display: "flex", alignItems: "center", gap: "9px", minHeight: "58px", padding: "2px 2px 14px", cursor: "pointer" } },
-          e("span", { style: { position: "relative", flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center" } },
-            e("input", {
-              className: "pnq-checkbox-input",
-              type: "checkbox", checked,
-              onChange: (ev) => this.setState({ privacyAcknowledged: ev.target.checked }),
-              style: { position: "absolute", inset: 0, width: "44px", height: "44px", margin: 0, opacity: 0, cursor: "pointer" }
-            }),
-            e("span", {
-              className: "pnq-checkbox-visual", "aria-hidden": "true",
-              style: {
-                width: "26px", height: "26px", borderRadius: "var(--radius-check)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: checked ? "var(--status-success-strong)" : "var(--white)",
-                border: "var(--border-control) solid " + (checked ? "var(--status-success-strong)" : "var(--gray-600)")
-              }
-            }, checked ? e(DS.Icon, { name: "check", size: 15, color: "var(--white)", strokeWidth: 3.2 }) : null)),
-          e("span", { style: { font: "500 14.5px/1.4 var(--font-text)", color: "var(--gray-800)" } },
-            "I understand this is a research prototype and will not enter personal or health information.")),
-        e(DS.Button, {
-          variant: "primary", size: "md", disabled: !checked,
-          onClick: () => { if (this.state.privacyAcknowledged) this.openAccountEntry(); }
-        }, "Continue"))
-    ];
-  }
-
   renderAccountEntry() {
     const ready = this.state.onboardingInput.trim().length >= 3;
     return [
-      this.onboardingBack(() => this.returnToPrivacy()),
+      this.onboardingBack(() => this.goScreen("launch", { accountConfirmation: false, onboardingInput: "" })),
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "36px 28px 12px", background: "var(--interface-app)" } },
         e(DS.IconTile, { size: "xl", tone: "blue", style: { marginBottom: "24px" } },
           e(DS.Icon, { name: "prescription", size: 32, color: "var(--brand-blue-deep)" })),
         e("div", { style: { font: "700 30px/1.12 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } },
-          "Enter a simulated", e("br"), "prescription ID"),
+          "Enter your", e("br"), "Prescription ID"),
         e("div", { style: { marginTop: "14px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-secondary)" } },
-          "This fictional ID frames the study experience. It is checked only on this screen and is never looked up."),
-        e("div", { "data-simulated-field": "", style: { marginTop: "30px" } },
+          "Your clinician gave you this ID when they set up your treatment. Enter it to connect to your record."),
+        e("div", { "data-prescription-field": "", style: { marginTop: "30px" } },
           e(DS.TextField, {
-            label: "Simulated prescription ID",
-            "aria-label": "Simulated prescription ID",
+            label: "Prescription ID",
+            "aria-label": "Prescription ID",
             value: this.state.onboardingInput,
             onChange: (ev) => this.setState({ onboardingInput: ev.target.value }),
-            placeholder: DEMO_PRESCRIPTION_ID,
-            hint: "Prototype only. Use fictional study values.",
+            placeholder: "e.g. " + DEFAULT_PRESCRIPTION_ID,
+            hint: "Your information is private and secure.",
             hintIcon: e(DS.Icon, { name: "lock", size: 16, color: "var(--gray-600)" })
           }))),
       e("div", { key: "f", style: { flex: "none", padding: "8px 24px", background: "var(--interface-app)" } },
@@ -505,21 +439,21 @@ class App extends React.Component {
 
   renderAccountConfirmation() {
     const rows = [
-      ["user", "Fictional study profile", "Avery Example"],
-      ["forms", "Prototype participant ID", "DEMO PARTICIPANT 001"]
+      ["user", "Name", "John Doe"],
+      ["mail", "Email", "john.doe@email.com"],
+      ["phone", "Phone", "+1 (401) 254-5010"]
     ];
     return [
       this.onboardingBack(() => this.goScreen("account", {
-        privacyAcknowledged: false,
         accountConfirmation: false,
-        onboardingInput: DEMO_PRESCRIPTION_ID
+        onboardingInput: DEFAULT_PRESCRIPTION_ID
       })),
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "30px 26px 12px", background: "var(--interface-app)" } },
         e("div", { style: { width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "22px", background: "var(--status-success-tint)" } },
           e(DS.Icon, { name: "checkThin", size: 30, color: "var(--status-success-strong)" })),
-        e("div", { style: { font: "700 29px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } }, "Fictional profile ready"),
+        e("div", { style: { font: "700 29px/1.14 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.018em" } }, "We found your record"),
         e("div", { style: { marginTop: "12px", font: "400 16px/1.55 var(--font-text)", color: "var(--text-secondary)" } },
-          "This fixed profile is used only to frame the study."),
+          "Please confirm this is you before we continue."),
         e(DS.Card, { variant: "list", style: { marginTop: "26px" } },
           rows.map(([icon, label, value], i) => e(React.Fragment, { key: label },
             i ? e(DS.CardDivider) : null,
@@ -535,16 +469,14 @@ class App extends React.Component {
           onClick: () => this.goScreen("dashboard", {
             onboardingSeen: true,
             onboardingInput: "",
-            privacyAcknowledged: false,
             accountConfirmation: false
           })
-        }, "Confirm fictional profile"),
+        }, "Yes, that's me"),
         e(DS.Button, {
           variant: "ghost", size: "md",
           onClick: () => this.goScreen("account", {
-            privacyAcknowledged: false,
             accountConfirmation: false,
-            onboardingInput: DEMO_PRESCRIPTION_ID
+            onboardingInput: DEFAULT_PRESCRIPTION_ID
           }),
           style: { marginTop: "8px", color: "var(--text-secondary)" }
         }, "Use a different ID"))
@@ -1774,7 +1706,6 @@ class App extends React.Component {
                 e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
         e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-          e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginBottom: "1px" } }, "This exploration ends at matching. Treatment isn't part of this prototype."),
           e(DS.Button, { variant: "primary", size: "sm", onClick: () => { this.hardStop(); this.setState((x) => shell.completeOptionState(x)); } }, finishesSession ? "Finish session" : "Return to matching options"),
           e("div", { style: { height: "9px" } }))
       ];
@@ -1807,7 +1738,7 @@ class App extends React.Component {
       : { launch: "Start", ear: "Ear", setup: "Headphones and volume", edu: "What to listen for", home: "Matching options", conclusion: "Session complete" }[st.screen];
     const actions = [
       ...(st.screen !== "home" ? [{ label: "Return to matching options", f: () => this.goScreen("home") }] : []),
-      { label: "Reset the prototype", f: () => this.resetAll() }
+      { label: "Reset application", f: () => this.resetAll() }
     ];
     const jumpGroups = [
       ...shell.OPTORDER.map((cid) => ({
@@ -1880,7 +1811,7 @@ class App extends React.Component {
   render() {
     const st = this.state, c = st.concept, s = st.stages[c];
     const framed = st.framed, dark = st.screen === "setup";
-    const onboardingScreen = ["launch", "privacy", "account", "dashboard"].includes(st.screen);
+    const onboardingScreen = ["launch", "account", "dashboard"].includes(st.screen);
     const statusOnDark = dark || onboardingScreen;
     const indicatorOnDark = dark || st.screen === "launch";
     const chromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
@@ -1894,7 +1825,6 @@ class App extends React.Component {
 
     const body = {
       launch: () => this.renderLaunch(),
-      privacy: () => this.renderPrivacy(),
       account: () => this.renderAccount(),
       dashboard: () => this.renderDashboard(),
       ear: () => this.renderEar(),

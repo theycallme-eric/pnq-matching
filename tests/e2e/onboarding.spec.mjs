@@ -11,7 +11,7 @@ const key = "pnq-mtp-v1";
 test.describe("onboarding", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("Launch renders the PNQ patient-app framing and Get started advances only to Privacy", async ({ page }) => {
+  test("Launch renders the PNQ patient-app framing and Get started advances directly to account setup", async ({ page }) => {
     await page.goto("/");
     const launch = page.locator('[data-screen-label="Launch"]');
     await expect(launch).toBeVisible();
@@ -19,11 +19,12 @@ test.describe("onboarding", () => {
     await expect(launch.locator('img[src$="waveform-mark.svg"]')).toBeVisible();
     await expect(launch.getByText("pnq", { exact: true })).toBeVisible();
     await expect(launch.getByText("health", { exact: true })).toBeVisible();
-    await expect(launch.getByText("A guided sound-matching study experience.")).toBeVisible();
-    await expect(launch.getByText("Research prototype")).toBeVisible();
+    await expect(launch.getByText("A guided sound-matching experience.")).toBeVisible();
+    await expect(launch.getByText(/prototype|fictional/i)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Get started" }).click();
-    await expect(page.locator('[data-screen-label="Privacy"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Create account"]')).toBeVisible();
+    await expect(page.locator('[data-screen-label="Privacy"]')).toHaveCount(0);
     await expect(page.locator('[data-screen-label="Setup · Ear"]')).toHaveCount(0);
   });
 
