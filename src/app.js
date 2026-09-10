@@ -43,6 +43,12 @@ const EDU = [
             ["Louder", { kind: "tone", pitch: .5, level: .62, bright: .14, behavior: "steady" }]] }
 ];
 
+// The app's existing neutral fallback test tone, shared with ear setup so the
+// sample introduces no second audio path or asset.
+const NEUTRAL_TEST_SOUND = Object.freeze({
+  kind: "tone", pitch: .5, level: .42, bright: .2, behavior: "steady"
+});
+
 function mainSpecs(st) {
   const c = st.concept;
   if (c === "n") return [{ kind: "tone", pitch: st.n.pitch, level: st.n.level, bright: .3, behavior: "steady" }];
@@ -52,7 +58,7 @@ function mainSpecs(st) {
   if (c === "a") return [pres.aSpec(st.a, st.stages.a)];
   if (c === "t") return [pres.fieldSpec(st.t)];
   if (c === "l") return [{ kind: st.l.prior.kind, pitch: st.l.pitch, level: st.l.level, bright: .25, behavior: "steady" }];
-  return [{ kind: "tone", pitch: .5, level: .42, bright: .2, behavior: "steady" }];
+  return [NEUTRAL_TEST_SOUND];
 }
 
 const font = {
@@ -136,10 +142,13 @@ class App extends React.Component {
 
   stopAudio() { this.withAudio((a) => a.stop()); if (this.state.playKey !== null) this.setState({ playKey: null }); }
 
-  toggleKey(key, specs) {
+  toggleKey(key, specs, route) {
     if (this.state.playKey === key) { this.stopAudio(); return; }
     if (this.state.playKey !== null) this.withAudio((a) => a.stop());
-    this.withAudio((a) => a.play(key, specs));
+    this.withAudio((a) => {
+      if (route && a.setEar) a.setEar(route);
+      a.play(key, specs);
+    });
     // Starting the stage's main voice is what unlocks its primary CTA (REQ-018).
     if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
     else this.setState({ playKey: key });
@@ -717,6 +726,8 @@ class App extends React.Component {
 
   renderEar() {
     const st = this.state;
+    const samplePlaying = st.playKey === "ear-sample";
+    const sampleRoute = st.ear === "Left ear" ? "left" : st.ear === "Right ear" ? "right" : "both";
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Select which ear(s)"),
@@ -725,6 +736,18 @@ class App extends React.Component {
         e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "18px" } },
           ["Left ear", "Right ear", "Both ears"].map((label) =>
             this.selectRowButton(label, label, st.ear === label, () => this.setEar(label)))),
+        e("div", { style: { marginTop: "18px" } },
+          e(DS.Button, {
+            variant: "outline",
+            size: "md",
+            disabled: !st.ear,
+            "aria-pressed": samplePlaying ? "true" : "false",
+            leadingIcon: samplePlaying ? null : e(DS.Icon, {
+              name: "play", size: 16,
+              color: st.ear ? "var(--control-accent)" : "var(--text-disabled)"
+            }),
+            onClick: () => st.ear && this.toggleKey("ear-sample", [NEUTRAL_TEST_SOUND], sampleRoute)
+          }, samplePlaying ? "Stop sample sound" : "Play sample sound")),
         st.earWarn ? e("div", { style: { marginTop: "14px" } }, this.alertBox("Choose an ear to continue.", false)) : null),
       this.bottomButton("Continue", () => st.ear ? this.goScreen("setup") : this.setState({ earWarn: true }), { disabled: !st.ear })
     ];
