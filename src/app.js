@@ -218,7 +218,13 @@ class App extends React.Component {
 
   openOption(cid, stage, seed) {
     this.hardStop();
-    this.setState((s) => shell.openOptionState(s, cid, stage, seed));
+    // Keep the completed summary underneath the two-step sheet while the
+    // participant considers or changes a selection. Once Continue confirms
+    // the next option, the fresh flow replaces that completed context.
+    this.setState((s) => ({
+      ...shell.openOptionState(s, cid, stage, seed),
+      matchingContextData: null
+    }));
   }
 
   finishOption() {
