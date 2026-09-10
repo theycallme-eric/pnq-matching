@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { expectSeparatedFooterTargets } from "./footer-target-helpers.mjs";
 
 async function boot(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -27,6 +28,26 @@ const state = (page) => page.evaluate(() => window.__pnqAppState());
 
 test.describe("session menu", () => {
   test.use({ viewport: { width: 390, height: 844 } });
+
+  test("390x844 footer targets own separate left, center, and right hit regions", async ({ page }) => {
+    await boot(page);
+    await openJumps(page);
+    await jumpGroup(page, "OPTION 1").getByRole("button", { name: "Volume", exact: true }).click();
+
+    let targets = await expectSeparatedFooterTargets(page);
+    await page.mouse.click(targets["session-menu"].centerX, targets["session-menu"].centerY);
+    await expect(page.getByRole("dialog", { name: "Session menu" })).toBeVisible();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+
+    targets = await expectSeparatedFooterTargets(page);
+    await page.mouse.click(targets.help.centerX, targets.help.centerY);
+    await expect(page.getByRole("dialog", { name: "Help" })).toBeVisible();
+    await page.getByRole("button", { name: "Close help" }).click();
+
+    targets = await expectSeparatedFooterTargets(page);
+    await page.mouse.click(targets.back.centerX, targets.back.centerY);
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+  });
 
   test("the invisible hotspot is the only opener; opening hard-stops sound and both dismiss controls work", async ({ page }) => {
     await boot(page);

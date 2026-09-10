@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { expectSeparatedFooterTargets } from "./footer-target-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -25,13 +26,7 @@ async function openHelp(page, actions) {
   await expect(page.locator("[data-screen]").getByRole("button", { name: "Wider range", exact: true })).toHaveCount(0);
   await expect(page.locator("[data-screen]").getByRole("button", { name: "Can't hear this", exact: true })).toHaveCount(0);
 
-  const [backBox, menuBox, helpBox] = await Promise.all([
-    back.boundingBox(),
-    footer.getByRole("button", { name: "Session menu" }).boundingBox(),
-    help.boundingBox()
-  ]);
-  expect(backBox.x + backBox.width).toBeLessThanOrEqual(menuBox.x);
-  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(helpBox.x);
+  await expectSeparatedFooterTargets(page);
 
   await help.click();
   const dialog = page.getByRole("dialog", { name: "Help" });
