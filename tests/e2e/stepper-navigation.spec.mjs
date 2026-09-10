@@ -35,7 +35,9 @@ async function expectActionRegionSeparated(page) {
     region.boundingBox(), previous.boundingBox(), next.boundingBox(), footer.boundingBox()
   ]);
 
-  expect(previousBox.x + previousBox.width).toBeLessThanOrEqual(nextBox.x);
+  expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(previousBox.y + .5);
+  expect(nextBox.x).toBeCloseTo(previousBox.x, 0);
+  expect(nextBox.width).toBeCloseTo(previousBox.width, 0);
   expect(regionBox.y + regionBox.height).toBeLessThanOrEqual(footerBox.y + .5);
   expect(previousBox.y + previousBox.height).toBeLessThanOrEqual(footerBox.y);
   expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(footerBox.y);

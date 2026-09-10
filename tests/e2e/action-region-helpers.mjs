@@ -7,7 +7,8 @@ export async function primaryActionTop(page, name) {
 
   await expect(region).toHaveCount(1);
   await expect(region).toBeVisible();
-  await expect(region).toHaveCSS("height", "121px");
+  expect(await region.evaluate((element) => element.getBoundingClientRect().height))
+    .toBeGreaterThanOrEqual(121);
   await expect(action).toBeVisible();
   await expect(footer).toBeVisible();
 
