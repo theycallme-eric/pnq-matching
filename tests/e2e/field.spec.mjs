@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { startMatchingOption } from "./onboarding-helpers.mjs";
 import { primaryActionTop } from "./action-region-helpers.mjs";
+import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -38,7 +39,7 @@ test.describe("field (Option 3)", () => {
     const initialTop = await primaryActionTop(page, label);
     await expect(page.getByRole("button", { name: label })).toBeDisabled();
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/worth telling us/)).toBeVisible();
     expect(await primaryActionTop(page, label)).toBe(initialTop);
 
@@ -130,7 +131,7 @@ test.describe("field (Option 3)", () => {
     await jumpTo(page, "Closer look");
     await expect(page.getByText(/Same idea, a smaller area/)).toBeVisible();
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/okay, and worth telling us/)).toBeVisible();
     await expect(page.getByText(/moving the marker higher/)).toBeVisible();
     // Still on the same runnable stage with audio available.
