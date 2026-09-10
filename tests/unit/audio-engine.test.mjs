@@ -300,6 +300,25 @@ test("earIsRouted and setEar route fully left / right / both", () => {
   assert.equal(panner.pan.value, 0, "unknown ear falls back to both");
 });
 
+test("each ear sample uses the selected channel, including a changed next selection", () => {
+  engine.panic();
+  const sample = [spec("tone", 0.5, 0.42, 0.2)];
+  const routes = [
+    ["left", -1],
+    ["right", 1],
+    ["both", 0],
+    ["left", -1]
+  ];
+
+  for (const [selectedEar, expectedPan] of routes) {
+    engine.setEar(selectedEar);
+    assert.equal(engine.play("ear-sample", sample), true);
+    assert.equal(graph().panner.pan.value, expectedPan, `${selectedEar} sample route`);
+    assert.equal(engine.playingKey(), "ear-sample");
+    engine.stop();
+  }
+});
+
 test("every voice routes through the one StereoPanner", () => {
   engine.panic();
   engine.setEar("left");
