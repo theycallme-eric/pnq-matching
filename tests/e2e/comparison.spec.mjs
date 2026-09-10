@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { startMatchingOption } from "./onboarding-helpers.mjs";
 import { primaryActionTop } from "./action-region-helpers.mjs";
+import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -28,7 +29,7 @@ test.describe("comparison (Option 2)", () => {
     const initialTop = await primaryActionTop(page, label);
     await expect(page.getByRole("button", { name: label })).toBeDisabled();
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/made it a little easier to hear/)).toBeVisible();
     expect(await primaryActionTop(page, label)).toBe(initialTop);
 
@@ -166,7 +167,7 @@ test.describe("comparison (Option 2)", () => {
 
     await jumpTo(page, "Directional · volume");
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/made it a little easier to hear/)).toBeVisible();
     expect((await rState(page)).level).toBeCloseTo(.52, 6);
   });

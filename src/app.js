@@ -67,6 +67,7 @@ class App extends React.Component {
     this.state = {
       ...shell.initialState(),
       accountConfirmation: false,
+      helpOpen: false,
       matchingOptions: matchingOptions.openMatchingOptions(),
       matchingContext: "dashboard",
       matchingContextData: null
@@ -264,6 +265,69 @@ class App extends React.Component {
     this.setState({ menuOpen: false, jumpOpen: false }, () => {
       if (this.menuButton) this.menuButton.focus();
     });
+  }
+
+  // REQ-012: footer Help is driven by the active matching context, so a
+  // screen can expose only the assistance actions it previously owned.
+  contextualHelpActions() {
+    const st = this.state;
+    if (st.screen !== "flow") return [];
+    const c = st.concept, s = st.stages[c];
+    if (c === "n" && ["vol", "p1", "p2", "p3"].includes(s)) {
+      return [
+        ...(s === "vol" ? [] : [{
+          label: "Wider range",
+          f: () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }
+        }]),
+        { label: "Can't hear this", f: () => this.pat("n", nar.noHear(this.state.n)) }
+      ];
+    }
+    if (c === "r" && s === "dir") {
+      return [{ label: "Can't hear this", f: () => this.rDir("nohear") }];
+    }
+    if (c === "a" && s === "listen") {
+      return [{ label: "Can't hear this", f: () => this.aResp("nohear") }];
+    }
+    if (c === "d" && (s === "field" || s === "zoom")) {
+      return [{ label: "Can't hear this", f: () => this.pat("d", field.noHear()) }];
+    }
+    return [];
+  }
+
+  openHelp() {
+    this.setState({ helpOpen: true }, () => {
+      if (this.helpCloseButton) this.helpCloseButton.focus();
+    });
+  }
+
+  closeHelp() {
+    this.setState({ helpOpen: false }, () => {
+      if (this.helpButton) this.helpButton.focus();
+    });
+  }
+
+  runHelpAction(action) {
+    this.setState({ helpOpen: false }, action.f);
+  }
+
+  onHelpKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.closeHelp();
+      return;
+    }
+    if (event.key !== "Tab" || !this.helpDialog) return;
+    const controls = [...this.helpDialog.querySelectorAll("button,[tabindex]")]
+      .filter((control) => control.tabIndex >= 0 && control.getClientRects().length);
+    if (!controls.length) return;
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   onMenuKeyDown(event) {
@@ -922,11 +986,8 @@ class App extends React.Component {
         // in the Field · Prepare markup; escapes must reassure (REQ-016), so
         // it renders here on the pass screen instead.
         n.note ? this.noteBox(n.note, "14px") : null,
-        e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "10px" } },
-          s === "p3" ? e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning") : null,
-          e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-            isVol ? null : this.escapeLink("Wider range", () => { const w = nar.widen(this.state.n); this.go("n", w.stage, w.obj); }),
-            this.escapeLink("Can't hear this", () => this.pat("n", nar.noHear(this.state.n)))))),
+        s === "p3" ? e("div", { style: { marginTop: "10px" } },
+          e(DS.Button, { variant: "outline", size: "sm", onClick: () => this.pat("n", nar.keepGoing(this.state.n)) }, "Keep fine-tuning")) : null),
       this.primaryActionRegion(
         e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: signOff }, nar.PRIMARY[s])
       )
@@ -1000,9 +1061,7 @@ class App extends React.Component {
               e(DS.Button, { key: label, variant: "outline", size: "sm", disabled: !heard, onClick: answer(tag) }, label))),
           c === "a" ? e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px", paddingTop: "14px", borderTop: "1px solid var(--gray-200)" } },
             e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(o.phase === "pitch" ? "close" : "right") }, settle)) : null),
-        o.msg ? this.noteBox(o.msg, "14px") : null,
-        c === "r" ? e("div", { style: { display: "flex", justifyContent: "center", marginTop: "10px" } },
-          this.escapeLink("Can't hear this", () => this.rDir("nohear"))) : null),
+        o.msg ? this.noteBox(o.msg, "14px") : null),
       c === "r"
         ? this.primaryActionRegion(
           e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle)
@@ -1011,8 +1070,6 @@ class App extends React.Component {
         c === "a" && o.suggest
           ? this.noteBox("Nothing nearby has beaten this sound for a while. One final check and we're done, or keep refining if you're not sure.")
           : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px" } },
-          this.escapeLink("Can't hear this", () => c === "a" ? this.aResp("nohear") : this.rDir("nohear"))),
         c === "a" && o.suggest
           ? e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.go("a", "chal") }, "Do the final check")
           : null,
@@ -1454,9 +1511,8 @@ class App extends React.Component {
         // in the Families intro markup; escapes must reassure (REQ-016), so it
         // renders here on the field screen instead.
         d.note ? this.noteBox(d.note, "12px") : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", gap: "16px", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
-          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())),
-          this.escapeLink("Can't hear this", () => this.pat("d", field.noHear())))),
+        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
+          this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())))),
       this.primaryActionRegion(
         // The step-forward action stays in place and goes gray until the sound
         // has been played once, so nobody advances on a marker they have never
@@ -1811,6 +1867,46 @@ class App extends React.Component {
 
   /* ---------- chrome ---------- */
 
+  renderHelp() {
+    const actions = this.contextualHelpActions();
+    return e("div", {
+      id: "contextual-help-dialog", ref: (node) => { this.helpDialog = node; },
+      role: "dialog", "aria-modal": "true", "aria-labelledby": "contextual-help-title",
+      "data-contextual-help": "", onKeyDown: (event) => this.onHelpKeyDown(event),
+      style: { position: "absolute", inset: 0, zIndex: 31, display: "flex", flexDirection: "column" }
+    },
+      e("div", { style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .55 } }),
+      e("button", {
+        type: "button", onClick: () => this.closeHelp(), "aria-label": "Dismiss help",
+        style: { flex: 1, border: "none", background: "transparent", cursor: "pointer", minHeight: "60px", position: "relative" }
+      }),
+      e("div", {
+        style: {
+          flex: "none", background: "var(--white)", borderRadius: "22px 22px 0 0",
+          padding: "16px 18px 22px", position: "relative"
+        }
+      },
+        e("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" } },
+          e("div", null,
+            e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".16em", color: "var(--text-secondary)" } }, "MATCHING ASSISTANCE"),
+            e("div", { id: "contextual-help-title", style: { font: "600 18px var(--font-ui)", color: "var(--text-heading)", marginTop: "4px" } }, "Help")),
+          e("button", {
+            type: "button", ref: (node) => { this.helpCloseButton = node; },
+            onClick: () => this.closeHelp(), "aria-label": "Close help",
+            style: { flex: "none", width: "44px", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", cursor: "pointer" }
+          }, e(DS.Icon, { name: "close", size: 20, color: "var(--gray-600)" }))),
+        e("div", { "data-help-actions": "", style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "14px" } },
+          actions.map((action) => e("button", {
+            key: action.label, type: "button", onClick: () => this.runHelpAction(action),
+            style: {
+              display: "flex", alignItems: "center", width: "100%", minHeight: "52px",
+              padding: "14px 16px", borderRadius: "13px", border: "1.5px solid var(--gray-200)",
+              background: "var(--white)", cursor: "pointer", textAlign: "left",
+              font: "600 14.5px var(--font-ui)", color: "var(--text-heading)"
+            }
+          }, action.label)))));
+  }
+
   renderMenu() {
     const st = this.state, c = st.concept;
     const where = st.screen === "flow" ? shell.OPTLABEL[c] || "Preserved flow"
@@ -1902,6 +1998,12 @@ class App extends React.Component {
     const progShow = st.screen === "flow" && prog.show;
     const nav = shell.navShow(st);
     const label = shell.screenLabelOf(st.screen, c, s);
+    const helpActions = this.contextualHelpActions();
+    const footerControlStyle = {
+      display: "flex", alignItems: "center", gap: "6px", minHeight: "44px",
+      padding: "0 8px", border: "none", background: "transparent", color: chromeFg,
+      font: "600 15px var(--font-ui)", cursor: "pointer"
+    };
 
     const body = {
       launch: () => this.renderLaunch(),
@@ -1951,11 +2053,19 @@ class App extends React.Component {
             e("div", { style: { height: "100%", background: "var(--control-accent)", borderRadius: "3px", transition: "width 420ms cubic-bezier(.4,0,.2,1)", width: prog.w } }))) : null,
         screenRoot,
         st.menuOpen ? this.renderMenu() : null,
-        onboardingScreen ? null : e("div", { "data-shell-footer": "", style: { flex: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "2px 8px 4px", background: chromeBg, borderTop: "1px solid " + chromeLine } },
+        st.helpOpen && helpActions.length ? this.renderHelp() : null,
+        onboardingScreen ? null : e("div", {
+          "data-shell-footer": "",
+          style: {
+            flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 56px minmax(0, 1fr)",
+            alignItems: "center", columnGap: "8px", padding: "2px 8px 4px",
+            background: chromeBg, borderTop: "1px solid " + chromeLine
+          }
+        },
           nav
-            ? e("button", { onClick: () => this.onBack(), style: { display: "flex", alignItems: "center", gap: "6px", minHeight: "44px", padding: "0 12px 0 8px", border: "none", background: "transparent", color: chromeFg, font: "600 15px var(--font-ui)", cursor: "pointer" } },
+            ? e("button", { type: "button", onClick: () => this.onBack(), style: { ...footerControlStyle, justifySelf: "start" } },
               e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
-            : e("span", { style: { display: "block", width: "8px", height: "44px" } }),
+            : e("span", { "aria-hidden": "true", style: { display: "block", height: "44px" } }),
           st.screen === "dashboard"
             ? e("span", { "aria-hidden": "true", style: { flex: "none", display: "block", width: "56px", height: "44px" } })
             : e("button", {
@@ -1963,7 +2073,15 @@ class App extends React.Component {
               "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
               "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
               style: { flex: "none", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
-            })),
+            }),
+          helpActions.length
+            ? e("button", {
+              type: "button", ref: (node) => { this.helpButton = node; }, onClick: () => this.openHelp(),
+              "aria-haspopup": "dialog", "aria-expanded": st.helpOpen ? "true" : "false",
+              "aria-controls": st.helpOpen ? "contextual-help-dialog" : undefined,
+              style: { ...footerControlStyle, justifySelf: "end" }
+            }, "Help")
+            : e("span", { "aria-hidden": "true", style: { display: "block", height: "44px" } })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
           : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));

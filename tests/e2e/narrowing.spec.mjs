@@ -6,6 +6,7 @@
 import { test, expect } from "@playwright/test";
 import { startMatchingOption } from "./onboarding-helpers.mjs";
 import { primaryActionTop } from "./action-region-helpers.mjs";
+import { chooseHelpAction, openContextualHelp } from "./contextual-help-helpers.mjs";
 
 async function seed(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -36,7 +37,7 @@ test.describe("narrowing (Option 1)", () => {
     const initialTop = await primaryActionTop(page, volumeLabel);
     await expect(page.getByRole("button", { name: volumeLabel })).toBeDisabled();
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/made the sound a little easier to hear/)).toBeVisible();
     expect(await primaryActionTop(page, volumeLabel)).toBe(initialTop);
 
@@ -152,7 +153,7 @@ test.describe("narrowing (Option 1)", () => {
     await jumpTo(page, "Pitch · fine");
     await expect(page.getByText("Small adjustments now")).toBeVisible();
 
-    await page.getByRole("button", { name: "Wider range" }).click();
+    await chooseHelpAction(page, "Wider range");
     await expect(page.getByText("Now find the pitch")).toBeVisible();
     expect(await progressPhase(page)).toContain("PITCH 1 OF 3");
     await expect(page.getByText("We’ve widened the pitch range again. Take your time. Close is good enough at this stage.")).toBeVisible();
@@ -171,14 +172,14 @@ test.describe("narrowing (Option 1)", () => {
     await page.goto("/");
     await startMatchingOption(page, 1);
 
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText("That’s okay. We made the sound a little easier to hear. Press play and try again.")).toBeVisible();
     let n = await nState(page);
     expect(n.level).toBeCloseTo(.52, 6);
     await expect(page.getByText("Start with how loud it is")).toBeVisible();
 
     // Repeats keep raising toward the cap; the stage stays runnable.
-    await page.getByRole("button", { name: "Can't hear this" }).click();
+    await chooseHelpAction(page, "Can't hear this");
     n = await nState(page);
     expect(n.level).toBeCloseTo(.64, 6);
     await page.getByText("Start Sound", { exact: true }).click();
@@ -186,9 +187,13 @@ test.describe("narrowing (Option 1)", () => {
     await expect(page.getByRole("button", { name: "The volume is about right" })).toBeEnabled();
 
     // The volume stage offers no Wider range; pitch passes offer both escapes.
-    await expect(page.getByRole("button", { name: "Wider range" })).toHaveCount(0);
+    let help = await openContextualHelp(page);
+    await expect(help.locator("[data-help-actions]").getByRole("button", { name: "Wider range" })).toHaveCount(0);
+    await expect(help.locator("[data-help-actions]").getByRole("button", { name: "Can't hear this" })).toBeVisible();
+    await help.getByRole("button", { name: "Close help" }).last().click();
     await page.getByRole("button", { name: "The volume is about right" }).click();
-    await expect(page.getByRole("button", { name: "Wider range" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Can't hear this" })).toBeVisible();
+    help = await openContextualHelp(page);
+    await expect(help.locator("[data-help-actions]").getByRole("button", { name: "Wider range" })).toBeVisible();
+    await expect(help.locator("[data-help-actions]").getByRole("button", { name: "Can't hear this" })).toBeVisible();
   });
 });
