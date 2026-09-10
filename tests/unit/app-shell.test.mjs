@@ -280,12 +280,14 @@ test("Back renders only where the prototype shows it and targets what it targets
   const st = shell.initialState();
   assert.equal(shell.navShow({ ...st, screen: "launch" }), false);
   assert.equal(shell.navShow({ ...st, screen: "home" }), false);
+  assert.equal(shell.navShow({ ...st, screen: "ear" }), true);
   assert.equal(shell.navShow({ ...st, screen: "setup" }), true);
   assert.equal(shell.navShow({ ...st, screen: "edu" }), true);
   const flowAt = (c, stage) => ({ ...st, screen: "flow", concept: c, stages: { ...st.stages, [c]: stage } });
   assert.equal(shell.navShow(flowAt("n", "intro")), false, "no Back on Prepare");
   assert.equal(shell.navShow(flowAt("l", "ret")), false);
   assert.equal(shell.navShow(flowAt("n", "vol")), true);
+  assert.deepEqual(shell.backTarget({ ...st, screen: "ear" }), { kind: "screen", screen: "dashboard" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "setup" }), { kind: "screen", screen: "ear" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "edu" }), { kind: "screen", screen: "setup" });
   assert.deepEqual(shell.backTarget({ ...st, screen: "setup", setupSeen: true, eduSeen: true }), { kind: "screen", screen: "home" });
@@ -294,6 +296,15 @@ test("Back renders only where the prototype shows it and targets what it targets
   assert.deepEqual(shell.backTarget(flowAt("n", "p2")), { kind: "stage", stage: "p1" });
   const zoomed = { ...flowAt("d", "zoom"), d: { ...shell.freshD(), level: 1 } };
   assert.deepEqual(shell.backTarget(zoomed), { kind: "zoomOut", stage: "field", level: 0 }, "zoom steps out before stages step back");
+
+  const activeSetup = { ...st, screen: "ear", onboardingSeen: true, ear: "Right ear", hp: true, vol: 72 };
+  const target = shell.backTarget(activeSetup);
+  const returned = shell.goScreenState(activeSetup, target.screen);
+  assert.deepEqual(
+    { screen: returned.screen, onboardingSeen: returned.onboardingSeen, ear: returned.ear, hp: returned.hp, vol: returned.vol },
+    { screen: "dashboard", onboardingSeen: true, ear: "Right ear", hp: true, vol: 72 },
+    "Back retains the active setup session"
+  );
 });
 
 test("measure(): >=620px is the framed 390x844 device, narrower is bare fullscreen", () => {

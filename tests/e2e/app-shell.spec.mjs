@@ -152,7 +152,7 @@ test.describe("app shell", () => {
     await expect(back).toHaveCount(0);
     await startSessionFromSplash(page);
     await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
-    await expect(back).toHaveCount(0);
+    await expect(back).toBeVisible();
     await page.getByText("Both ears", { exact: true }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(back).toBeVisible();

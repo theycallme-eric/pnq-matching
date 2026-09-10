@@ -605,9 +605,9 @@ class App extends React.Component {
     const st = this.state;
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "18px 22px 10px" } },
-        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Which ear would you like to work with?"),
+        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Select which ear(s)"),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "8px" } },
-          "Sound plays only in the ear you choose. If you hear it in both, pick the side where it is strongest, or choose both ears."),
+          "Which ear(s) would you like to treat?"),
         e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "18px" } },
           ["Left ear", "Right ear", "Both ears"].map((label) =>
             this.selectRowButton(label, label, st.ear === label, () => this.setEar(label)))),
