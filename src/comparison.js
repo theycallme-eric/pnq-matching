@@ -73,7 +73,7 @@ export function neither(r) {
   return { kind: "patch", patch: { spread: Math.min(.4, r.spread * 1.9), round: r.round + 1, uncertain: unc, note: "Neither, then. We have widened out and moved to a different area." } };
 }
 
-// "I can't hear these sounds" (REQ-016): raise the level, reassure, stay put.
+// Comparison contextual Help (REQ-003): raise the level, reassure, stay put.
 export function compNoHear(r) {
   return { kind: "patch", patch: { level: Math.min(.85, r.level + .12), note: "We made the sounds a little easier to hear. Check your headphones, then replay." } };
 }

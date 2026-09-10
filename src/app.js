@@ -310,6 +310,12 @@ class App extends React.Component {
     if (c === "r" && s === "dir") {
       return [{ label: "Can't hear this", f: () => this.rDir("nohear") }];
     }
+    if (c === "r" && s === "comp") {
+      return [{
+        label: "Can't hear these sounds",
+        f: () => this.applyR(comparison.compNoHear(this.state.r))
+      }];
+    }
     if (c === "a" && s === "listen") {
       return [{ label: "Can't hear this", f: () => this.aResp("nohear") }];
     }
@@ -1248,8 +1254,8 @@ class App extends React.Component {
   }
 
   // Shared · Two-sound comparison (REQ-008): forced-choice pairs that halve
-  // the spread, with the same-answer stop, the fatigue finisher and the
-  // "can't hear" escape (REQ-016).
+  // the spread, with the same-answer stop, the fatigue finisher and contextual
+  // Help for Option 2's "can't hear" escape (REQ-003).
   renderPair() {
     const st = this.state, c = st.concept;
     let A, B, title, caption, note = "", badgeB = false, pickA, pickB, noHear;
@@ -1265,7 +1271,6 @@ class App extends React.Component {
       secs.push({ label: "Neither is close", f: () => this.rNeither() });
       secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
       if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
-      noHear = () => this.applyR(comparison.compNoHear(this.state.r));
     } else if (c === "a") {
       ({ A, B } = pres.aChalSpecs(st.a));
       title = "One more check";
@@ -1307,7 +1312,7 @@ class App extends React.Component {
           secs.map((sec) =>
             e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
               e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
-        e("button", {
+        c === "r" ? null : e("button", {
           onClick: noHear,
           style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
         }, "I can't hear these sounds"))
