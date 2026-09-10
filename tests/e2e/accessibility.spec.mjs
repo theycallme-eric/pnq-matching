@@ -186,13 +186,10 @@ test.describe("accessibility and participant copy", () => {
     await page.goto("/");
     await auditScreen("Launch");
     await page.getByRole("button", { name: "Get started" }).click();
-    await auditScreen("Privacy");
-    await page.getByRole("checkbox", { name: /research prototype/i }).check();
-    await page.getByRole("button", { name: "Continue" }).click();
     await auditScreen("Create account / entry");
     await page.getByRole("button", { name: "Continue" }).click();
     await auditScreen("Create account / confirmation");
-    await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+    await page.getByRole("button", { name: "Yes, that's me" }).click();
     await auditScreen("Dashboard");
     await page.getByRole("button", { name: "New Session" }).click();
     await auditScreen("Setup / ear");
@@ -223,13 +220,10 @@ test.describe("accessibility and participant copy", () => {
     await disableAuditMotion(page);
     await audit("Launch");
     await page.getByRole("button", { name: "Get started" }).click();
-    await audit("Privacy");
-    await page.getByRole("checkbox", { name: /research prototype/i }).check();
-    await page.getByRole("button", { name: "Continue" }).click();
     await audit("Account entry");
     await page.getByRole("button", { name: "Continue" }).click();
     await audit("Account confirmation");
-    await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+    await page.getByRole("button", { name: "Yes, that's me" }).click();
     await audit("Dashboard");
     await page.getByRole("button", { name: "New Session" }).click();
     await audit("Ear");
@@ -268,29 +262,21 @@ test.describe("accessibility and participant copy", () => {
     await expectVisibleFocus(start);
     await start.press("Enter");
 
-    const checkbox = page.getByRole("checkbox", { name: /research prototype/i });
-    const privacyContinue = page.getByRole("button", { name: "Continue" });
-    await expect(privacyContinue).toHaveAttribute("aria-disabled", "true");
-    expect(await privacyContinue.evaluate((button) => getComputedStyle(button).borderStyle)).toBe("dashed");
-    await expect(checkbox).not.toBeChecked();
-    await expectVisibleFocus(checkbox);
-    await checkbox.press("Space");
-    await expect(checkbox).toBeChecked();
-    await expect(page.locator(".pnq-checkbox-visual svg")).toBeVisible();
-    await privacyContinue.press("Enter");
-
-    const input = page.getByRole("textbox", { name: "Simulated prescription ID" });
+    const input = page.getByRole("textbox", { name: "Prescription ID" });
+    await input.fill("a");
+    const accountContinue = page.getByRole("button", { name: "Continue" });
+    await expect(accountContinue).toHaveAttribute("aria-disabled", "true");
+    await expect(accountContinue).not.toHaveCSS("border-style", "dashed");
     await expectVisibleFocus(input);
     await input.press("ControlOrMeta+A");
-    await input.pressSequentially("KEYBOARD-DEMO");
+    await input.pressSequentially("PNQ-KEYBOARD");
     const onboardingBack = page.getByRole("button", { name: "Back" });
     await expectVisibleFocus(onboardingBack);
     await onboardingBack.press("Enter");
-    await expect(page.locator('[data-screen-label="Privacy"]')).toBeVisible();
-    await page.getByRole("checkbox", { name: /research prototype/i }).press("Space");
+    await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
+    await page.getByRole("button", { name: "Get started" }).press("Enter");
     await page.getByRole("button", { name: "Continue" }).press("Enter");
-    await page.getByRole("button", { name: "Continue" }).press("Enter");
-    await page.getByRole("button", { name: "Confirm fictional profile" }).press("Enter");
+    await page.getByRole("button", { name: "Yes, that's me" }).press("Enter");
 
     const newSession = page.getByRole("button", { name: "New Session" });
     await expectVisibleFocus(newSession);
@@ -345,7 +331,7 @@ test.describe("accessibility and participant copy", () => {
     await expect(menu).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("dialog", { name: "Session menu" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Close", exact: true })).toBeFocused();
-    const reset = page.getByRole("button", { name: "Reset the prototype" });
+    const reset = page.getByRole("button", { name: "Reset application" });
     await expectVisibleFocus(reset);
     await reset.press("Enter");
     await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();

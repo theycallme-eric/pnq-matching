@@ -40,7 +40,7 @@ test.describe("confidence and completion", () => {
     await expect(page.getByText("That’s this one done", { exact: true })).toBeVisible();
     await expect(page.getByText("Both ears", { exact: true })).toBeVisible();
     await expect(page.getByText("Very close", { exact: true })).toBeVisible();
-    await expect(page.getByText("Treatment isn't part of this prototype.", { exact: false })).toBeVisible();
+    await expect(page.getByText(/prototype|fictional/i)).toHaveCount(0);
     await expect(page.locator("[data-technical-values]")) .toHaveCount(0);
 
     await page.evaluate(() => {

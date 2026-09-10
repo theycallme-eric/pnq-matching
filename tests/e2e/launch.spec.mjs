@@ -33,7 +33,37 @@ test("launch screen loads the design system and renders the blue welcome mark", 
 
   // Launch chrome comes from design-system components.
   await expect(page.locator('[data-screen="launch"]')).toBeVisible();
-  await expect(page.getByText("A guided sound-matching study experience.")).toBeVisible();
+  await expect(page.getByText("A guided sound-matching experience.")).toBeVisible();
+  await expect(page.getByText(/prototype|fictional/i)).toHaveCount(0);
+});
+
+test("launch enters account setup directly and disabled buttons use the solid design-system treatment", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Get started" }).click();
+
+  await expect(page.locator('[data-screen-label="Create account"]')).toBeVisible();
+  await expect(page.locator('[data-screen-label="Privacy"]')).toHaveCount(0);
+  await expect(page.getByText(/privacy|prototype|fictional/i)).toHaveCount(0);
+
+  const input = page.getByRole("textbox", { name: "Prescription ID" });
+  await input.fill("a");
+  const disabled = page.getByRole("button", { name: "Continue" });
+  await expect(disabled).toHaveAttribute("aria-disabled", "true");
+  await expect(disabled).toHaveCSS("background-color", "rgb(223, 226, 231)");
+  const treatment = await disabled.evaluate((button) => {
+    const tokenProbe = document.createElement("div");
+    tokenProbe.style.background = "var(--interface-disabled)";
+    document.body.append(tokenProbe);
+    const result = {
+      background: getComputedStyle(button).backgroundColor,
+      borderStyle: getComputedStyle(button).borderStyle,
+      tokenBackground: getComputedStyle(tokenProbe).backgroundColor
+    };
+    tokenProbe.remove();
+    return result;
+  });
+  expect(treatment.borderStyle).not.toBe("dashed");
+  expect(treatment.background).toBe(treatment.tokenBackground);
 });
 
 test("both waveform mark variants are served byte-for-byte from the built bundle", async ({ request }) => {

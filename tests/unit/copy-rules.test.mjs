@@ -38,6 +38,8 @@ test("copy-rules: application audit retains every immersive-shell banned categor
     ["This is pulsatile tinnitus", "clinical subtype terminology"],
     ["Progressive Narrowing", "internal concept name"],
     ["Use the 2D Pitch–Volume Field", "internal concept name"],
+    ["Fictional profile ready", "prototype or fictional framing"],
+    ["Research prototype", "prototype or fictional framing"],
     ["The adaptive algorithm chooses the next sound", "prototype implementation terminology"],
     ["Your match is 4.2 kHz and 52 dB", "technical audio value"],
     ["Technical values are shown in Hz and dB", "technical audio value"],
@@ -59,7 +61,7 @@ test("copy-rules: application audit retains every immersive-shell banned categor
   assert.deepEqual(
     APPLICATION_BANNED_COPY_PATTERNS.map(({ label }) => label),
     [
-      "internal concept name", "prototype implementation terminology", "technical audio value",
+      "internal concept name", "prototype or fictional framing", "prototype implementation terminology", "technical audio value",
       "failure-recovery framing", "sequential option framing", "unsupported clinical claim"
     ]
   );
@@ -68,8 +70,7 @@ test("copy-rules: application audit retains every immersive-shell banned categor
 test("copy-rules: neutral alternatives and non-claim treatment boundaries pass", () => {
   assert.deepEqual(auditApplicationParticipantStrings([
     "Choose an option with your moderator.",
-    "Option 1", "Option 2", "Option 3", "Done",
-    "This exploration ends at matching. Treatment isn't part of this prototype."
+    "Option 1", "Option 2", "Option 3", "Done", "Return to matching options"
   ]), []);
 });
 
@@ -80,12 +81,12 @@ test("copy-rules: sentence case passes and uppercase is limited to registered st
   assert.match(auditParticipantStrings(["THIS SHOULD NOT BE A HEADING"])[0], /uppercase/);
 });
 
-test("copy-rules: application owns shell-only labels and fictional identifiers", () => {
+test("copy-rules: application owns shell-only labels and prescription identifiers", () => {
   assert.deepEqual([...APPLICATION_STRUCTURAL_OVERLINES], ["EXPLORE PNQ", "TAKE YOUR TIME"]);
   assert.match(auditParticipantStrings(["EXPLORE PNQ"])[0], /uppercase/);
-  assert.match(auditParticipantStrings(["DEMO PARTICIPANT 001"])[0], /uppercase/);
+  assert.match(auditParticipantStrings(["PNQ-RX-4821"])[0], /uppercase/);
   assert.deepEqual(auditApplicationParticipantStrings([
-    "EXPLORE PNQ", "TAKE YOUR TIME", "DEMO PARTICIPANT 001", "DEMO-RX-4821", "FICTIONAL-999"
+    "EXPLORE PNQ", "TAKE YOUR TIME", "PNQ-RX-4821"
   ]), []);
 });
 

@@ -36,13 +36,10 @@ async function visitShellScreens(page, audit) {
   await page.goto("/");
   await audit("Launch");
   await page.getByRole("button", { name: "Get started" }).click();
-  await audit("Privacy");
-  await page.getByRole("checkbox", { name: /research prototype/i }).check();
-  await page.getByRole("button", { name: "Continue" }).click();
   await audit("Create account · entry");
   await page.getByRole("button", { name: "Continue" }).click();
   await audit("Create account · confirmation");
-  await page.getByRole("button", { name: "Confirm fictional profile" }).click();
+  await page.getByRole("button", { name: "Yes, that's me" }).click();
   await audit("Dashboard");
   await page.getByRole("button", { name: "New Session" }).click();
   await audit("Setup · Ear");
@@ -141,12 +138,12 @@ test.describe("app shell", () => {
 
     // resetAll (session menu) clears storage and returns to Launch.
     await page.getByRole("button", { name: "Session menu" }).click();
-    await page.getByRole("button", { name: "Reset the prototype" }).click();
+    await page.getByRole("button", { name: "Reset application" }).click();
     await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
     expect(await page.evaluate((k) => sessionStorage.getItem(k), key)).toBeNull();
   });
 
-  test("app shell shows Back only where the prototype does and it navigates as the prototype does", async ({ page }) => {
+  test("app shell shows Back only on the established screens and preserves its navigation", async ({ page }) => {
     await page.goto("/");
     const back = page.getByRole("button", { name: "Back" });
     await expect(back).toHaveCount(0);
@@ -200,7 +197,7 @@ test.describe("app shell chrome", () => {
       await expectContainedShell(page, "bare");
     });
     expect(visited).toEqual([
-      "Launch", "Privacy", "Create account · entry", "Create account · confirmation",
+      "Launch", "Create account · entry", "Create account · confirmation",
       "Dashboard", "Setup · Ear", "Setup · Headphones and volume",
       "Shared · What to listen for", "Matching options", "Session complete"
     ]);
@@ -238,9 +235,7 @@ test.describe("app shell chrome", () => {
 
     // Navigate, then cross the exact breakpoint: the draft and screen survive.
     await page.getByRole("button", { name: "Get started" }).click();
-    await page.getByRole("checkbox", { name: /research prototype/i }).check();
-    await page.getByRole("button", { name: "Continue" }).click();
-    const input = page.getByRole("textbox", { name: "Simulated prescription ID" });
+    const input = page.getByRole("textbox", { name: "Prescription ID" });
     await input.fill("LOCAL-ONLY-DRAFT");
     await page.setViewportSize({ width: 619, height: 900 });
     await expect(frame).toHaveAttribute("data-device-frame", "bare");
