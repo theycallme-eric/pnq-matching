@@ -86,7 +86,7 @@ test.describe("onboarding", () => {
     expect(afterBack.onboardingSeen).toBe(true);
   });
 
-  test("Setup · Headphones and volume gates Continue, updates live, and persists setupSeen through education", async ({ page }) => {
+  test("Setup · Headphones and volume gates Continue, updates live, and opens matching options", async ({ page }) => {
     await page.goto("/");
     await startSessionFromSplash(page);
     await page.getByText("Both ears", { exact: true }).click();
@@ -122,16 +122,17 @@ test.describe("onboarding", () => {
     await expect(setup.getByText("/ 100%")).toHaveCount(0);
     await expect(cont).not.toHaveAttribute("aria-disabled", "true");
 
-    // Completing marks setupSeen, persists it, and advances directly to education.
+    // Completing marks setupSeen, persists it, and overlays matching options
+    // on the setup context without exposing the former full hub.
     await cont.click();
-    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
-    await expect(page.locator('[data-screen-label="Matching options"]')).toHaveCount(0);
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(page.locator('[data-matching-options-context="setup"]')).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
     const stored = await page.evaluate((k) => JSON.parse(sessionStorage.getItem(k)), key);
     expect(stored.setupSeen).toBe(true);
+    expect(stored.eduSeen).toBe(false);
 
-    await page.getByRole("button", { name: "I'm ready to start" }).click();
-    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Headphones and volume/ })).toHaveCount(0);
+    await expect(page.getByText("SOUND PLAYS IN", { exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();

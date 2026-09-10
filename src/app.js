@@ -662,7 +662,7 @@ class App extends React.Component {
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },
         e(DS.Button, {
           variant: "primary", size: "md", onDark: true, disabled: !(st.hp && ready),
-          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("edu", { setupSeen: true }) : this.setState({ setupWarn: true })
+          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("home", { setupSeen: true }) : this.setState({ setupWarn: true })
         }, "Continue"),
         e("div", { style: { height: "9px" } }))
     ];
@@ -1895,7 +1895,8 @@ class App extends React.Component {
 
   render() {
     const st = this.state, c = st.concept, s = st.stages[c];
-    const framed = st.framed, dark = st.screen === "setup";
+    const framed = st.framed;
+    const dark = st.screen === "setup" || st.screen === "home" && st.matchingContext === "setup";
     const onboardingScreen = ["launch", "account", "dashboard"].includes(st.screen);
     const statusOnDark = dark || onboardingScreen;
     const indicatorOnDark = dark || st.screen === "launch";
