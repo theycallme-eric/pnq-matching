@@ -113,10 +113,11 @@ test.describe("onboarding", () => {
     expect(stored.setupSeen).toBe(true);
 
     await page.getByRole("button", { name: "I'm ready to start" }).click();
-    const row = page.getByRole("button", { name: /Headphones and volume/ });
-    await expect(row.getByText("Done")).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Headphones and volume/ })).toHaveCount(0);
     await page.reload();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: /Headphones and volume/ }).getByText("Done")).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+    expect((await page.evaluate((k) => JSON.parse(sessionStorage.getItem(k)), key)).setupSeen).toBe(true);
   });
 });

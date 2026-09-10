@@ -4,7 +4,7 @@
  * followed by direct returns to that selector after Options 1 and 2.
  */
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const storageKey = "pnq-mtp-v1";
 const screen = (page, label) => page.locator(`[data-screen-label="${label}"]`);
@@ -23,7 +23,7 @@ async function expectNoPrematureSelector(page) {
 }
 
 async function finishOption1(page) {
-  await page.getByRole("button", { name: "Option 1" }).click();
+  await startMatchingOption(page, 1);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "The volume is about right" }).click();
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
@@ -37,7 +37,7 @@ async function finishOption1(page) {
 }
 
 async function finishOption2(page) {
-  await page.getByRole("button", { name: "Option 2" }).click();
+  await startMatchingOption(page, 2);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "The volume is set, move on" }).click();
   await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
