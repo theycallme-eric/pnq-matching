@@ -379,41 +379,44 @@ class App extends React.Component {
       e("div", { style: { height: "9px" } }));
   }
 
-  // REQ-011: matching screens reserve one shared strip for their primary
-  // action. Supporting choices and notes live in the independently scrolling
-  // content above it, so neither content growth nor answer state can move the
-  // primary action toward the shell footer.
-  primaryActionRegion(action) {
+  // REQ-004: every affected matching screen shares one bottom-anchored action
+  // region. A single action sits at the same footer offset as Match complete;
+  // additional actions grow the region upward without moving the lowest one.
+  // The content above remains the independently scrolling flex child.
+  screenActionRegion(action) {
     return e("div", {
-      key: "primary-action-region",
+      key: "screen-action-region",
+      "data-screen-action-region": "",
       "data-primary-action-region": "",
       style: {
-        flex: "none", height: "121px", padding: "8px 22px 0",
-        background: "var(--gray-50)", overflow: "hidden"
+        flex: "none", minHeight: "121px",
+        padding: "var(--space-8) var(--gutter-screen) var(--space-18)",
+        display: "flex", flexDirection: "column", justifyContent: "flex-end",
+        gap: "var(--space-8)", background: "var(--gray-50)"
       }
     }, action);
   }
 
-  // REQ-014: steppers use one paired action region above the shell footer.
-  // Previous is deliberately wired to the local sequence callback instead of
-  // the footer's Back dispatcher; the first step remains present but inert.
+  // REQ-005: steppers use the shared anchored region as a full-width vertical
+  // stack. The progressive primary is above Previous; Previous remains wired
+  // to the local sequence callback rather than the footer's Back dispatcher.
   stepActionRegion({ canPrevious, onPrevious, nextLabel, canNext, onNext, size = "sm" }) {
-    return this.primaryActionRegion(
+    return this.screenActionRegion(
       e("div", {
         "data-step-actions": "",
         style: {
-          display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          gap: "10px", alignItems: "stretch"
+          display: "flex", flexDirection: "column", gap: "var(--space-8)",
+          alignItems: "stretch", minWidth: 0
         }
       },
         e(DS.Button, {
-          variant: "outline", size, disabled: !canPrevious,
-          "data-step-action": "previous", onClick: canPrevious ? onPrevious : undefined
-        }, "Previous step"),
-        e(DS.Button, {
           variant: "primary", size, disabled: !canNext,
           "data-step-action": "next", onClick: onNext
-        }, nextLabel))
+        }, nextLabel),
+        e(DS.Button, {
+          variant: "outline", size, disabled: !canPrevious,
+          "data-step-action": "previous", onClick: canPrevious ? onPrevious : undefined
+        }, "Previous step"))
     );
   }
 
@@ -1119,7 +1122,7 @@ class App extends React.Component {
             e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer(o.phase === "pitch" ? "close" : "right") }, settle)) : null),
         o.msg ? this.noteBox(o.msg, "14px") : null),
       c === "r"
-        ? this.primaryActionRegion(
+        ? this.screenActionRegion(
           e(DS.Button, { variant: "primary", size: "sm", disabled: !heard, onClick: answer("right") }, settle)
         )
         : e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
@@ -1882,7 +1885,7 @@ class App extends React.Component {
           notClose ? e("div", { style: { background: "var(--blue-50)", border: "1px solid var(--blue-200)", borderRadius: "12px", padding: "11px 14px", font: "400 13.5px/1.5 var(--font-text)", color: "var(--gray-700)", marginTop: "2px" } }, "That's useful to know. We can keep refining, or finish now and match again another day.") : null,
           notClose ? e("div", { style: { marginTop: "9px" } },
             e(DS.Button, { variant: "outline", size: "sm", onClick: finish }, "Finish anyway")) : null),
-        this.primaryActionRegion(
+        this.screenActionRegion(
           notClose
             ? e(DS.Button, { variant: "primary", size: "sm", onClick: keepRefining }, "Keep refining")
             : e(DS.Button, { variant: "primary", size: "sm", disabled: !conf, onClick: finish }, "Finish matching")
@@ -1904,9 +1907,9 @@ class App extends React.Component {
                 e("div", { style: { font: "700 10px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-secondary)" } }, row.label),
                 e("div", { style: { font: "500 14.5px/1.35 var(--font-ui)", color: "var(--text-heading)", marginTop: "3px" } }, row.sub))))),
           st.showTech ? e("div", { "data-technical-values": true, style: { textAlign: "center", font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "12px" } }, done.tech) : null),
-        e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-          e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.finishOption() }, finishesSession ? "Finish session" : "Return to matching options"),
-          e("div", { style: { height: "9px" } }))
+        this.screenActionRegion(
+          e(DS.Button, { variant: "primary", size: "sm", onClick: () => this.finishOption() }, finishesSession ? "Finish session" : "Return to matching options")
+        )
       ];
     }
     // Generic working stage: real interactions land with each concept's own
