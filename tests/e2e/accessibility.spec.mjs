@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { startSessionFromSplash } from "./onboarding-helpers.mjs";
-import { auditParticipantStrings, REQUIRED_COPY } from "../../src/participant-copy.js";
+import { REQUIRED_COPY } from "../../src/participant-copy.js";
+import { auditApplicationParticipantStrings } from "../../src/app-copy.js";
 
 const GROUPS = [
   "OPTION 1", "OPTION 2", "OPTION 3", "SOUND-FAMILY GUIDED (PRESERVED)",
@@ -179,7 +180,7 @@ test.describe("accessibility and participant copy", () => {
   test("participant copy audit covers every immersive shell screen through the shared selector", async ({ page }) => {
     const problems = [];
     const auditScreen = async (name) => {
-      for (const issue of auditParticipantStrings(await participantText(page))) problems.push(`${name}: ${issue}`);
+      for (const issue of auditApplicationParticipantStrings(await participantText(page))) problems.push(`${name}: ${issue}`);
     };
 
     await page.goto("/");
@@ -372,7 +373,7 @@ test.describe("accessibility and participant copy", () => {
         const where = `${cap} / ${label.trim()}`;
         const copy = await participantText(page);
         allCopy.push(...copy);
-        for (const issue of auditParticipantStrings(copy)) allProblems.push(`${where}: ${issue}`);
+        for (const issue of auditApplicationParticipantStrings(copy)) allProblems.push(`${where}: ${issue}`);
         for (const issue of await accessibilityProblems(page)) allProblems.push(`${where}: ${issue}`);
       }
     }

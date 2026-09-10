@@ -6,7 +6,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { startSessionFromSplash } from "./onboarding-helpers.mjs";
-import { auditParticipantStrings } from "../../src/participant-copy.js";
+import { auditApplicationParticipantStrings } from "../../src/app-copy.js";
 
 const hub = (page) => page.locator('[data-screen-label="Matching options"]');
 const selector = (page) => page.locator("[data-option-selector]");
@@ -141,7 +141,7 @@ test.describe("home hub", () => {
     // No internal concept names or research language anywhere on the hub.
     const text = await page.locator("[data-device-frame]").innerText();
     expect(text).not.toMatch(/Narrowing|Comparison|Adaptive|Families|2D|Field|Longitudinal|concept|hypothes|method|approach|stage|winner|fallback|retry/i);
-    expect(auditParticipantStrings(text.split(/\n+/))).toEqual([]);
+    expect(auditApplicationParticipantStrings(text.split(/\n+/))).toEqual([]);
   });
 
   test("options complete out of order, return to the same selector, and reopen fresh with unique Done state", async ({ page }) => {
@@ -218,7 +218,7 @@ test.describe("home hub", () => {
       await expect(conclusion).toContainText("All three options are complete");
       const conclusionText = await conclusion.innerText();
       expect(conclusionText).not.toMatch(/winner|best match|rank|recommend|start treatment/i);
-      expect(auditParticipantStrings(conclusionText.split(/\n+/))).toEqual([]);
+      expect(auditApplicationParticipantStrings(conclusionText.split(/\n+/))).toEqual([]);
       await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
       await page.waitForTimeout(300);
       await expect(conclusion).toBeVisible();
