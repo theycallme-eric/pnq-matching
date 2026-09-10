@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startMatchingOption } from "./onboarding-helpers.mjs";
 
 const storageKey = "pnq-mtp-v1";
 const screen = (page, label) => page.locator(`[data-screen-label="${label}"]`);
@@ -19,7 +19,7 @@ async function restoreReadySession(page) {
 
 async function finishOptionTwoFromConfidence(page) {
   await startMatchingOption(page, 2);
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   const optionTwo = page.getByText("OPTION 2", { exact: true }).locator("..");
   await optionTwo.getByRole("button", { name: "Confidence", exact: true }).click();

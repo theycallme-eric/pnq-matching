@@ -3,7 +3,7 @@
  * persistence, framed vs bare chrome, conditional Back, and audio hard stop.
  */
 import { test, expect } from "@playwright/test";
-import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const key = "pnq-mtp-v1";
 
@@ -20,7 +20,7 @@ async function completeSetup(page) {
 }
 
 async function completeOptionFromConfidence(page, optionLabel) {
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   const group = page.getByText(optionLabel.toUpperCase(), { exact: true }).locator("..");
   await group.getByRole("button", { name: "Confidence", exact: true }).click();
@@ -133,7 +133,7 @@ test.describe("app shell", () => {
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
 
     // resetAll (session menu) clears storage and returns to Launch.
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Reset application" }).click();
     await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
     expect(await page.evaluate((k) => sessionStorage.getItem(k), key)).toBeNull();
@@ -158,14 +158,14 @@ test.describe("app shell", () => {
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect(back).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Jump to a different section" }).click();
     await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
     await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
     await back.click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Jump to a different section" }).click();
     await page.getByRole("button", { name: "Headphone setup", exact: true }).click();
     await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
@@ -176,7 +176,7 @@ test.describe("app shell", () => {
   test("app shell hard-stops audio on every screen and stage transition", async ({ page }) => {
     await page.goto("/");
     await completeSetup(page);
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Jump to a different section" }).click();
     await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
     await page.getByRole("button", { name: /A lower sound/ }).click();

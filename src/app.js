@@ -69,6 +69,7 @@ class App extends React.Component {
       accountConfirmation: false,
       helpOpen: false,
       matchingOptions: matchingOptions.openMatchingOptions(),
+      matchingOptionsOpen: false,
       matchingContext: "dashboard",
       matchingContextData: null
     };
@@ -89,7 +90,9 @@ class App extends React.Component {
       const restored = shell.restoreSession(sessionStorage.getItem(shell.STORAGE_KEY));
       if (restored) this.setState({
         ...restored,
-        accountConfirmation: false
+        accountConfirmation: false,
+        matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingOptionsOpen: restored.screen === "home"
       });
     } catch (err) {}
     this.measure = () => {
@@ -105,7 +108,7 @@ class App extends React.Component {
     if (this.aud) this.aud.stop();
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps, prevState) {
     if (this.skipNextPersist) {
       this.skipNextPersist = false;
       try { sessionStorage.removeItem(shell.STORAGE_KEY); } catch (err) {}
@@ -117,6 +120,9 @@ class App extends React.Component {
     // React state is the single source of truth for playback: playKey null
     // means silence, even if a voice somehow outlived its screen.
     if (this.state.playKey === null) this.withAudio((a) => { if (a.playingKey() !== null) a.stop(); });
+    if (this.state.matchingOptionsOpen && !prevState.matchingOptionsOpen && this.matchingOptionsCloseButton) {
+      this.matchingOptionsCloseButton.focus();
+    }
   }
 
   withAudio(f) { if (this.aud) f(this.aud); else if (this.audP) this.audP.then((m) => { if (m) { this.aud = m; f(m); } }); }
@@ -183,10 +189,11 @@ class App extends React.Component {
     this.hardStop();
     this.setState((s) => {
       const next = shell.goScreenState(s, screen, extra);
-      if (screen !== "home") return next;
+      if (screen !== "home") return { ...next, matchingOptionsOpen: false };
       return {
         ...next,
         matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingOptionsOpen: true,
         matchingContext: s.screen === "edu" ? "education" : s.screen === "setup" ? "setup" : s.matchingContext,
         matchingContextData: null
       };
@@ -212,7 +219,11 @@ class App extends React.Component {
     this.hardStop();
     this.setState((s) => ({
       ...shell.newSessionState(s),
-      accountConfirmation: false
+      accountConfirmation: false,
+      matchingOptions: matchingOptions.openMatchingOptions(),
+      matchingOptionsOpen: false,
+      matchingContext: "dashboard",
+      matchingContextData: null
     }));
   }
 
@@ -223,6 +234,7 @@ class App extends React.Component {
     // the next option, the fresh flow replaces that completed context.
     this.setState((s) => ({
       ...shell.openOptionState(s, cid, stage, seed),
+      matchingOptionsOpen: false,
       matchingContextData: null
     }));
   }
@@ -232,10 +244,11 @@ class App extends React.Component {
     this.setState((s) => {
       const contextData = shell.doneData(s, mainSpecs(s));
       const next = shell.completeOptionState(s);
-      if (next.screen !== "home") return next;
+      if (next.screen !== "home") return { ...next, matchingOptionsOpen: false };
       return {
         ...next,
         matchingOptions: matchingOptions.openMatchingOptions(),
+        matchingOptionsOpen: true,
         matchingContext: "completion",
         matchingContextData: contextData
       };
@@ -256,7 +269,13 @@ class App extends React.Component {
     this.skipNextPersist = true;
     this.hardStop();
     try { sessionStorage.removeItem(shell.STORAGE_KEY); } catch (err) {}
-    this.setState((s) => shell.resetAllState(s));
+    this.setState((s) => ({
+      ...shell.resetAllState(s),
+      matchingOptions: matchingOptions.openMatchingOptions(),
+      matchingOptionsOpen: false,
+      matchingContext: "dashboard",
+      matchingContextData: null
+    }));
   }
 
   openMenu() {
@@ -810,16 +829,52 @@ class App extends React.Component {
     if (optionId) this.openOption(optionId);
   }
 
+  closeMatchingOptions() {
+    this.setState({ matchingOptionsOpen: false }, () => {
+      if (this.menuButton) this.menuButton.focus();
+    });
+  }
+
+  onMatchingOptionsKeyDown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.closeMatchingOptions();
+      return;
+    }
+    if (event.key !== "Tab" || !this.matchingOptionsDialog) return;
+    const controls = [...this.matchingOptionsDialog.querySelectorAll("button,input,[tabindex]")]
+      .filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+    if (!controls.length) return;
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   renderMatchingOptionsSheet() {
     const selection = this.state.matchingOptions || matchingOptions.openMatchingOptions();
     const selectedOption = selection.selectedOption;
     return e("div", {
       "data-matching-options-layer": "",
-      style: { position: "absolute", inset: 0, zIndex: 20, display: "flex", alignItems: "flex-end" }
+      onKeyDown: (event) => this.onMatchingOptionsKeyDown(event),
+      style: {
+        position: "absolute",
+        top: this.state.framed ? "var(--h-status-bar)" : "env(safe-area-inset-top)",
+        right: 0, bottom: 0, left: 0,
+        zIndex: 32, display: "flex", alignItems: "flex-end"
+      }
     },
-      e("div", { "aria-hidden": "true", style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .48 } }),
+      e("div", {
+        "data-matching-options-backdrop": "", "aria-hidden": "true",
+        style: { position: "absolute", inset: 0, background: "var(--navy-900)", opacity: .48 }
+      }),
       e("section", {
         role: "dialog", "aria-modal": "true", "aria-labelledby": "matching-options-title",
+        ref: (node) => { this.matchingOptionsDialog = node; },
         "data-matching-options-sheet": "",
         style: {
           position: "relative", width: "100%", maxHeight: "calc(100% - 20px)", overflowY: "auto",
@@ -827,8 +882,18 @@ class App extends React.Component {
           boxShadow: "var(--shadow-device)", padding: "10px 20px 18px"
         }
       },
-        e("div", { "aria-hidden": "true", style: { width: "42px", height: "4px", margin: "0 auto", borderRadius: "var(--radius-full)", background: "var(--gray-300)" } }),
-        e("h1", { id: "matching-options-title", style: { margin: "14px 0 0", font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Choose a matching option"),
+        e("div", { style: { position: "relative", height: "20px" } },
+          e("div", { "aria-hidden": "true", style: { position: "absolute", top: 0, left: "50%", width: "42px", height: "4px", borderRadius: "var(--radius-full)", background: "var(--gray-300)", transform: "translateX(-50%)" } }),
+          e("button", {
+            type: "button", ref: (node) => { this.matchingOptionsCloseButton = node; },
+            onClick: () => this.closeMatchingOptions(), "aria-label": "Close matching options",
+            style: {
+              position: "absolute", top: "-8px", right: "-8px", width: "44px", height: "44px", display: "flex", alignItems: "center",
+              justifyContent: "center", border: "none", borderRadius: "var(--radius-full)",
+              background: "transparent", cursor: "pointer"
+            }
+          }, e(DS.Icon, { name: "close", size: 20, color: "var(--gray-600)" }))),
+        e("h1", { id: "matching-options-title", style: { margin: "8px 0 0", font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, "Choose a matching option"),
         e("p", { style: { margin: "6px 0 0", font: "400 14px/1.4 var(--font-text)", color: "var(--text-body)" } }, "Select one, then continue."),
         e("div", {
           "data-option-selector": "", role: "group", "aria-label": "Matching options",
@@ -858,14 +923,15 @@ class App extends React.Component {
   }
 
   renderHome() {
-    return [
-      e("div", {
-        key: "context", "data-matching-options-context": this.state.matchingContext || "dashboard",
-        "aria-hidden": "true", inert: "",
-        style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", pointerEvents: "none" }
-      }, this.renderMatchingContext()),
-      this.renderMatchingOptionsSheet()
-    ];
+    const covered = this.state.matchingOptionsOpen;
+    return e("div", {
+      "data-matching-options-context": this.state.matchingContext || "dashboard",
+      ...(covered ? { "aria-hidden": "true", inert: "" } : {}),
+      style: {
+        flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
+        pointerEvents: covered ? "none" : undefined
+      }
+    }, this.renderMatchingContext());
   }
 
   renderConclusion() {
@@ -2125,6 +2191,7 @@ class App extends React.Component {
         st.helpOpen && helpActions.length ? this.renderHelp() : null,
         onboardingScreen ? null : e("div", {
           "data-shell-footer": "",
+          ...(st.screen === "home" && st.matchingOptionsOpen ? { "aria-hidden": "true", inert: "" } : {}),
           style: {
             // REQ-013: reserve independent left, center, and right hit regions
             // even when one of the visible footer controls is absent.
@@ -2161,7 +2228,8 @@ class App extends React.Component {
             : e("span", { "data-footer-region": "help", "aria-hidden": "true", style: { display: "block", gridColumn: "3", height: "44px" } })),
         framed
           ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
-          : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } })));
+          : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } }),
+        st.screen === "home" && st.matchingOptionsOpen ? this.renderMatchingOptionsSheet() : null));
   }
 }
 

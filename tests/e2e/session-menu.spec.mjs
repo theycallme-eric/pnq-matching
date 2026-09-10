@@ -7,6 +7,9 @@ async function boot(page) {
   })));
   await page.goto("/");
   await expect(page.locator('[data-screen="home"]')).toBeVisible();
+  await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+  await page.getByRole("button", { name: "Close matching options" }).click();
+  await expect(page.locator("[data-matching-options-sheet]")).toHaveCount(0);
 }
 
 async function openMenu(page) {

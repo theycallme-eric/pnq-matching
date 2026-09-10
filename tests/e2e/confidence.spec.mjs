@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openSessionMenu } from "./onboarding-helpers.mjs";
 import { primaryActionTop } from "./action-region-helpers.mjs";
 
 async function openConfidence(page, optionNumber = 1) {
@@ -7,7 +8,7 @@ async function openConfidence(page, optionNumber = 1) {
   })));
   await page.goto("/");
   await page.getByRole("button", { name: `Option ${optionNumber}` }).click();
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   await page.getByRole("button", { name: "Confidence", exact: true }).nth(optionNumber - 1).click();
   await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();

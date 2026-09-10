@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 async function reachEducation(page) {
   await page.goto("/");
@@ -9,7 +9,7 @@ async function reachEducation(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
 }
