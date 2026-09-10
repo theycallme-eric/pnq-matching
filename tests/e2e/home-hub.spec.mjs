@@ -225,7 +225,7 @@ test.describe("home hub", () => {
       expect(await page.evaluate(() => window.__pnqAppState().optOrder)).toEqual(order.map((n) => optionCid[n]));
 
       await page.getByRole("button", { name: "Session menu" }).click();
-      await expect(page.getByRole("button", { name: "Reset the prototype" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Reset application" })).toBeVisible();
       await page.getByRole("button", { name: "Close", exact: true }).click();
       await expect(conclusion).toBeVisible();
       expect((await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")))).optOrder)

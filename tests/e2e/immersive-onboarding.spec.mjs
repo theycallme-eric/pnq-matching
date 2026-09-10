@@ -1,5 +1,5 @@
 /*
- * Focused browser coverage for the prototype-only patient-app onboarding
+ * Focused browser coverage for the patient-app onboarding
  * journey (REQ-001, REQ-002, REQ-003).
  */
 import { test, expect } from "@playwright/test";
@@ -8,7 +8,7 @@ const storageKey = "pnq-mtp-v1";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-test("splash, privacy, simulated identifier, and fictional confirmation reach the dashboard locally", async ({ page }) => {
+test("splash, prescription ID, and account confirmation reach the dashboard locally", async ({ page }) => {
   await page.addInitScript(() => {
     const calls = [];
     const storageWrites = [];
@@ -71,74 +71,46 @@ test("splash, privacy, simulated identifier, and fictional confirmation reach th
   await expect(page.locator('[data-screen-label="Dashboard"]')).toHaveCount(0);
 
   await splash.getByRole("button", { name: "Get started" }).click();
-  let privacy = page.locator('[data-screen-label="Privacy"]');
-  await expect(privacy).toBeVisible();
-
-  const acknowledgment = privacy.getByRole("checkbox", { name: /research prototype/i });
-  const privacyContinue = privacy.getByRole("button", { name: "Continue" });
-  await expect(acknowledgment).not.toBeChecked();
-  await expect(privacyContinue).toHaveAttribute("aria-disabled", "true");
-  await privacyContinue.press("Enter");
-  await expect(privacy).toBeVisible();
-
-  await acknowledgment.focus();
-  await expect(acknowledgment).toBeFocused();
-  await acknowledgment.press("Space");
-  await expect(acknowledgment).toBeChecked();
-  await expect(privacyContinue).not.toHaveAttribute("aria-disabled", "true");
-  await acknowledgment.press("Space");
-  await expect(acknowledgment).not.toBeChecked();
-  await expect(privacyContinue).toHaveAttribute("aria-disabled", "true");
-
-  // Privacy Back returns immediately and the in-memory acknowledgment resets.
-  await privacy.getByRole("button", { name: "Back" }).click();
-  await expect(splash).toBeVisible();
-  expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBeNull();
-  await splash.getByRole("button", { name: "Get started" }).click();
-  privacy = page.locator('[data-screen-label="Privacy"]');
-  await expect(privacy.getByRole("checkbox", { name: /research prototype/i })).not.toBeChecked();
-  await privacy.getByRole("checkbox", { name: /research prototype/i }).check();
-  await privacy.getByRole("button", { name: "Continue" }).click();
-
   let account = page.locator('[data-screen-label="Create account"]');
+  await expect(page.locator('[data-screen-label="Privacy"]')).toHaveCount(0);
   await expect(account).toHaveAttribute("data-account-step", "entry");
-  const identifier = account.getByRole("textbox", { name: "Simulated prescription ID" });
+  const identifier = account.getByRole("textbox", { name: "Prescription ID" });
   const accountContinue = account.getByRole("button", { name: "Continue" });
-  await expect(identifier).toHaveValue("DEMO-RX-4821");
+  await expect(identifier).toHaveValue("PNQ-4821-LK");
   await identifier.fill(" a ");
   await expect(accountContinue).toHaveAttribute("aria-disabled", "true");
+  await expect(accountContinue).not.toHaveCSS("border-style", "dashed");
   await accountContinue.press("Enter");
   await expect(account).toHaveAttribute("data-account-step", "entry");
-  await identifier.fill(" FICTIONAL-999 ");
+  await identifier.fill(" PNQ-9999 ");
   await expect(accountContinue).not.toHaveAttribute("aria-disabled", "true");
 
-  // Account Back returns to privacy, drops the draft, and starts no audio.
+  // Account Back returns to Launch, drops the draft, and starts no audio.
   await account.getByRole("button", { name: "Back" }).click();
-  await expect(privacy).toBeVisible();
+  await expect(splash).toBeVisible();
   expect(await page.evaluate(() => window.__pnqAppState().onboardingInput)).toBe("");
   expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBeNull();
 
-  await privacy.getByRole("checkbox", { name: /research prototype/i }).check();
-  await privacy.getByRole("button", { name: "Continue" }).click();
+  await splash.getByRole("button", { name: "Get started" }).click();
   account = page.locator('[data-screen-label="Create account"]');
-  await expect(account.getByRole("textbox", { name: "Simulated prescription ID" })).toHaveValue("DEMO-RX-4821");
-  await account.getByRole("textbox", { name: "Simulated prescription ID" }).fill("FICTIONAL-999");
+  await expect(account.getByRole("textbox", { name: "Prescription ID" })).toHaveValue("PNQ-4821-LK");
+  await account.getByRole("textbox", { name: "Prescription ID" }).fill("PNQ-9999");
   await account.getByRole("button", { name: "Continue" }).click();
 
   await expect(account).toHaveAttribute("data-account-step", "confirmation");
-  await expect(account.getByText("Fictional study profile", { exact: true })).toBeVisible();
-  await expect(account.getByText("Avery Example", { exact: true })).toBeVisible();
-  await expect(account.getByText("DEMO PARTICIPANT 001", { exact: true })).toBeVisible();
+  await expect(account.getByText("We found your record", { exact: true })).toBeVisible();
+  await expect(account.getByText("John Doe", { exact: true })).toBeVisible();
+  await expect(account.getByText("john.doe@email.com", { exact: true })).toBeVisible();
   await expect(account.getByRole("textbox")).toHaveCount(0);
   expect(await page.evaluate(() => window.__pnqAppState().onboardingInput)).toBe("");
 
   // The return action is immediate, local, and does not restore the entered ID.
   await account.getByRole("button", { name: "Use a different ID" }).click();
   await expect(account).toHaveAttribute("data-account-step", "entry");
-  await expect(account.getByRole("textbox", { name: "Simulated prescription ID" })).toHaveValue("DEMO-RX-4821");
+  await expect(account.getByRole("textbox", { name: "Prescription ID" })).toHaveValue("PNQ-4821-LK");
   await account.getByRole("button", { name: "Continue" }).click();
 
-  await account.getByRole("button", { name: "Confirm fictional profile" }).click();
+  await account.getByRole("button", { name: "Yes, that's me" }).click();
   const dashboard = page.locator('[data-screen-label="Dashboard"]');
   await expect(dashboard).toBeVisible();
   await expect(dashboard.getByRole("button", { name: "New Session" })).toBeVisible();
@@ -153,7 +125,7 @@ test("splash, privacy, simulated identifier, and fictional confirmation reach th
     url: location.href
   }), storageKey);
   expect(observations.calls).toEqual([]);
-  for (const value of ["DEMO-RX-4821", "FICTIONAL-999", "Avery Example", "DEMO PARTICIPANT 001"]) {
+  for (const value of ["PNQ-9999", "John Doe", "john.doe@email.com", "+1 (401) 254-5010"]) {
     expect(JSON.stringify(observations.writes)).not.toContain(value);
     expect(JSON.stringify(observations.console)).not.toContain(value);
     expect(observations.local).not.toContain(value);
