@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startMatchingOption } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startMatchingOption } from "./onboarding-helpers.mjs";
 import { primaryActionTop } from "./action-region-helpers.mjs";
 import { chooseHelpAction } from "./contextual-help-helpers.mjs";
 
@@ -11,7 +11,7 @@ async function seed(page) {
 
 async function jumpTo(page, label) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   await page.getByRole("button", { name: label, exact: true }).click();
 }

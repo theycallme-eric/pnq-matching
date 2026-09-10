@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startSessionFromSplash } from "./onboarding-helpers.mjs";
 import { REQUIRED_COPY } from "../../src/participant-copy.js";
 import { auditApplicationParticipantStrings } from "../../src/app-copy.js";
 
@@ -18,7 +18,7 @@ async function boot(page) {
 }
 
 async function openJumps(page) {
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
 }
 
@@ -27,7 +27,7 @@ function jumpGroup(page, cap) {
 }
 
 async function participantText(page) {
-  return page.locator("[data-screen]").evaluate((root) => {
+  return page.locator("[data-device-frame]").evaluate((root) => {
     const values = [];
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -40,8 +40,7 @@ async function participantText(page) {
 }
 
 async function accessibilityProblems(page, includeModerator = false) {
-  const rootSelector = includeModerator ? "[data-device-frame]" : "[data-screen]";
-  return page.locator(rootSelector).evaluate((root, auditModerator) => {
+  return page.locator("[data-device-frame]").evaluate((root, auditModerator) => {
     const selector = 'button,input,select,textarea,a[href],[role="button"],[role="slider"]';
     const problems = [];
     for (const el of root.querySelectorAll(selector)) {
@@ -140,6 +139,12 @@ async function expectVisibleFocus(locator) {
 }
 
 async function finishOptionWithKeyboard(page, cap) {
+  const matchingOptionsClose = page.getByRole("button", { name: "Close matching options" });
+  if (await matchingOptionsClose.isVisible()) {
+    await expectVisibleFocus(matchingOptionsClose);
+    await matchingOptionsClose.press("Enter");
+    await expect(page.locator("[data-matching-options-sheet]")).toHaveCount(0);
+  }
   const menu = page.getByRole("button", { name: "Session menu" });
   await expectVisibleFocus(menu);
   await menu.press("Enter");
@@ -165,7 +170,7 @@ async function finishOptionWithKeyboard(page, cap) {
 }
 
 async function openCompletion(page, cap) {
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   const group = page.getByText(cap, { exact: true }).locator("..");
   await group.getByRole("button", { name: "Confidence", exact: true }).click();
@@ -235,7 +240,7 @@ test.describe("accessibility and participant copy", () => {
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
     await audit("Matching options");
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Jump to a different section" }).click();
     for (const issue of await accessibilityProblems(page, true)) problems.push(`Session menu: ${issue}`);
     for (const issue of await contrastProblems(page)) problems.push(`Session menu: contrast ${issue}`);
@@ -379,7 +384,7 @@ test.describe("accessibility and participant copy", () => {
     await bothEars.press("Space");
     await expect(bothEars).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Session menu" }).click();
+    await openSessionMenu(page);
     await page.getByRole("button", { name: "Return to matching options" }).click();
     const option = page.getByRole("button", { name: "Option 1" });
     await expect(option).not.toHaveAttribute("aria-disabled", /.*/);

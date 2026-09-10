@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openSessionMenu } from "./onboarding-helpers.mjs";
 
 const seededSession = {
   ear: "Both ears",
@@ -18,7 +19,7 @@ async function seed(page) {
 
 async function jumpTo(page, group, label) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   const section = page.getByText(group, { exact: true }).locator("..");
   await section.getByRole("button", { name: label, exact: true }).click();

@@ -4,7 +4,7 @@
  * internal completion accounting remain stable.
  */
 import { test, expect } from "@playwright/test";
-import { startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startSessionFromSplash } from "./onboarding-helpers.mjs";
 import { auditApplicationParticipantStrings } from "../../src/app-copy.js";
 
 const optionsScreen = (page) => page.locator('[data-screen-label="Matching options"]');
@@ -48,7 +48,7 @@ async function chooseOption(page, number) {
 
 async function completeFromConfidence(page, number, concludes) {
   await chooseOption(page, number);
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   await page.getByRole("button", { name: "Confidence", exact: true }).nth(number - 1).click();
   await page.getByText("Fairly close", { exact: true }).click();

@@ -14,3 +14,9 @@ export async function startMatchingOption(page, option) {
   await page.getByRole("button", { name: label, exact: true }).click();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 }
+
+export async function openSessionMenu(page) {
+  const matchingOptionsClose = page.getByRole("button", { name: "Close matching options" });
+  if (await matchingOptionsClose.isVisible()) await matchingOptionsClose.click();
+  await page.getByRole("button", { name: "Session menu" }).click();
+}

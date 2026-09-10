@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { chooseHelpAction } from "./contextual-help-helpers.mjs";
+import { openSessionMenu } from "./onboarding-helpers.mjs";
 
 async function boot(page) {
   await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
@@ -10,7 +11,7 @@ async function boot(page) {
 }
 
 async function jumpTo(page, cap, chip) {
-  await page.getByRole("button", { name: "Session menu" }).click();
+  await openSessionMenu(page);
   await page.getByRole("button", { name: "Jump to a different section" }).click();
   const group = page.getByText(cap, { exact: true }).locator("..");
   await expect(group).toBeVisible();
@@ -26,7 +27,7 @@ test.describe("preserved flows (adaptive, longitudinal, education)", () => {
   test("none of the preserved flows appear on the participant hub", async ({ page }) => {
     await boot(page);
     const hub = page.locator('[data-screen="home"]');
-    await expect(hub.getByRole("button", { name: "Option 1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Option 1" })).toBeVisible();
     await expect(hub.getByText(/adaptive|longitudinal|exploration/i)).toHaveCount(0);
   });
 
