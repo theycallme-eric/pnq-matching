@@ -81,10 +81,10 @@ export function passBody(s) {
 // The label names what comes next, so nobody thinks the first pitch choice is
 // final.
 export const PRIMARY = {
-  vol: "The volume is about right",
+  vol: "This volume is close",
   p1: "Next: closer adjustments",
   p2: "Next: fine adjustments",
-  p3: "This matches what I hear"
+  p3: "This pitch is close"
 };
 
 export const VOL_HINT = "Set this to how loud your tinnitus feels, not how loud is comfortable.";

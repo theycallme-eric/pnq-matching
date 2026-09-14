@@ -109,13 +109,19 @@ test.describe("field (Option 3)", () => {
     await expect(page.getByText("Closer still")).toBeVisible();
     await expect(page.locator("[data-field-grid]")).toHaveCSS("transform", /matrix\(6\.66/);
     await expect(page.locator("[data-field-region]")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "This sounds like my tinnitus" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "This sound is close" })).toBeVisible();
+    await expect(page.getByText("This sounds like my tinnitus", { exact: true })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "This sound is close" }).click();
+    await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
+    await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
+    await expect.poll(() => playing(page)).toBe("dfield");
   });
 
   test("field completion is participant-confirmed into shared confidence and match complete", async ({ page }) => {
     await seed(page);
     await jumpTo(page, "Closer look · closest");
-    await page.getByRole("button", { name: "This sounds like my tinnitus" }).click();
+    await page.getByRole("button", { name: "This sound is close" }).click();
     await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
     await page.getByText("Very close", { exact: true }).click();
     await page.getByRole("button", { name: "Finish matching" }).click();
@@ -130,13 +136,15 @@ test.describe("field (Option 3)", () => {
     await seed(page);
     await jumpTo(page, "Closer look");
     await expect(page.getByText(/Same idea, a smaller area/)).toBeVisible();
+    await page.getByRole("button", { name: "Play from here" }).click();
+    await expect.poll(() => playing(page)).toBe("dfield");
 
     await chooseHelpAction(page, "Can't hear this");
     await expect(page.getByText(/okay, and worth telling us/)).toBeVisible();
     await expect(page.getByText(/moving the marker higher/)).toBeVisible();
-    // Still on the same runnable stage with audio available.
-    await page.getByRole("button", { name: "Play from here" }).click();
+    // Still on the same runnable stage with its existing owner active.
     await expect.poll(() => playing(page)).toBe("dfield");
+    await expect(page.getByRole("button", { name: "Stop the sound" })).toBeVisible();
 
     await page.getByRole("button", { name: "Start over" }).click();
     await expect(page.getByText("Move around and listen")).toBeVisible();
@@ -144,25 +152,33 @@ test.describe("field (Option 3)", () => {
     expect(d.level).toBe(0);
     expect(d.x).toBe(.5);
     expect(d.heard).toBe(false);
+    await expect.poll(() => playing(page)).toBe(null);
     await expect(page.getByRole("button", { name: "Look closely at this area" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Play the sound" })).toBeVisible();
   });
 
-  test("field Back steps out one zoom level and keeps the marker where it was", async ({ page }) => {
+  test("field Back steps out one zoom level and keeps the marker and sound active", async ({ page }) => {
     await seed(page);
-    await jumpTo(page, "Closer look · closest");
+    await jumpTo(page, "Whole field");
+    await page.getByRole("button", { name: "Play the sound" }).click();
+    await page.getByRole("button", { name: "Look closely at this area" }).click();
+    await page.getByRole("button", { name: "Look closely at this area" }).click();
     await expect(page.getByText("Closer still")).toBeVisible();
 
     await page.getByRole("button", { name: "Back" }).click();
     let d = await dState(page);
     expect(d.level).toBe(1);
     await expect(page.getByText(/Back out one step/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop the sound" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Look closely at this area" })).toBeEnabled();
+    expect(await playing(page)).toBe("dfield");
 
     await page.getByRole("button", { name: "Back" }).click();
     d = await dState(page);
     expect(d.level).toBe(0);
     expect(d.x).toBe(.5);
     await expect(page.getByText(/Back to the whole range/)).toBeVisible();
+    expect(await playing(page)).toBe("dfield");
 
     await page.getByRole("button", { name: "Back" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();

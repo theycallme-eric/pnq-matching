@@ -21,6 +21,7 @@ export const DVOL = { min: .12, max: .68 };
 
 // Refinement levels on the field: each shows a smaller window of the space.
 export const DSPAN = [1, .38, .15];
+export const FINAL_ACTION = "This sound is close";
 
 // Grid lines are individual SVG lines rather than a repeating gradient:
 // percentage-stepped gradients round per tile, which dropped and thickened

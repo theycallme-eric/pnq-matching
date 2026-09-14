@@ -38,3 +38,22 @@ test("A/B judgment unlocks only after both sounds of the same pair", () => {
   assert.notEqual(nextKey, firstKey);
   assert.equal(gating.prReady(nextPair, nextKey), false, "a new pair relocks judgment");
 });
+
+test("entering A/B with a carried directional sound does not count either audition", () => {
+  const initial = shell.initialState();
+  const directional = {
+    ...initial,
+    screen: "flow",
+    concept: "r",
+    playKey: "main",
+    stages: { ...initial.stages, r: "dir" },
+    r: { ...initial.r, phase: "pitch", pitchOk: 1 }
+  };
+  const pair = shell.stageState(directional, "r", "comp", { round: 1, uncertain: 0 });
+  const key = gating.pairKeyOf(pair);
+  assert.equal(pair.playKey, null, "the first pair waits for an explicit audition");
+  assert.equal(pair.prKey, null);
+  assert.equal(pair.prHeardA, false);
+  assert.equal(pair.prHeardB, false);
+  assert.equal(gating.prReady(pair, key), false);
+});

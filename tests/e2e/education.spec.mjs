@@ -99,7 +99,7 @@ test.describe("education", () => {
     await page.getByRole("button", { name: "I'm ready to start" }).click();
     await startMatchingOption(page, 1);
 
-    const advance = page.getByRole("button", { name: "The volume is about right" });
+    const advance = page.getByRole("button", { name: "This volume is close" });
     await expect(advance).toBeVisible();
     await expect(advance).toBeDisabled();
     const play = page.getByRole("button", { name: "Start Sound", exact: true });

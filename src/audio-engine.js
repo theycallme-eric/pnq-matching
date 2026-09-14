@@ -160,6 +160,16 @@ export function update(specs) {
     return false;
   }
 }
+
+// Transfer the existing graph to a new logical owner while updating it in
+// place. Option 2 uses this when the participant chooses the other auditioned
+// candidate: the selected tone becomes current without stop()/play() and the
+// newly rendered pair still has independent heard gating.
+export function updateOwner(key, specs) {
+  if (!update(specs)) return false;
+  curKey = key;
+  return true;
+}
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : MASTER_LEVEL; }
 export function setEar(e) {
   ear = EARPAN[e] === undefined ? 'both' : e;

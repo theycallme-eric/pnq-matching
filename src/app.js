@@ -216,10 +216,28 @@ class App extends React.Component {
   }
 
   // Apply an Option 2 comparison result: stay on the stage with a patch, or
-  // leave it (phase done, spread floor, fallback to directional).
-  applyR(res) {
-    if (res.kind === "stage") { this.go("r", res.stage, res.obj); return; }
-    this.setState((s) => ({ r: { ...s.r, ...res.patch } }), () => this.syncOption());
+  // leave it (phase done, spread floor, fallback to directional). A selected
+  // A/B candidate is handed the existing graph without stop()/play(); every
+  // newly rendered pair still clears both explicit-audition flags.
+  applyR(res, selected) {
+    const carrySelection = !!selected && this.optionPlaying();
+    if (res.kind === "stage") {
+      if (!carrySelection) { this.go("r", res.stage, res.obj); return; }
+      this.withAudio((a) => {
+        if (!this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec]))) return;
+        this.setState({ playKey: selected.owner }, () => this.go("r", res.stage, res.obj));
+      });
+      return;
+    }
+    const changesPair = Object.prototype.hasOwnProperty.call(res.patch, "round");
+    this.setState((s) => ({
+      r: { ...s.r, ...res.patch },
+      ...(changesPair ? { prKey: null, prHeardA: false, prHeardB: false } : {}),
+      ...(carrySelection ? { playKey: selected.owner } : {})
+    }), () => {
+      if (!carrySelection) { this.syncOption(); return; }
+      this.withAudio((a) => this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec])));
+    });
   }
 
   rDir(tag) { this.applyR(comparison.dirAnswer(this.state.r, tag)); }
@@ -1259,7 +1277,7 @@ class App extends React.Component {
         : [["Mine is higher", "higher"], ["Mine is lower", "lower"]]);
     const settle = c === "a"
       ? (o.phase === "pitch" ? "This sounds like mine" : "This is as loud as mine")
-      : (o.phase === "vol" ? "The volume is set, move on" : "The pitch is set, finish up");
+      : comparison.DIRECTIONAL_CLOSE[o.phase];
     const answer = (tag) => () => {
       if (!gating.heardHere(this.state)) {
         this.setState((s) => ({ [c]: { ...s[c], msg: "Press play first, then tell us how it compares." } }));
@@ -1336,7 +1354,9 @@ class App extends React.Component {
       e(DS.Button, { variant: "outline", size: "xs", disabled: !ready, onClick: onPick }, "This one"));
   }
 
-  rPick(pitch) { this.applyR(comparison.pick(this.state.r, pitch)); }
+  rPick(owner, spec) {
+    this.applyR(comparison.pick(this.state.r, spec.pitch), { owner, spec });
+  }
 
   rNeither() {
     const res = comparison.neither(this.state.r);
@@ -1356,8 +1376,8 @@ class App extends React.Component {
       title = "Which one is closer?";
       caption = "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
       note = comparison.compNote(r);
-      pickA = (spec) => this.rPick(spec.pitch);
-      pickB = (spec) => this.rPick(spec.pitch);
+      pickA = (spec) => this.rPick("prA", spec);
+      pickB = (spec) => this.rPick("prB", spec);
       secs.push({ label: "Neither is close", f: () => this.rNeither() });
       secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
       if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
@@ -1401,7 +1421,7 @@ class App extends React.Component {
         e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
           secs.map((sec) =>
             e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
-              e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
+              e(DS.Button, { variant: "ghost", disabled: c === "r" && !ready, onClick: sec.f }, sec.label)))),
         c === "r" ? null : e("button", {
           onClick: noHear,
           style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
@@ -1747,7 +1767,7 @@ class App extends React.Component {
         // The step-forward action stays in place and goes solid gray until the
         // sound has been played once. Confirming the last level remains the
         // participant's call (REQ-009).
-        nextLabel: v.hasNext ? "Look closely at this area" : "This sounds like my tinnitus",
+        nextLabel: v.hasNext ? "Look closely at this area" : field.FINAL_ACTION,
         canNext: d.heard, onNext: advance, size: "md"
       })
     ];

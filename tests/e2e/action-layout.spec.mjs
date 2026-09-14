@@ -108,13 +108,13 @@ async function expectVerticalStepActions(page, nextLabel) {
 }
 
 const stepScenarios = [
-  ["OPTION 1", "Volume", "The volume is about right"],
+  ["OPTION 1", "Volume", "This volume is close"],
   ["OPTION 1", "Pitch · coarse", "Next: closer adjustments"],
   ["OPTION 1", "Pitch · medium", "Next: fine adjustments"],
-  ["OPTION 1", "Pitch · fine", "This matches what I hear"],
+  ["OPTION 1", "Pitch · fine", "This pitch is close"],
   ["OPTION 3", "Whole field", "Look closely at this area"],
   ["OPTION 3", "Closer look", "Look closely at this area"],
-  ["OPTION 3", "Closer look · closest", "This sounds like my tinnitus"]
+  ["OPTION 3", "Closer look · closest", "This sound is close"]
 ];
 
 test.describe("matching action layout (REQ-001, REQ-004, REQ-005)", () => {
@@ -130,8 +130,8 @@ test.describe("matching action layout (REQ-001, REQ-004, REQ-005)", () => {
     const reference = await actionGeometry(page, "Return to matching options");
 
     const singleActionScenarios = [
-      ["OPTION 2", "Directional · volume", "The volume is set, move on"],
-      ["OPTION 2", "Directional · pitch", "The pitch is set, finish up"],
+      ["OPTION 2", "Directional · volume", "This volume is close"],
+      ["OPTION 2", "Directional · pitch", "This pitch is close"],
       ["OPTION 1", "Confidence", "Finish matching"],
       ["OPTION 2", "Confidence", "Finish matching"],
       ["OPTION 3", "Confidence", "Finish matching"]

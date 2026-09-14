@@ -47,6 +47,8 @@ test.describe("confidence and completion", () => {
     await page.getByRole("button", { name: "Keep refining" }).click();
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
     expect(await page.evaluate(() => window.__pnqAppState().n.conf)).toBe(null);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
+    await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
   });
 
   test("finishing shows the summary and returns every option without a completion marker", async ({ page }) => {

@@ -93,10 +93,16 @@ test("wider range reopens the coarse pass around the choice with its note", () =
   assert.match(r.obj.note, /widened the pitch range again/);
 });
 
-test("per-pass copy matches the prototype", () => {
+test("per-pass copy keeps directional actions and uses approved close language", () => {
   assert.equal(nar.passTitle("vol", freshN()), "Start with how loud it is");
   assert.equal(nar.passTitle("p3", freshN()), "Small adjustments now");
   assert.equal(nar.passTitle("p3", { ...freshN(), extra: 1 }), "Closer still");
-  assert.equal(nar.PRIMARY.p3, "This matches what I hear");
+  assert.deepEqual(nar.PRIMARY, {
+    vol: "This volume is close",
+    p1: "Next: closer adjustments",
+    p2: "Next: fine adjustments",
+    p3: "This pitch is close"
+  });
+  assert.doesNotMatch(Object.values(nar.PRIMARY).join("\n"), /This matches what I hear/);
   assert.match(nar.passBody("p1"), /two closer passes follow/);
 });
