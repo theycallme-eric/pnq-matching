@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { expectSeparatedFooterTargets } from "./footer-target-helpers.mjs";
+import { expectSeparatedNavigationTargets } from "./footer-target-helpers.mjs";
 import { openSessionMenu } from "./onboarding-helpers.mjs";
 
 async function seed(page) {
@@ -16,9 +16,9 @@ async function jumpTo(page, label) {
 }
 
 async function openHelp(page, actions) {
-  const footer = page.locator("[data-shell-footer]");
-  const back = footer.getByRole("button", { name: "Back", exact: true });
-  const help = footer.getByRole("button", { name: "Help", exact: true });
+  const navigation = page.locator("[data-session-navigation]");
+  const back = navigation.getByRole("button", { name: "Back", exact: true });
+  const help = navigation.getByRole("button", { name: "Help", exact: true });
 
   await expect(back).toBeVisible();
   await expect(help).toBeVisible();
@@ -27,11 +27,12 @@ async function openHelp(page, actions) {
   await expect(page.locator("[data-screen]").getByRole("button", { name: "Wider range", exact: true })).toHaveCount(0);
   await expect(page.locator("[data-screen]").getByRole("button", { name: "Can't hear this", exact: true })).toHaveCount(0);
 
-  await expectSeparatedFooterTargets(page);
+  await expectSeparatedNavigationTargets(page);
 
   await help.click();
   const dialog = page.getByRole("dialog", { name: "Help" });
   await expect(dialog).toBeVisible();
+  await expect(navigation).toHaveAttribute("inert", "");
   await expect(dialog.locator("[data-help-actions] > button")).toHaveText(actions);
   return dialog;
 }

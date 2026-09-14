@@ -2,7 +2,8 @@ import { expect } from "@playwright/test";
 
 export async function primaryActionTop(page, name) {
   const region = page.locator("[data-primary-action-region]");
-  const footer = page.locator("[data-shell-footer]");
+  const navigation = page.locator("[data-session-navigation]");
+  const screen = page.locator("[data-screen]");
   const action = region.getByRole("button", { name, exact: true });
 
   await expect(region).toHaveCount(1);
@@ -10,20 +11,23 @@ export async function primaryActionTop(page, name) {
   expect(await region.evaluate((element) => element.getBoundingClientRect().height))
     .toBeGreaterThanOrEqual(121);
   await expect(action).toBeVisible();
-  await expect(footer).toBeVisible();
+  await expect(navigation).toBeVisible();
 
-  const [regionBox, actionBox, footerBox] = await Promise.all([
+  const [regionBox, actionBox, navigationBox, screenBox] = await Promise.all([
     region.boundingBox(),
     action.boundingBox(),
-    footer.boundingBox()
+    navigation.boundingBox(),
+    screen.boundingBox()
   ]);
 
   expect(regionBox).not.toBeNull();
   expect(actionBox).not.toBeNull();
-  expect(footerBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect(screenBox).not.toBeNull();
+  expect(regionBox.y).toBeGreaterThanOrEqual(navigationBox.y + navigationBox.height - 0.5);
   expect(actionBox.y).toBeGreaterThanOrEqual(regionBox.y - 0.5);
   expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(regionBox.y + regionBox.height + 0.5);
-  expect(regionBox.y + regionBox.height).toBeLessThanOrEqual(footerBox.y + 0.5);
+  expect(regionBox.y + regionBox.height).toBeLessThanOrEqual(screenBox.y + screenBox.height + 0.5);
   expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(page.viewportSize().height);
 
   return Math.round(actionBox.y * 10) / 10;

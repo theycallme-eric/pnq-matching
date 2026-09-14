@@ -13,16 +13,16 @@ async function restoreReadyOptions(page) {
   await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
 }
 
-test.describe("matching-options full-device bottom sheet", () => {
+test.describe("matching-options full-device half-sheet", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("opens over the screen footer and blocks its hidden session hotspot", async ({ page }) => {
+  test("opens over the top session navigation and blocks its hidden session hotspot", async ({ page }) => {
     await restoreReadyOptions(page);
 
     const frame = page.locator("[data-device-frame]");
     const screen = page.locator('[data-screen-label="Matching options"]');
     const context = page.locator("[data-matching-options-context]");
-    const footer = page.locator("[data-shell-footer]");
+    const navigation = page.locator("[data-session-navigation]");
     const layer = page.locator("[data-matching-options-layer]");
     const sheet = page.locator("[data-matching-options-sheet]");
 
@@ -30,8 +30,8 @@ test.describe("matching-options full-device bottom sheet", () => {
     await expect(context.getByText("What to listen for", { exact: true })).toBeVisible();
     await expect(context).toHaveAttribute("aria-hidden", "true");
     await expect(context).toHaveAttribute("inert", "");
-    await expect(footer).toHaveAttribute("aria-hidden", "true");
-    await expect(footer).toHaveAttribute("inert", "");
+    await expect(navigation).toHaveAttribute("aria-hidden", "true");
+    await expect(navigation).toHaveAttribute("inert", "");
     const titleBox = await page.locator("#matching-options-title").boundingBox();
     expect(titleBox.height).toBeLessThan(32);
 
@@ -42,21 +42,21 @@ test.describe("matching-options full-device bottom sheet", () => {
       };
       const frameNode = layerNode.parentElement;
       const screenNode = frameNode.querySelector('[data-screen-label="Matching options"]');
-      const footerNode = frameNode.querySelector("[data-shell-footer]");
+      const navigationNode = frameNode.querySelector("[data-session-navigation]");
       const sheetNode = layerNode.querySelector("[data-matching-options-sheet]");
-      const footerBox = footerNode.getBoundingClientRect();
+      const navigationBox = navigationNode.getBoundingClientRect();
       const hit = document.elementFromPoint(
-        footerBox.left + footerBox.width / 2,
-        footerBox.top + footerBox.height / 2
+        navigationBox.left + navigationBox.width / 2,
+        navigationBox.top + navigationBox.height / 2
       );
       return {
         directChild: frameNode.matches("[data-device-frame]"),
         frame: rect(frameNode),
         screen: rect(screenNode),
-        footer: rect(footerNode),
+        navigation: rect(navigationNode),
         layer: rect(layerNode),
         sheet: rect(sheetNode),
-        footerHitIsInLayer: layerNode.contains(hit)
+        navigationHitIsInLayer: layerNode.contains(hit)
       };
     });
 
@@ -65,12 +65,13 @@ test.describe("matching-options full-device bottom sheet", () => {
     expect(geometry.layer.right).toBeCloseTo(geometry.frame.right, 0);
     expect(geometry.layer.top).toBeLessThanOrEqual(geometry.screen.top + 0.5);
     expect(geometry.layer.bottom).toBeCloseTo(geometry.frame.bottom, 0);
-    expect(geometry.layer.bottom).toBeGreaterThanOrEqual(geometry.footer.bottom);
+    expect(geometry.layer.top).toBeLessThanOrEqual(geometry.navigation.top + 0.5);
+    expect(geometry.layer.bottom).toBeGreaterThanOrEqual(geometry.navigation.bottom);
     expect(geometry.sheet.bottom).toBeCloseTo(geometry.frame.bottom, 0);
-    expect(geometry.footerHitIsInLayer).toBe(true);
+    expect(geometry.navigationHitIsInLayer).toBe(true);
 
-    const footerBox = await footer.boundingBox();
-    await page.mouse.click(footerBox.x + footerBox.width / 2, footerBox.y + footerBox.height / 2);
+    const navigationBox = await navigation.boundingBox();
+    await page.mouse.click(navigationBox.x + navigationBox.width / 2, navigationBox.y + navigationBox.height / 2);
     await expect(page.getByRole("dialog", { name: "Session menu" })).toHaveCount(0);
     await expect(sheet).toBeVisible();
     await expect(screen).toBeVisible();
@@ -92,7 +93,7 @@ test.describe("matching-options full-device bottom sheet", () => {
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect(page.locator('[data-matching-options-context="education"]')).not.toHaveAttribute("aria-hidden", "true");
     await expect(page.getByText("What to listen for", { exact: true })).toBeVisible();
-    await expect(page.locator("[data-shell-footer]")).not.toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("[data-session-navigation]")).not.toHaveAttribute("aria-hidden", "true");
     const state = await page.evaluate(() => window.__pnqAppState());
     expect(state.screen).toBe("home");
     expect(state.concept).toBe("n");

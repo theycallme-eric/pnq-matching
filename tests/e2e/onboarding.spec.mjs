@@ -24,6 +24,8 @@ test.describe("onboarding", () => {
 
     await page.getByRole("button", { name: "Get started" }).click();
     await expect(page.locator('[data-screen-label="Create account"]')).toBeVisible();
+    await expect(page.locator("[data-onboarding-navigation]")).toHaveCount(1);
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
     await expect(page.locator('[data-screen-label="Privacy"]')).toHaveCount(0);
     await expect(page.locator('[data-screen-label="Setup · Ear"]')).toHaveCount(0);
   });
@@ -33,6 +35,8 @@ test.describe("onboarding", () => {
     await startSessionFromSplash(page);
     const ear = page.locator('[data-screen-label="Setup · Ear"]');
     await expect(ear).toBeVisible();
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(1);
+    await expect(page.locator("[data-session-navigation]")).toHaveCSS("background-color", "rgb(22, 38, 63)");
     await expect(ear.getByText("Select which ear(s)", { exact: true })).toBeVisible();
     await expect(ear.getByText("Which ear(s) would you like to treat?", { exact: true })).toBeVisible();
 

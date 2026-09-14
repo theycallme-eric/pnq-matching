@@ -27,12 +27,12 @@ async function jumpTo(page, group, label) {
 
 async function actionGeometry(page, lowestActionName) {
   const region = page.locator("[data-screen-action-region]");
-  const footer = page.locator("[data-shell-footer]");
+  const navigation = page.locator("[data-session-navigation]");
   const action = region.getByRole("button", { name: lowestActionName, exact: true });
 
   await expect(region).toHaveCount(1);
   await expect(region).toBeVisible();
-  await expect(footer).toBeVisible();
+  await expect(navigation).toBeVisible();
   await expect(action).toBeVisible();
 
   const geometry = await region.evaluate((element, actionName) => {
@@ -41,17 +41,20 @@ async function actionGeometry(page, lowestActionName) {
     const scrollRegion = element.parentElement.querySelector('[style*="overflow-y: auto"]');
     const regionRect = element.getBoundingClientRect();
     const actionRect = action.getBoundingClientRect();
-    const footerRect = element.parentElement.parentElement
-      .querySelector("[data-shell-footer]").getBoundingClientRect();
+    const screenRect = element.closest("[data-screen]").getBoundingClientRect();
+    const navigationRect = element.closest("[data-device-frame]")
+      .querySelector("[data-session-navigation]").getBoundingClientRect();
 
     return {
       regionTop: regionRect.top,
       regionBottom: regionRect.bottom,
       actionTop: actionRect.top,
       actionBottom: actionRect.bottom,
-      footerTop: footerRect.top,
-      bottomGap: footerRect.top - actionRect.bottom,
-      regionInsideScreen: regionRect.bottom <= footerRect.top + 0.5,
+      screenBottom: screenRect.bottom,
+      navigationBottom: navigationRect.bottom,
+      bottomGap: screenRect.bottom - actionRect.bottom,
+      regionInsideScreen: regionRect.top >= navigationRect.bottom - 0.5
+        && regionRect.bottom <= screenRect.bottom + 0.5,
       actionInsideRegion: actionRect.top >= regionRect.top - 0.5
         && actionRect.bottom <= regionRect.bottom + 0.5,
       contentCanScroll: scrollRegion
@@ -65,7 +68,7 @@ async function actionGeometry(page, lowestActionName) {
   expect(geometry.actionInsideRegion).toBe(true);
   expect(geometry.contentCanScroll).toBe(true);
   expect(geometry.noHorizontalOverflow).toBe(true);
-  expect(geometry.actionBottom).toBeLessThanOrEqual(geometry.footerTop);
+  expect(geometry.actionBottom).toBeLessThanOrEqual(geometry.screenBottom);
   return geometry;
 }
 

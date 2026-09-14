@@ -22,6 +22,12 @@ test.describe("patient dashboard", () => {
   test("an onboarding-complete participant arrives at a PNQ dashboard with the grouped Explore PNQ card", async ({ page }) => {
     const dashboard = await arriveAfterOnboarding(page);
     await expect(dashboard).toBeVisible();
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+    const dashboardChrome = await page.evaluate(() => ({
+      safe: getComputedStyle(document.querySelector('[data-safe-area="top"]')).backgroundColor,
+      header: getComputedStyle(document.querySelector("[data-dashboard-header]")).backgroundColor
+    }));
+    expect(dashboardChrome.safe).toBe(dashboardChrome.header);
     await expect(dashboard.getByText("pnq health", { exact: true })).toBeVisible();
 
     const newSession = dashboard.getByRole("button", { name: "New Session", exact: true });

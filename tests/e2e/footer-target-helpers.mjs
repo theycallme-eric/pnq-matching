@@ -2,14 +2,14 @@ import { expect } from "@playwright/test";
 
 const REGIONS = ["back", "session-menu", "help"];
 
-export async function expectSeparatedFooterTargets(page) {
-  const footer = page.locator("[data-shell-footer]");
-  await expect(footer).toBeVisible();
+export async function expectSeparatedNavigationTargets(page) {
+  const navigation = page.locator("[data-session-navigation]");
+  await expect(navigation).toBeVisible();
   for (const region of REGIONS) {
-    await expect(footer.locator(`[data-footer-region="${region}"]`)).toBeVisible();
+    await expect(navigation.locator(`[data-session-navigation-region="${region}"]`)).toBeVisible();
   }
 
-  const geometry = await footer.evaluate((footerNode, regions) => {
+  const geometry = await navigation.evaluate((navigationNode, regions) => {
     const rectOf = (node) => {
       const rect = node.getBoundingClientRect();
       const y = rect.top + rect.height / 2;
@@ -33,26 +33,26 @@ export async function expectSeparatedFooterTargets(page) {
 
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      footer: rectOf(footerNode),
+      navigation: rectOf(navigationNode),
       targets: Object.fromEntries(regions.map((region) => [
         region,
-        rectOf(footerNode.querySelector(`[data-footer-region="${region}"]`))
+        rectOf(navigationNode.querySelector(`[data-session-navigation-region="${region}"]`))
       ]))
     };
   }, REGIONS);
 
   expect(geometry.viewport).toEqual({ width: 390, height: 844 });
-  expect(geometry.footer.left).toBeGreaterThanOrEqual(0);
-  expect(geometry.footer.right).toBeLessThanOrEqual(geometry.viewport.width);
-  expect(geometry.footer.top).toBeGreaterThanOrEqual(0);
-  expect(geometry.footer.bottom).toBeLessThanOrEqual(geometry.viewport.height);
+  expect(geometry.navigation.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.navigation.right).toBeLessThanOrEqual(geometry.viewport.width);
+  expect(geometry.navigation.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.navigation.bottom).toBeLessThanOrEqual(geometry.viewport.height);
 
   for (const region of REGIONS) {
     const target = geometry.targets[region];
-    expect(target.left).toBeGreaterThanOrEqual(geometry.footer.left);
-    expect(target.right).toBeLessThanOrEqual(geometry.footer.right);
-    expect(target.top).toBeGreaterThanOrEqual(geometry.footer.top);
-    expect(target.bottom).toBeLessThanOrEqual(geometry.footer.bottom);
+    expect(target.left).toBeGreaterThanOrEqual(geometry.navigation.left);
+    expect(target.right).toBeLessThanOrEqual(geometry.navigation.right);
+    expect(target.top).toBeGreaterThanOrEqual(geometry.navigation.top);
+    expect(target.bottom).toBeLessThanOrEqual(geometry.navigation.bottom);
     expect(target.ownsHitPoints).toEqual([true, true, true]);
   }
 
