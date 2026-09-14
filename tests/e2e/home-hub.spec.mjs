@@ -21,6 +21,8 @@ async function reachReadyOptions(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(sheet(page)).toBeVisible();
 }
 
@@ -151,7 +153,7 @@ test.describe("Explore PNQ on Home", () => {
 test.describe("matching options route", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("appears after the headphone gate and requires explicit confirmation", async ({ page }) => {
+  test("appears after the education gate and requires explicit confirmation", async ({ page }) => {
     await page.goto("/");
     await startSessionFromSplash(page);
     await expect(sheet(page)).toHaveCount(0);
@@ -162,8 +164,11 @@ test.describe("matching options route", () => {
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
 
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    await expect(sheet(page)).toHaveCount(0);
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(sheet(page)).toBeVisible();
-    await expect(page.locator('[data-matching-options-context="setup"]')).toBeVisible();
+    await expect(page.locator('[data-matching-options-context="education"]')).toBeVisible();
     await expect(selector(page).getByRole("button")).toHaveCount(3);
     await expect(page.getByText("GETTING SET UP", { exact: true })).toHaveCount(0);
     const continueButton = page.getByRole("button", { name: "Continue", exact: true });
@@ -195,7 +200,7 @@ test.describe("matching options route", () => {
       await expect(option(page, number)).toHaveAttribute("data-option-state", "available");
     }
     let state = await page.evaluate(() => window.__pnqAppState());
-    expect([state.earSeen, state.setupSeen, state.eduSeen]).toEqual([true, true, false]);
+    expect([state.earSeen, state.setupSeen, state.eduSeen]).toEqual([true, true, true]);
     expect(state.optOrder).toEqual(["d"]);
 
     await chooseOption(page, 3);

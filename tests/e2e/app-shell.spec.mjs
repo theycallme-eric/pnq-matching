@@ -16,6 +16,8 @@ async function completeSetup(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 }
 
@@ -47,6 +49,8 @@ async function visitShellScreens(page, audit) {
   await page.getByRole("button", { name: /Headphones/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
+  await audit("What to listen for");
+  await page.getByRole("button", { name: "I'm ready to start" }).click();
   await audit("Matching options");
   await completeOptionFromConfidence(page, "Option 1");
   await completeOptionFromConfidence(page, "Option 2");
@@ -103,12 +107,12 @@ async function expectContainedShell(page, expectedMode) {
 test.describe("app shell", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("app shell persists setup only and reloads to Matching options with fresh flow state", async ({ page }) => {
+  test("app shell persists completed session gates and reloads to Matching options with fresh flow state", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
     await completeSetup(page);
 
-    // Options unlock as soon as the headphone check completes; open Option 1.
+    // Options unlock only after setup and education; open Option 1.
     await startMatchingOption(page, 1);
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
     await expect(page.locator("[data-progress]")).toBeVisible();
@@ -119,7 +123,7 @@ test.describe("app shell", () => {
     expect(stored.onboardingSeen).toBe(true);
     expect(stored.earSeen).toBe(true);
     expect(stored.setupSeen).toBe(true);
-    expect(stored.eduSeen).toBe(false);
+    expect(stored.eduSeen).toBe(true);
     expect(stored.optOrder).toEqual([]);
 
     // Mid-flow reload lands on the hub and reseeds flow state from the factories.
@@ -155,6 +159,11 @@ test.describe("app shell", () => {
     await page.getByRole("button", { name: /Headphones Plug in/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    await back.click();
+    await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect(back).toHaveCount(0);
 
@@ -221,7 +230,7 @@ test.describe("app shell chrome", () => {
     expect(visited).toEqual([
       "Launch", "Create account · entry", "Create account · confirmation",
       "Dashboard", "Setup · Ear", "Setup · Headphones and volume",
-      "Matching options", "Session complete"
+      "What to listen for", "Matching options", "Session complete"
     ]);
   });
 

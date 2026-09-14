@@ -21,11 +21,10 @@ export const OPTORDER = ["n", "r", "d"];
 export const OPTLABEL = { n: "Option 1", r: "Option 2", d: "Option 3" };
 export const OPTFIRST = { n: "vol", r: "dir", d: "field" };
 
-// The selector becomes available as soon as the headphone check is complete.
-// Education remains available as supporting content, but is no longer a gate
-// between setup and matching.
+// Matching-option entry is gated by both session setup steps. Education is a
+// once-per-session requirement, not just supporting content.
 export function optionSelectionReady(s) {
-  return s.setupSeen === true;
+  return s.setupSeen === true && s.eduSeen === true;
 }
 
 export const STAGES = {
@@ -159,7 +158,8 @@ export function restoreSession(raw) {
   if (legacyProgress) screen = "home";
   else if (!restored.earSeen && laterProgress) screen = "ear";
   else if (restored.earSeen && !restored.setupSeen) screen = "setup";
-  else if (restored.earSeen && restored.setupSeen) screen = "home";
+  else if (restored.earSeen && restored.setupSeen && !restored.eduSeen) screen = "edu";
+  else if (optionSelectionReady(restored)) screen = "home";
   return { ...restored, screen, playKey: null };
 }
 
@@ -284,7 +284,7 @@ export function advanceShellState(s) {
   if (s.screen === "account") return goScreenState(s, "dashboard", { onboardingSeen: true, onboardingInput: "" });
   if (s.screen === "dashboard") return newSessionState(s);
   if (s.screen === "ear") return goScreenState(s, "setup", { earSeen: !!s.ear });
-  if (s.screen === "setup") return goScreenState(s, "home", { setupSeen: !!s.hp && s.vol >= 100 });
+  if (s.screen === "setup") return goScreenState(s, "edu", { setupSeen: !!s.hp && s.vol >= 100 });
   if (s.screen === "edu") return goScreenState(s, "home", { eduSeen: true });
   return { ...s, ...clearedNavigationState() };
 }
@@ -352,10 +352,10 @@ export function navShow(s) {
 // one, and on the 2D field a zoom level steps out before a stage does.
 export function backTarget(s) {
   if (s.screen === "ear") return { kind: "screen", screen: "dashboard" };
-  if (s.screen === "setup") return { kind: "screen", screen: s.setupSeen ? "home" : "ear" };
+  if (s.screen === "setup") return { kind: "screen", screen: optionSelectionReady(s) ? "home" : "ear" };
   if (s.screen === "edu") {
     if (s.educationReturn === "dashboard") return { kind: "screen", screen: "dashboard" };
-    return { kind: "screen", screen: s.setupSeen || s.eduSeen ? "home" : "setup" };
+    return { kind: "screen", screen: optionSelectionReady(s) ? "home" : "setup" };
   }
   if (s.screen !== "flow") return { kind: "screen", screen: "home" };
   const c = s.concept, ss = s.stages[c];

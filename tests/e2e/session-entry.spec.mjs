@@ -1,10 +1,10 @@
 /*
  * Focused browser coverage for the session-level setup sequence (REQ-005):
- * New Session -> ear -> headphones/volume -> option selector, followed by
- * direct returns to that selector after Options 1 and 2.
+ * New Session -> ear -> headphones/volume -> education -> option selector,
+ * followed by direct returns to that selector after Options 1 and 2.
  */
 import { test, expect } from "@playwright/test";
-import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { openSessionMenu, startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 const storageKey = "pnq-mtp-v1";
 const screen = (page, label) => page.locator(`[data-screen-label="${label}"]`);
@@ -47,7 +47,7 @@ async function finishOption2(page) {
 test.describe("session entry", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("runs setup once in order and returns Options 1 and 2 directly to the selector", async ({ page }) => {
+  test("runs setup and education once in order and returns Options 1 and 2 directly to the selector", async ({ page }) => {
     await page.goto("/");
     await startSessionFromSplash(page);
 
@@ -84,19 +84,44 @@ test.describe("session entry", () => {
     await page.getByLabel("Device volume").fill("100");
     await setupContinue.click();
 
-    // Device completion opens the selector over the retained setup context.
-    await expect(selector(page)).toBeVisible();
-    await expect(page.locator('[data-matching-options-context="setup"]')).toBeVisible();
+    // Device completion opens required education and cannot expose options yet.
+    const education = screen(page, "Shared · What to listen for");
+    await expect(education).toBeVisible();
+    await expectNoPrematureSelector(page);
     await expectSilent(page);
     state = await page.evaluate(() => window.__pnqAppState());
     expect({ earSeen: state.earSeen, setupSeen: state.setupSeen, eduSeen: state.eduSeen })
       .toEqual({ earSeen: true, setupSeen: true, eduSeen: false });
-    for (const n of [1, 2, 3]) await expect(page.getByRole("button", { name: `Option ${n}` })).toBeEnabled();
 
-    const stored = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), storageKey);
+    let stored = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), storageKey);
     expect(Object.keys(stored).sort()).toEqual(["onboardingSeen", "earSeen", "setupSeen", "eduSeen", "optDone", "optOrder"].sort());
     expect({ earSeen: stored.earSeen, setupSeen: stored.setupSeen, eduSeen: stored.eduSeen })
       .toEqual({ earSeen: true, setupSeen: true, eduSeen: false });
+
+    // Even the shared return action cannot route around an unfinished gate.
+    await openSessionMenu(page);
+    await page.getByRole("button", { name: "Return to matching options", exact: true }).click();
+    await expect(education).toBeVisible();
+    await expectNoPrematureSelector(page);
+
+    // Back returns to setup without bypassing education. The already-valid
+    // setup can continue forward to the same required education screen.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(setup).toBeVisible();
+    await expectNoPrematureSelector(page);
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).not.toHaveAttribute("aria-disabled", "true");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(education).toBeVisible();
+
+    // Education completion opens a fresh two-step sheet over education.
+    await page.getByRole("button", { name: "I'm ready to start", exact: true }).click();
+    await expect(selector(page)).toBeVisible();
+    await expect(page.locator('[data-matching-options-context="education"]')).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+    for (const n of [1, 2, 3]) await expect(page.getByRole("button", { name: `Option ${n}` })).toBeEnabled();
+    stored = await page.evaluate((key) => JSON.parse(sessionStorage.getItem(key)), storageKey);
+    expect(stored.eduSeen).toBe(true);
 
     // Returning from each of the first two real option completions bypasses all session gates.
     await finishOption1(page);

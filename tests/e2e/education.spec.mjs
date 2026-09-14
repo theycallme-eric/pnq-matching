@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { openSessionMenu, startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
+import { startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
 
 async function reachEducation(page) {
   await page.goto("/");
@@ -9,15 +9,12 @@ async function reachEducation(page) {
   await page.getByRole("button", { name: /Headphones Plug in/ }).click();
   await page.getByLabel("Device volume").fill("100");
   await page.getByRole("button", { name: "Continue" }).click();
-  await openSessionMenu(page);
-  await page.getByRole("button", { name: "Jump to a different section" }).click();
-  await page.getByRole("button", { name: "Pitch and volume", exact: true }).click();
 }
 
 test.describe("education", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("Home education has a visible Back control that returns to the unchanged Explore PNQ card", async ({ page }) => {
+  test("dashboard education remains directly accessible and returns without completing a session gate", async ({ page }) => {
     await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
       onboardingSeen: true
     })));
@@ -35,25 +32,66 @@ test.describe("education", () => {
     expect(await page.evaluate(() => window.__pnqAppState().onboardingSeen)).toBe(true);
     expect(await page.evaluate(() => window.__pnqAppState().optDone)).toEqual({});
     expect(await page.evaluate(() => window.__pnqAppState().optOrder)).toEqual([]);
+
+    await home.getByRole("button", { name: "What to listen for", exact: true }).click();
+    await page.getByRole("button", { name: /Louder/ }).click();
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-LOUDNESS1");
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
+    await expect(home).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+    expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")).eduSeen)).toBe(false);
   });
 
-  test("shared examples toggle through the audio engine and completion persists", async ({ page }) => {
+  test("active-session education keeps its examples and stops playback before opening the sheet", async ({ page }) => {
     await reachEducation(page);
-    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    const education = page.locator('[data-screen-label="Shared · What to listen for"]');
+    await expect(education).toBeVisible();
+    for (const label of ["A lower sound", "A higher sound", "Quieter", "Louder"]) {
+      await expect(education.getByText(label, { exact: true })).toBeVisible();
+    }
 
     const lower = page.getByRole("button", { name: /A lower sound/ });
     await expect(lower).toHaveAttribute("aria-pressed", "false");
     await lower.press("Enter");
     await expect(lower).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("edu-PITCH0");
-    await lower.press("Space");
-    await expect(lower).toHaveAttribute("aria-pressed", "false");
-    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
 
     await page.getByRole("button", { name: "I'm ready to start" }).click();
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "Option 1" })).not.toHaveAttribute("aria-disabled", "true");
+    await expect(page.locator('[data-matching-options-context="education"]')).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
+    await expect(page.locator('[data-option-state="selected"]')).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+    expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
     expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("pnq-mtp-v1")).eduSeen)).toBe(true);
+  });
+
+  test("reload resumes each active-session gate and always starts silent", async ({ page }) => {
+    const restore = async (value) => {
+      await page.evaluate((stored) => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify(stored)), value);
+      await page.reload();
+      await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine?.playingKey() ?? null)).toBe(null);
+      expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
+    };
+
+    await page.goto("/");
+    await restore({ onboardingSeen: true, earSeen: false, setupSeen: true, eduSeen: true });
+    await expect(page.locator('[data-screen-label="Setup · Ear"]')).toBeVisible();
+
+    await restore({ onboardingSeen: true, earSeen: true, setupSeen: false, eduSeen: true });
+    await expect(page.locator('[data-screen-label="Setup · Headphones and volume"]')).toBeVisible();
+
+    await restore({ onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: false });
+    await expect(page.locator('[data-screen-label="Shared · What to listen for"]')).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toHaveCount(0);
+
+    await restore({ onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true });
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+    await expect(page.locator('[data-matching-options-context="education"]')).toBeVisible();
+    await expect(page.locator("[data-matching-options-sheet]")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
   });
 
   test("working-stage judgment stays in place and gray until playback", async ({ page }) => {
