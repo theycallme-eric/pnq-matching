@@ -77,15 +77,12 @@ async function completeOption(page, number) {
   } else if (number === 1) {
     await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "The volume is about right" }).click();
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: closer adjustments" }).click();
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "This matches what I hear" }).click();
   } else {
+    await page.getByRole("button", { name: "Play the sound" }).click();
     for (let level = 0; level < 3; level++) {
-      await page.getByRole("button", { name: "Play the sound" }).click();
       await page.getByRole("button", { name: level < 2 ? "Look closely at this area" : "This sounds like my tinnitus" }).click();
     }
   }

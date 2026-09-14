@@ -196,7 +196,7 @@ test("ready() and unlock() build the graph on the mocked context", () => {
   const { panner, master } = graph();
   assert.ok(panner, "a StereoPanner is connected to the destination");
   assert.ok(master, "the master gain feeds the panner");
-  assert.equal(master.gain.value, 0.5);
+  assert.equal(master.gain.value, 0.25, "one shared master starts at the review level");
 });
 
 /* ---------- freqOf: exponential mapping over per-kind FRQ ranges ---------- */
@@ -338,8 +338,10 @@ test("setMuted silences and restores the master gain", () => {
   const { master } = graph();
   engine.setMuted(true);
   assert.equal(master.gain.value, 0);
+  engine.panic();
+  assert.equal(graph().master.gain.value, 0, "a rebuild cannot bypass mute");
   engine.setMuted(false);
-  assert.equal(master.gain.value, 0.5);
+  assert.equal(graph().master.gain.value, 0.25, "unmute restores the shared review level");
 });
 
 /* ---------- single playback owner ---------- */
@@ -393,12 +395,35 @@ test("stop() leaves nothing audible; update() while stopped starts nothing", () 
   const playing = liveSources();
   engine.stop();
   assert.equal(engine.playingKey(), null);
+  assert.equal(graph().master.gain.value, 0.25, "stop does not alter the shared master");
   for (const s of playing) assert.notEqual(s.stoppedAt, null);
   assert.equal(liveSources().length, 0, "no source is producing output");
   const startedBefore = ctx().sources.length;
   engine.update([spec("tone")]);
   assert.equal(engine.playingKey(), null, "playKey null => nothing audible");
   assert.equal(ctx().sources.length, startedBefore, "update started no voice");
+});
+
+test("play and update failures panic to one silent, rebuildable graph", () => {
+  engine.panic();
+  const c = ctx();
+  const createFilter = c.createBiquadFilter;
+  c.createBiquadFilter = () => { throw new Error("filter failed"); };
+  assert.equal(engine.play("broken-play", [spec("hiss")]), false);
+  assert.equal(engine.playingKey(), null);
+  assert.equal(liveSources().length, 0, "a partially built source is stopped");
+  assert.equal(graph().master.gain.value, 0.25);
+  c.createBiquadFilter = createFilter;
+
+  assert.equal(engine.play("broken-update", [spec("tone")]), true);
+  const source = liveSources()[0];
+  source.frequency.setTargetAtTime = () => { throw new Error("automation failed"); };
+  Object.defineProperty(source.frequency, "value", { configurable: true, set() { throw new Error("fallback failed"); } });
+  assert.equal(engine.update([spec("tone", .8)]), false);
+  assert.equal(engine.playingKey(), null);
+  assert.notEqual(source.stoppedAt, null);
+  assert.equal(liveSources().length, 0);
+  assert.equal(graph().master.gain.value, 0.25);
 });
 
 test("panic() tears the graph down, rebuilds it, and it plays again immediately", () => {
@@ -414,6 +439,7 @@ test("panic() tears the graph down, rebuilds it, and it plays again immediately"
   const rebuilt = graph();
   assert.ok(rebuilt.master && rebuilt.panner, "fresh graph reaches destination");
   assert.notEqual(rebuilt.master, old.master);
+  assert.equal(rebuilt.master.gain.value, 0.25, "panic rebuild restores the same shared master");
   assert.equal(engine.play("after-panic", [spec("tone")]), true);
   assert.equal(engine.playingKey(), "after-panic");
   assert.equal(liveSources().length, 1);
