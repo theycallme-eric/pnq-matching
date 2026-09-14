@@ -15,10 +15,13 @@ let ctx = null, master = null, panner = null, layers = [], noise = null;
 let muted = false, curKey = null, ear = 'both', gen = 0;
 
 const EARPAN = { left: -1, right: 1, both: 0 };
+// Prototype listening-review level. Every synthesized voice reaches this one
+// master, preserving all relative per-voice gains and ear routing.
+const MASTER_LEVEL = 0.25;
 
 function buildGraph(c) {
   master = c.createGain();
-  master.gain.value = muted ? 0 : 0.5;
+  master.gain.value = muted ? 0 : MASTER_LEVEL;
   panner = c.createStereoPanner ? c.createStereoPanner() : null;
   if (panner) {
     panner.pan.value = EARPAN[ear] ?? 0;
@@ -32,8 +35,13 @@ function ac() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    try { ctx = new AC(); } catch (e) { return null; }
-    buildGraph(ctx);
+    try {
+      ctx = new AC();
+      buildGraph(ctx);
+    } catch (e) {
+      ctx = null; master = null; panner = null;
+      return null;
+    }
   }
   if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
   return ctx;
@@ -53,10 +61,16 @@ export function freqOf(kind, p) {
   return r[0] * Math.pow(r[1] / r[0], q);
 }
 function gainOf(level) { const l = Math.max(0, Math.min(1, level)); return 0.02 + l * l * 0.55; }
+function target(param, value, time, constant) {
+  try { param.setTargetAtTime(value, time, constant); } catch (e) { param.value = value; }
+}
 
 function buildLayer(c, spec) {
   const g = c.createGain(); g.gain.value = 0;
   const L = { spec, g, stops: [], nodes: [g] };
+  // Register before any source starts so a partial construction failure is
+  // still covered by panic teardown and cannot leave an orphaned voice.
+  layers.push(L);
   const f = freqOf(spec.kind, spec.pitch);
   if (spec.kind === 'hiss') {
     const src = c.createBufferSource(); src.buffer = noiseBuf(c); src.loop = true;
@@ -105,7 +119,7 @@ export function panic() {
   teardown();
   if (!ctx) return;
   try { if (panner) panner.disconnect(); master.disconnect(); } catch (e) {}
-  buildGraph(ctx);
+  try { buildGraph(ctx); } catch (e) { master = null; panner = null; }
 }
 
 export function play(key, specs) {
@@ -113,28 +127,40 @@ export function play(key, specs) {
   stop();
   const mine = ++gen;
   if (mine !== gen) return false;
-  curKey = key;
-  layers = specs.map(s => buildLayer(c, s));
-  return true;
+  try {
+    curKey = key;
+    layers = [];
+    for (const s of specs) buildLayer(c, s);
+    return true;
+  } catch (e) {
+    panic();
+    return false;
+  }
 }
 export function update(specs) {
-  if (!ctx || !layers.length) return;
+  if (!ctx || !layers.length) return false;
   const rebuild = specs.length !== layers.length || specs.some((s, i) => s.kind !== layers[i].spec.kind);
-  if (rebuild) { const k = curKey; play(k, specs); return; }
-  const t = ctx.currentTime;
-  specs.forEach((s, i) => {
-    const L = layers[i];
-    const f = freqOf(s.kind, s.pitch);
-    if (L.osc) { try { L.osc.frequency.setTargetAtTime(f, t, .015); } catch (e) { L.osc.frequency.value = f; } }
-    if (L.h) { try { L.h.frequency.setTargetAtTime(Math.min(f * 3, 14000), t, .015); } catch (e) {} }
-    if (L.filt) { try { L.filt.frequency.setTargetAtTime(f, t, .015); } catch (e) {} }
-    if (L.lp) { try { L.lp.frequency.setTargetAtTime(700 + (s.bright ?? .3) * 2600, t, .02); } catch (e) {} }
-    if (L.hg) { try { L.hg.gain.setTargetAtTime((s.bright ?? 0) * .16, t, .02); } catch (e) {} }
-    try { L.g.gain.setTargetAtTime(gainOf(s.level), t, .02); } catch (e) { L.g.gain.value = gainOf(s.level); }
-    L.spec = s;
-  });
+  if (rebuild) { const k = curKey; return play(k, specs); }
+  try {
+    const t = ctx.currentTime;
+    specs.forEach((s, i) => {
+      const L = layers[i];
+      const f = freqOf(s.kind, s.pitch);
+      if (L.osc) target(L.osc.frequency, f, t, .015);
+      if (L.h) target(L.h.frequency, Math.min(f * 3, 14000), t, .015);
+      if (L.filt) target(L.filt.frequency, f, t, .015);
+      if (L.lp) target(L.lp.frequency, 700 + (s.bright ?? .3) * 2600, t, .02);
+      if (L.hg) target(L.hg.gain, (s.bright ?? 0) * .16, t, .02);
+      target(L.g.gain, gainOf(s.level), t, .02);
+      L.spec = s;
+    });
+    return true;
+  } catch (e) {
+    panic();
+    return false;
+  }
 }
-export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.5; }
+export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : MASTER_LEVEL; }
 export function setEar(e) {
   ear = EARPAN[e] === undefined ? 'both' : e;
   if (panner) { try { panner.pan.setTargetAtTime(EARPAN[ear], ctx.currentTime, .02); } catch (x) { panner.pan.value = EARPAN[ear]; } }

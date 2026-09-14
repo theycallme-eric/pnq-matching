@@ -182,7 +182,7 @@ test.describe("app shell", () => {
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   });
 
-  test("app shell hard-stops audio on every screen and stage transition", async ({ page }) => {
+  test("app shell stops at screen boundaries and preserves normal in-option transitions", async ({ page }) => {
     await page.goto("/");
     await completeSetup(page);
     await openSessionMenu(page);
@@ -196,12 +196,26 @@ test.describe("app shell", () => {
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
     expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
 
-    // Stage transition inside a flow stops the main voice too.
+    // A normal transition inside the active option preserves its one owner.
     await startMatchingOption(page, 1);
     await page.getByText("Start Sound", { exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
     await page.getByRole("button", { name: "The volume is about right" }).click();
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
+    await expect(page.getByRole("button", { name: "Stop Sound", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+    // Back from the option's first working stage is an option-exit boundary.
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+    expect(await page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
+
+    // Confirming a different option always enters it silent.
+    await startMatchingOption(page, 2);
+    await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start Sound", exact: true })).toHaveAttribute("aria-pressed", "false");
+    expect(await page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
   });
 });
 

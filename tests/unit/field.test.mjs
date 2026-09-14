@@ -111,13 +111,13 @@ test("Back steps out one zoom level before it steps back a stage", () => {
   assert.equal(backTarget(s).kind, "screen");
 });
 
-test("field refinement changes hard-stop the playing voice", () => {
+test("field refinement preserves the playing voice and marks the new level heard", () => {
   const s = { ...initialState(), screen: "flow", concept: "d", playKey: "dfield" };
   const next = stageState(s, "d", "zoom", { cx: .6, cy: .4, level: 1, zoomed: true, heard: false });
-  assert.equal(next.playKey, null, "the tone stops across the jump");
+  assert.equal(next.playKey, "dfield", "the same option owner survives the zoom");
   assert.equal(next.stages.d, "zoom");
   assert.equal(next.d.level, 1);
-  assert.equal(next.d.heard, false);
+  assert.equal(next.d.heard, true);
   assert.equal(next.d.note, "");
 });
 

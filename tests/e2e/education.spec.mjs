@@ -109,9 +109,10 @@ test.describe("education", () => {
     await expect(advance).toBeEnabled();
     await advance.click();
     await expect(page.locator('[data-screen-label="Narrowing · Refinement pass"]')).toBeVisible();
-    // The stage transition hard-stops audio, so the new pass stays locked
-    // until its own sound has been played (REQ-001, REQ-018).
-    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
-    await expect(page.getByRole("button", { name: "Next: closer adjustments" })).toBeDisabled();
+    // Once matching playback starts, a normal in-option transition carries
+    // both the active owner and the heard gate into the next pass.
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
+    await expect(page.getByRole("button", { name: "Stop Sound", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Next: closer adjustments" })).toBeEnabled();
   });
 });

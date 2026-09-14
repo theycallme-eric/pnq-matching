@@ -232,19 +232,25 @@ test("moderator jump targets mirror V5's stage jumps plus its scenario presets",
   assert.deepEqual([edge.seed.heard, edge.seed.x, edge.seed.y], [true, .96, .06]);
 });
 
-test("every navigation reducer clears playback, menus, warnings, and transient flow state", () => {
+test("the shared playback contract preserves only normal transitions inside the active option", () => {
   const playing = {
-    ...shell.initialState(), playKey: "main", menuOpen: true, jumpOpen: true, menuStopped: true,
+    ...shell.initialState(), screen: "flow", concept: "n", playKey: "main", menuOpen: true, jumpOpen: true, menuStopped: true,
     setupWarn: true, earWarn: true, heardStage: { old: true }, prKey: "pair", prHeardA: true, prHeardB: true
   };
-  const results = [
+  const carried = shell.stageState(playing, "n", "p1");
+  assert.equal(shell.playbackTransition(playing, { kind: "stage", screen: "flow", concept: "n", stage: "p1" }), "preserve");
+  assert.equal(carried.playKey, "main");
+  assert.equal(carried.heardStage["n|p1"], true, "the sounding destination is already heard");
+  assert.equal(carried.menuOpen, false);
+
+  const boundaries = [
     shell.goScreenState(playing, "home", { playKey: "cannot-override" }),
     shell.openOptionState(playing, "r"),
     shell.jumpState(playing, "t", "field", shell.freshT()),
-    shell.stageState(playing, "n", "p1"),
+    shell.stageState(playing, "n", "done"),
     shell.resetAllState(playing)
   ];
-  for (const state of results) {
+  for (const state of boundaries) {
     assert.equal(state.playKey, null);
     assert.equal(state.menuOpen, false);
     assert.equal(state.jumpOpen, false);
@@ -256,7 +262,24 @@ test("every navigation reducer clears playback, menus, warnings, and transient f
     assert.equal(state.prHeardB, false);
     assert.deepEqual(state.heardStage, {});
   }
-  assert.deepEqual(results[0].n, shell.freshN(), "safe shell screens discard option working state");
+  assert.equal(shell.playbackTransition(playing, { kind: "screen", screen: "home" }), "hard-stop");
+  assert.equal(shell.playbackTransition(playing, { kind: "stage", screen: "flow", concept: "r", stage: "dir" }), "hard-stop");
+  assert.deepEqual(boundaries[0].n, shell.freshN(), "safe shell screens discard option working state");
+});
+
+test("Option 3 carries playback and heard state through zoom and Confidence", () => {
+  const playing = {
+    ...shell.initialState(), screen: "flow", concept: "d", playKey: "dfield",
+    stages: { ...shell.initialState().stages, d: "field" },
+    d: { ...shell.freshD(), heard: true }
+  };
+  const zoom = shell.stageState(playing, "d", "zoom", { cx: .6, cy: .4, level: 1, heard: false });
+  assert.equal(zoom.playKey, "dfield");
+  assert.equal(zoom.d.heard, true, "an actively updated zoom is heard without replay");
+  assert.equal(zoom.heardStage["d|zoom"], true);
+  const confidence = shell.stageState(zoom, "d", "conf");
+  assert.equal(confidence.playKey, "dfield");
+  assert.equal(confidence.heardStage["d|conf"], true);
 });
 
 test("screen roots carry the established data-screen-label values without Privacy", () => {

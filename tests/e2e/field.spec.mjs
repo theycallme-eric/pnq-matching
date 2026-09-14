@@ -95,17 +95,17 @@ test.describe("field (Option 3)", () => {
     expect(d.cx).toBeCloseTo(before.x, 6);
     expect(d.cy).toBeCloseTo(before.y, 6);
     await expect(page.getByText(/Same idea, a smaller area/)).toBeVisible();
-    // The grid layer visibly scales up (1/.38). The stage transition stops
-    // audio and the new zoom must be played before judgment.
+    // The grid layer visibly scales up (1/.38) while the same owner keeps
+    // sounding with the zoomed position and the destination remains heard.
     await expect(page.locator("[data-field-grid]")).toHaveCSS("transform", /matrix\(2\.63/);
-    expect(await playing(page)).toBe(null);
-    await expect(page.getByRole("button", { name: "Look closely at this area" })).toBeDisabled();
-    await page.getByRole("button", { name: "Play the sound" }).click();
+    expect(await playing(page)).toBe("dfield");
+    await expect(page.getByRole("button", { name: "Stop the sound" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Look closely at this area" })).toBeEnabled();
 
     await page.getByRole("button", { name: "Look closely at this area" }).click();
     d = await dState(page);
     expect(d.level).toBe(2);
-    expect(await playing(page)).toBe(null);
+    expect(await playing(page)).toBe("dfield");
     await expect(page.getByText("Closer still")).toBeVisible();
     await expect(page.locator("[data-field-grid]")).toHaveCSS("transform", /matrix\(6\.66/);
     await expect(page.locator("[data-field-region]")).toHaveCount(0);

@@ -26,11 +26,8 @@ async function finishOption1(page) {
   await startMatchingOption(page, 1);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "The volume is about right" }).click();
-  await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "Next: closer adjustments" }).click();
-  await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "Next: fine adjustments" }).click();
-  await page.getByRole("button", { name: "Start Sound", exact: true }).click();
   await page.getByRole("button", { name: "This matches what I hear" }).click();
   await page.getByText("Fairly close", { exact: true }).click();
   await page.getByRole("button", { name: "Finish matching" }).click();
