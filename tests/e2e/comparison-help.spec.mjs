@@ -49,6 +49,7 @@ test.describe("comparison contextual Help (REQ-001, REQ-003)", () => {
     await openComparison(page);
 
     const before = (await appState(page)).r;
+    await page.getByRole("button", { name: "Play sound 1" }).click();
     const dialog = await openContextualHelp(page);
     await dialog.getByRole("button", { name: "Can't hear these sounds", exact: true }).click();
 
@@ -62,7 +63,8 @@ test.describe("comparison contextual Help (REQ-001, REQ-003)", () => {
       expect(after[key]).toBe(before[key]);
     }
 
-    await expect(page.getByRole("button", { name: "Play sound 1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop sound 1" })).toBeVisible();
+    expect(await page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
     await expect(page.getByRole("button", { name: "Play sound 2" })).toBeVisible();
     await expect(page.getByRole("button", { name: "This one" })).toHaveCount(2);
     await expect(page.getByRole("button", { name: "Neither is close", exact: true })).toBeVisible();

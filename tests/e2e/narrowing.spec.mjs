@@ -65,36 +65,36 @@ test.describe("narrowing (Option 1)", () => {
     await expect(volOff).toBeEnabled();
     await volOff.click();
 
-    // Every stage transition hard-stops audio and the new stage must be played
-    // before it can be judged (REQ-001, REQ-018).
+    // Normal stage transitions preserve the owner and carry the pressed/heard
+    // state into the newly current parameters.
     await expect(page.getByText("Now find the pitch")).toBeVisible();
-    expect(await playingKey(page)).toBe(null);
+    expect(await playingKey(page)).toBe("main");
+    await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
     expect(await progressPhase(page)).toContain("PITCH 1 OF 3");
 
     // Choose a pitch on the coarse pass; adjustments carry into the tone only
     // while this stage's sound is playing.
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("slider", { name: "Pitch" }).fill("70");
     expect((await nState(page)).pitch).toBeCloseTo(.7, 6);
     await page.getByRole("button", { name: "Next: closer adjustments" }).click();
 
     await expect(page.getByText("Getting closer")).toBeVisible();
-    expect(await playingKey(page)).toBe(null);
+    expect(await playingKey(page)).toBe("main");
     expect(await progressPhase(page)).toContain("PITCH 2 OF 3");
     let n = await nState(page);
     expect(n.center).toBeCloseTo(.7, 6);
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
 
     await expect(page.getByText("Small adjustments now")).toBeVisible();
-    expect(await playingKey(page)).toBe(null);
+    expect(await playingKey(page)).toBe("main");
     expect(await progressPhase(page)).toContain("PITCH 3 OF 3");
     await expect(page.getByRole("button", { name: "Keep fine-tuning" })).toBeVisible();
 
     // The fixed sign-off ends in shared Confidence with the final pitch/level.
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "This matches what I hear" }).click();
     await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
+    expect(await playingKey(page)).toBe("main");
+    await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
     n = await nState(page);
     expect(n.pitch).toBeCloseTo(.7, 6);
     expect(n.level).toBeCloseTo(.4, 6);
@@ -128,7 +128,6 @@ test.describe("narrowing (Option 1)", () => {
     expect(parseFloat(band.left)).toBeCloseTo(54, 2);
     expect(parseFloat(band.width)).toBeCloseTo(32, 2);
 
-    await page.getByText("Start Sound", { exact: true }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
     await expect(page.getByText("Small adjustments now")).toBeVisible();
     layer = await layerStyle(page);
@@ -146,6 +145,26 @@ test.describe("narrowing (Option 1)", () => {
     expect(await progressPhase(page)).toContain("PITCH 4 OF 4");
     await expect(page.getByText("Another pass, narrower again. Keep going for as long as it helps.")).toBeVisible();
     expect(parseFloat((await layerStyle(page)).width)).toBeCloseTo(1666.67, 2);
+  });
+
+  test("Back preserves playback inside Option 1 and engine update failure clears it", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "Pitch · medium");
+    await page.getByText("Start Sound", { exact: true }).click();
+    await expect.poll(() => playingKey(page)).toBe("main");
+
+    await page.getByRole("button", { name: "Previous step" }).click();
+    await expect(page.getByText("Now find the pitch")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop Sound", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(await playingKey(page)).toBe("main");
+
+    // Simulate an engine-side loss; the next live update must synchronize the
+    // application back to silence instead of leaving an orphaned pressed UI.
+    await page.evaluate(() => window.__pnqAudioEngine.stop());
+    await page.getByRole("slider", { name: "Pitch" }).fill("60");
+    await expect.poll(() => page.evaluate(() => window.__pnqAppState().playKey)).toBe(null);
+    await expect(page.getByRole("button", { name: "Start Sound", exact: true })).toHaveAttribute("aria-pressed", "false");
+    expect(await playingKey(page)).toBe(null);
   });
 
   test("wider range reopens the coarse pass with its reassurance note, still runnable", async ({ page }) => {

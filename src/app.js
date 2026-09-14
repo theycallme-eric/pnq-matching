@@ -124,7 +124,7 @@ class App extends React.Component {
       } catch (err) {}
     }
     // React state is the single source of truth for playback: playKey null
-    // means silence, even if a voice somehow outlived its screen.
+    // means silence, even if a voice somehow outlived a boundary.
     if (this.state.playKey === null) this.withAudio((a) => { if (a.playingKey() !== null) a.stop(); });
     if (this.state.matchingOptionsOpen && !prevState.matchingOptionsOpen && this.matchingOptionsCloseButton) {
       this.matchingOptionsCloseButton.focus();
@@ -133,25 +133,47 @@ class App extends React.Component {
 
   withAudio(f) { if (this.aud) f(this.aud); else if (this.audP) this.audP.then((m) => { if (m) { this.aud = m; f(m); } }); }
 
-  // Every screen change goes through here. panic() rebuilds the output graph,
-  // so a tone can never outlive the screen that started it.
-  hardStop() {
-    this.withAudio((a) => { if (a.panic) a.panic(); else a.stop(); });
+  audioFailure(a) {
+    try { if (a.panic) a.panic(); else a.stop(); } catch (err) {}
     if (this.state.playKey !== null) this.setState({ playKey: null });
   }
 
-  stopAudio() { this.withAudio((a) => a.stop()); if (this.state.playKey !== null) this.setState({ playKey: null }); }
+  audioCall(a, operation) {
+    try {
+      if (operation(a) !== false) return true;
+    } catch (err) {}
+    this.audioFailure(a);
+    return false;
+  }
+
+  hardStopEngine() {
+    this.withAudio((a) => { try { if (a.panic) a.panic(); else a.stop(); } catch (err) {} });
+  }
+
+  // Screen, option, menu, reset, completion and error boundaries rebuild the
+  // output graph so a tone cannot survive them.
+  hardStop() {
+    this.hardStopEngine();
+    if (this.state.playKey !== null) this.setState({ playKey: null });
+  }
+
+  stopAudio() {
+    this.withAudio((a) => { try { a.stop(); } catch (err) { this.audioFailure(a); } });
+    if (this.state.playKey !== null) this.setState({ playKey: null });
+  }
 
   toggleKey(key, specs, route) {
     if (this.state.playKey === key) { this.stopAudio(); return; }
-    if (this.state.playKey !== null) this.withAudio((a) => a.stop());
     this.withAudio((a) => {
-      if (route && a.setEar) a.setEar(route);
-      a.play(key, specs);
+      const started = this.audioCall(a, () => {
+        if (route && a.setEar) a.setEar(route);
+        return a.play(key, specs);
+      });
+      if (!started) return;
+      // State changes only after the engine confirms playback.
+      if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
+      else this.setState({ playKey: key });
     });
-    // Starting the stage's main voice is what unlocks its primary CTA (REQ-018).
-    if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
-    else this.setState({ playKey: key });
   }
 
   // A/B pair gating (REQ-018): playing one side records it for the current
@@ -160,15 +182,42 @@ class App extends React.Component {
 
   prReady(key) { return gating.prReady(this.state, key); }
 
-  // Adjustments while the main tone plays carry into it live instead of
-  // cutting out and restarting.
-  syncMain() { if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state))); }
+  optionPlaying(st = this.state) {
+    return st.screen === "flow" && shell.OPTORDER.includes(st.concept) && st.playKey !== null;
+  }
+
+  optionSpecs(st = this.state) {
+    if (st.concept === "r" && st.stages.r === "comp") {
+      const pair = comparison.pairSpecs(st.r);
+      return [st.playKey === "prB" ? pair.B : pair.A];
+    }
+    return mainSpecs(st);
+  }
+
+  toggleOption(key, specs) {
+    if (this.optionPlaying()) this.stopAudio();
+    else this.toggleKey(key, specs);
+  }
+
+  // Normal option transitions and adjustments update the one current owner
+  // in place. An update failure atomically clears app state and the graph.
+  syncOption() {
+    if (!this.optionPlaying()) return;
+    this.withAudio((a) => this.audioCall(a, () => a.update(this.optionSpecs(this.state))));
+  }
+
+  syncMain() {
+    if (this.optionPlaying()) this.syncOption();
+    else if (this.state.playKey === "main") {
+      this.withAudio((a) => this.audioCall(a, () => a.update(mainSpecs(this.state))));
+    }
+  }
 
   // Apply an Option 2 comparison result: stay on the stage with a patch, or
   // leave it (phase done, spread floor, fallback to directional).
   applyR(res) {
     if (res.kind === "stage") { this.go("r", res.stage, res.obj); return; }
-    this.setState((s) => ({ r: { ...s.r, ...res.patch } }), () => this.syncMain());
+    this.setState((s) => ({ r: { ...s.r, ...res.patch } }), () => this.syncOption());
   }
 
   rDir(tag) { this.applyR(comparison.dirAnswer(this.state.r, tag)); }
@@ -178,7 +227,7 @@ class App extends React.Component {
   // explicit action (final check, close enough, keep refining).
   aResp(tag) {
     this.setState((s) => ({ a: { ...s.a, ...pres.aResp(s.a, tag) } }), () => {
-      if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state)));
+      if (this.state.playKey === "main") this.withAudio((a) => this.audioCall(a, () => a.update(mainSpecs(this.state))));
     });
   }
 
@@ -186,8 +235,9 @@ class App extends React.Component {
   // heard live (tuning sliders adjust the tone while it plays).
   pat(c, obj) {
     this.setState((s) => ({ [c]: { ...s[c], ...obj } }), () => {
-      if (this.state.playKey === "main") this.withAudio((a) => a.update(mainSpecs(this.state)));
-      else if (this.state.playKey === "dfield") this.withAudio((a) => a.update([field.dSpec(this.state.d)]));
+      if (this.optionPlaying()) this.syncOption();
+      else if (this.state.playKey === "main") this.withAudio((a) => this.audioCall(a, () => a.update(mainSpecs(this.state))));
+      else if (this.state.playKey === "dfield") this.withAudio((a) => this.audioCall(a, () => a.update([field.dSpec(this.state.d)])));
     });
   }
 
@@ -270,8 +320,14 @@ class App extends React.Component {
   }
 
   go(c, stage, obj) {
-    this.hardStop();
-    this.setState((s) => shell.stageState(s, c, stage, obj));
+    let transition = "hard-stop";
+    this.setState((s) => {
+      transition = shell.playbackTransition(s, { kind: "stage", screen: "flow", concept: c, stage });
+      return shell.stageState(s, c, stage, obj);
+    }, () => {
+      if (transition === "preserve") this.syncOption();
+      else this.hardStopEngine();
+    });
   }
 
   resetAll() {
@@ -1109,7 +1165,7 @@ class App extends React.Component {
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, nar.passTitle(s, n)),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, nar.passBody(s)),
         e(DS.Card, { variant: "section" },
-          this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))),
+          this.playToggleButton(this.optionPlaying(st), () => this.toggleOption("main", mainSpecs(this.state))),
           isVol
             ? e("div", { style: { marginTop: "18px" } },
               e(DS.TuningSlider, { label: "Volume", value: n.level, onChange: (v) => this.pat("n", { level: v }), precision: "Coarse" }),
@@ -1207,7 +1263,7 @@ class App extends React.Component {
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
         e("div", { style: { marginTop: "14px" } },
           e(DS.Card, { variant: "section" },
-            this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state))))),
+            this.playToggleButton(c === "r" ? this.optionPlaying(st) : st.playKey === "main", () => c === "r" ? this.toggleOption("main", mainSpecs(this.state)) : this.toggleKey("main", mainSpecs(this.state))))),
         e("div", { style: { marginTop: "18px" } },
           e(DS.SectionLabel, null, "HOW DOES IT COMPARE?"),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "8px", marginTop: "11px" } },
@@ -1238,12 +1294,15 @@ class App extends React.Component {
   // nothing shifts under a thumb (REQ-018).
   pairCard(which, spec, label, ready, pick, badge) {
     const pk = which === "a" ? "prA" : "prB";
-    const playing = this.state.playKey === pk;
-    const onPlay = () => { this.prHeard(which, gating.pairKeyOf(this.state)); this.toggleKey(pk, [spec]); };
+    const playing = this.state.playKey === pk || this.state.concept === "r" && which === "a" && this.state.playKey === "main";
+    const onPlay = () => {
+      if (playing) return this.stopAudio();
+      this.prHeard(which, gating.pairKeyOf(this.state));
+      this.toggleKey(pk, [spec]);
+    };
     const onPick = () => {
       const x = this.state;
       if (!gating.prReady(x, gating.pairKeyOf(x))) return;
-      this.stopAudio();
       pick(spec);
     };
     const ring = (delay) => e("span", { style: { position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid var(--blue-300)", animation: "pnqRing 1.8s ease-out infinite" + delay } });
@@ -1272,7 +1331,6 @@ class App extends React.Component {
 
   rNeither() {
     const res = comparison.neither(this.state.r);
-    if (res.kind === "patch") this.stopAudio();
     this.applyR(res);
   }
 
@@ -1562,7 +1620,9 @@ class App extends React.Component {
     const r = this.dEl.getBoundingClientRect(), g = this.dGrab || { dx: 0, dy: 0 }, w = this.dWin || { span: 1, x0: 0, y0: 0 };
     const p = field.dragPoint(w, (ev.clientX - g.dx - r.left) / r.width, (ev.clientY - g.dy - r.top) / r.height);
     this.setState((s) => ({ d: { ...s.d, ...p } }), () => {
-      if (this.state.playKey === "dfield") this.withAudio((a) => a.update([field.dSpec(this.state.d)]));
+      if (this.state.playKey === "dfield") {
+        this.withAudio((a) => this.audioCall(a, () => a.update([field.dSpec(this.state.d)])));
+      }
     });
   }
 
@@ -1972,7 +2032,7 @@ class App extends React.Component {
             e(DS.Card, { variant: "section" },
               e(DS.SectionLabel, null, "YOUR MATCHED SOUND"),
               e("div", { style: { marginTop: "11px" } },
-                this.playToggleButton(st.playKey === "main", () => this.toggleKey("main", mainSpecs(this.state)))))),
+                this.playToggleButton(this.optionPlaying(st), () => this.toggleOption("main", mainSpecs(this.state)))))),
           e("div", { style: { display: "flex", flexDirection: "column", gap: "9px", marginTop: "14px" } },
             ["Very close", "Fairly close", "Not close yet"].map((label) =>
               this.selectRowButton(label, label, conf === label, () => choose(label)))),

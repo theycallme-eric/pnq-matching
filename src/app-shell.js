@@ -5,9 +5,9 @@
  * factories, the sessionStorage persistence shape, chrome measurement and
  * the navigation reducers, ported from the V5 mobile test prototype.
  *
- * Every reducer that changes screen or stage returns playKey: null - the
- * renderer pairs that with the engine's hard stop so no sound outlives the
- * screen that started it.
+ * Screen, option, menu and reset boundaries clear playback. Normal stage
+ * transitions inside an actively sounding participant option preserve its
+ * one owner; the renderer updates that owner to the destination parameters.
  */
 
 // `launch` and `home` remain the renderer-facing ids for the splash and option
@@ -200,8 +200,8 @@ export function screenLabelOf(screen, concept, stage) {
 }
 
 /* ---------- navigation reducers ---------- */
-// Every screen or stage change returns playKey: null; the renderer calls the
-// engine's hard stop alongside applying these.
+// Screen and option boundaries hard-stop. stageState is the only preserving
+// reducer, and only when playbackTransition explicitly permits it.
 
 const INITIAL_STAGES = { n: "vol", f: "intro", r: "dir", d: "field", a: "listen", l: "ret", t: "field" };
 
@@ -217,6 +217,32 @@ function clearedNavigationState() {
     playKey: null, menuOpen: false, jumpOpen: false, menuStopped: false,
     setupWarn: false, earWarn: false, prKey: null, prHeardA: false, prHeardB: false
   };
+}
+
+const OPTION_PLAY_KEYS = {
+  n: ["main"],
+  r: ["main", "prA", "prB"],
+  d: ["dfield", "main"]
+};
+const PLAYBACK_BOUNDARY_STAGES = new Set(["intro", "edu", "done"]);
+
+// One auditable transition contract for playback. Preservation is deliberately
+// narrow: a normal stage transition, inside the same participant option, from
+// and to an audible working/confidence stage, with that option's owner active.
+// Everything else is a hard boundary.
+export function playbackTransition(s, destination) {
+  const d = destination || {};
+  const fromStage = s.stages && s.stages[s.concept];
+  const validOwner = (OPTION_PLAY_KEYS[s.concept] || []).includes(s.playKey);
+  const sameActiveOption = d.kind === "stage" && s.screen === "flow" && d.screen === "flow" &&
+    d.concept === s.concept && OPTORDER.includes(s.concept);
+  const audibleStages = !PLAYBACK_BOUNDARY_STAGES.has(fromStage) && !PLAYBACK_BOUNDARY_STAGES.has(d.stage);
+  return sameActiveOption && validOwner && audibleStages ? "preserve" : "hard-stop";
+}
+
+function heardKeyAt(c, stage, obj) {
+  if (c === "r" && stage === "dir") return "r|dir|" + obj.phase;
+  return c + "|" + stage;
 }
 
 export function goScreenState(s, screen, extra) {
@@ -280,11 +306,28 @@ export function jumpState(s, c, stage, conceptState) {
 }
 
 export function stageState(s, c, stage, obj) {
-  return {
+  const transition = playbackTransition(s, { kind: "stage", screen: "flow", concept: c, stage });
+  const nextConcept = { ...s[c], note: "", ...(obj || {}) };
+  const next = {
     ...s, ...clearedNavigationState(), heardStage: {},
     stages: { ...s.stages, [c]: stage },
-    [c]: { ...s[c], note: "", ...(obj || {}) }
+    [c]: nextConcept
   };
+  if (transition === "hard-stop") return next;
+
+  next.playKey = s.playKey;
+  next.heardStage = { ...s.heardStage, [heardKeyAt(c, stage, nextConcept)]: true };
+  // Field's existing CTA uses its local heard flag as well as the shared gate.
+  // A tone updated into the new viewport has genuinely been heard there.
+  if (c === "d" && (stage === "field" || stage === "zoom")) next.d = { ...next.d, heard: true };
+  // Entering an A/B stage with the carried main candidate presents it as
+  // Sound 1. Record only that audition; Sound 2 stays participant-controlled.
+  if (c === "r" && stage === "comp") {
+    next.prKey = "r|comp|" + next.r.round + "|" + next.r.uncertain;
+    next.prHeardA = s.playKey !== "prB";
+    next.prHeardB = s.playKey === "prB";
+  }
+  return next;
 }
 
 // Full reset for the moderator between participants: every option, the setup

@@ -3,13 +3,18 @@ import assert from "node:assert/strict";
 import * as gating from "../../src/gating.js";
 import * as shell from "../../src/app-shell.js";
 
-test("stage judgment stays locked until the current stage has played", () => {
+test("stage judgment carries while playback is preserved and locks after silence", () => {
   const start = { ...shell.initialState(), screen: "flow", concept: "n" };
   assert.equal(gating.heardHere(start), false);
   const heard = { ...start, ...gating.markHeardState(start) };
   assert.equal(gating.heardHere(heard), true);
   const next = shell.stageState(heard, "n", "p1");
-  assert.equal(gating.heardHere(next), false, "a new stage relocks judgment");
+  assert.equal(gating.heardHere(next), false, "heard history alone does not imply active playback");
+
+  const sounding = { ...heard, playKey: "main" };
+  const carried = shell.stageState(sounding, "n", "p1");
+  assert.equal(gating.heardHere(carried), true, "a preserved owner carries heard state forward");
+  assert.equal(carried.playKey, "main");
 });
 
 test("directional phases have independent heard keys", () => {

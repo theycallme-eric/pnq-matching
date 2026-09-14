@@ -111,13 +111,14 @@ test.describe("comparison (Option 2)", () => {
     await expect(page.getByText("Play both sounds before choosing.")).toHaveCount(0);
 
     await picks.first().click();
-    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe(null);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prB");
     const r = await rState(page);
     expect(r.round).toBe(3);
     expect(r.spread).toBeCloseTo(.156, 6);
     expect(r.center).toBeCloseTo(.45, 6);
     await expect(picks.first()).toBeDisabled();
     await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Stop sound 2" })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("reaching the spread floor ends the loop into Confidence", async ({ page }) => {
