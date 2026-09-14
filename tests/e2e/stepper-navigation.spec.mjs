@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { expectSeparatedFooterTargets } from "./footer-target-helpers.mjs";
+import { expectSeparatedNavigationTargets } from "./footer-target-helpers.mjs";
 import { openSessionMenu } from "./onboarding-helpers.mjs";
 
 async function seed(page) {
@@ -31,18 +31,20 @@ async function expectActionRegionSeparated(page) {
   await expect(previous).toBeVisible();
   await expect(next).toBeVisible();
 
-  const footer = page.locator("[data-shell-footer]");
-  const [regionBox, previousBox, nextBox, footerBox] = await Promise.all([
-    region.boundingBox(), previous.boundingBox(), next.boundingBox(), footer.boundingBox()
+  const navigation = page.locator("[data-session-navigation]");
+  const screen = page.locator("[data-screen]");
+  const [regionBox, previousBox, nextBox, navigationBox, screenBox] = await Promise.all([
+    region.boundingBox(), previous.boundingBox(), next.boundingBox(), navigation.boundingBox(), screen.boundingBox()
   ]);
 
   expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(previousBox.y + .5);
   expect(nextBox.x).toBeCloseTo(previousBox.x, 0);
   expect(nextBox.width).toBeCloseTo(previousBox.width, 0);
-  expect(regionBox.y + regionBox.height).toBeLessThanOrEqual(footerBox.y + .5);
-  expect(previousBox.y + previousBox.height).toBeLessThanOrEqual(footerBox.y);
-  expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(footerBox.y);
-  await expectSeparatedFooterTargets(page);
+  expect(regionBox.y).toBeGreaterThanOrEqual(navigationBox.y + navigationBox.height - .5);
+  expect(regionBox.y + regionBox.height).toBeLessThanOrEqual(screenBox.y + screenBox.height + .5);
+  expect(previousBox.y + previousBox.height).toBeLessThanOrEqual(screenBox.y + screenBox.height);
+  expect(nextBox.y + nextBox.height).toBeLessThanOrEqual(screenBox.y + screenBox.height);
+  await expectSeparatedNavigationTargets(page);
 }
 
 test.describe("matching stepper navigation (REQ-014)", () => {
@@ -117,7 +119,7 @@ test.describe("matching stepper navigation (REQ-014)", () => {
     expect(state.stages.n).toBe("p2");
   });
 
-  test("field Previous moves back one refinement level and remains separate from the footer", async ({ page }) => {
+  test("field Previous moves back one refinement level and remains separate from the top navigation", async ({ page }) => {
     await seed(page);
     await jumpTo(page, "OPTION 3", "Whole field");
     let actions = stepActions(page);

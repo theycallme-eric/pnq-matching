@@ -26,10 +26,10 @@ test.describe("comparison contextual Help (REQ-001, REQ-003)", () => {
     await openComparison(page);
 
     const screen = page.locator("[data-screen]");
-    const footer = page.locator("[data-shell-footer]");
+    const navigation = page.locator("[data-session-navigation]");
     await expect(screen.getByRole("button", { name: "I can't hear these sounds", exact: true })).toHaveCount(0);
-    await expect(footer.getByRole("button", { name: "Back", exact: true })).toBeVisible();
-    await expect(footer.getByRole("button", { name: "Help", exact: true })).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Back", exact: true })).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Help", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Play sound 1" }).click();
     const beforeHelp = await appState(page);
@@ -38,7 +38,7 @@ test.describe("comparison contextual Help (REQ-001, REQ-003)", () => {
     await dialog.getByRole("button", { name: "Close help" }).click();
 
     await expect(dialog).toHaveCount(0);
-    await expect(footer.getByRole("button", { name: "Help", exact: true })).toBeFocused();
+    await expect(navigation.getByRole("button", { name: "Help", exact: true })).toBeFocused();
     expect(await appState(page)).toEqual(beforeHelp);
     await expect(page.getByRole("button", { name: "Stop sound 1" })).toBeVisible();
     await expect(page.getByRole("button", { name: "This one" }).first()).toBeDisabled();

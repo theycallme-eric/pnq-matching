@@ -288,13 +288,14 @@ export function stageState(s, c, stage, obj) {
 }
 
 // Full reset for the moderator between participants: every option, the setup
-// steps and the screen return to their first-run state. The caller also clears
-// sessionStorage under STORAGE_KEY.
+// steps and the screen return to their first-run state. Presentation geometry
+// belongs to the viewport rather than the session, so it survives the reset.
+// The caller also clears sessionStorage under STORAGE_KEY.
 export function resetAllState(s) {
-  return initialState();
+  return { ...initialState(), framed: s.framed, devScale: s.devScale };
 }
 
-/* ---------- bottom bar: conditional Back ---------- */
+/* ---------- shared session navigation: conditional Back ---------- */
 
 export function navShow(s) {
   const inFlow = s.screen === "flow";

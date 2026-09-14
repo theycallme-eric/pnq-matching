@@ -33,6 +33,12 @@ test("launch screen loads the design system and renders the blue welcome mark", 
 
   // Launch chrome comes from design-system components.
   await expect(page.locator('[data-screen="launch"]')).toBeVisible();
+  await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+  const launchChrome = await page.evaluate(() => ({
+    safe: getComputedStyle(document.querySelector('[data-safe-area="top"]')).backgroundColor,
+    screen: getComputedStyle(document.querySelector('[data-screen="launch"]')).backgroundColor
+  }));
+  expect(launchChrome.safe).toBe(launchChrome.screen);
   await expect(page.getByText("A guided sound-matching experience.")).toBeVisible();
   await expect(page.getByText(/prototype|fictional/i)).toHaveCount(0);
 });

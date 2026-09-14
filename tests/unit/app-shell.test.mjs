@@ -122,18 +122,19 @@ test("malformed, unknown, and hostile stored values fail safely without audio", 
   assert.deepEqual(dirty.n, shell.freshN());
 });
 
-test("resetAll returns every shell and option value to first-run splash state", () => {
+test("resetAll clears session state while preserving the measured device presentation", () => {
   let st = shell.initialState();
   st = shell.openOptionState(st, "n");
   st = shell.stageState(st, "n", "p2", { pitch: .9 });
   st = {
     ...st, screen: "conclusion", onboardingSeen: true, earSeen: true, onboardingInput: "SIM-123",
+    framed: false, devScale: .731,
     setupSeen: true, eduSeen: true, hp: true, vol: 100, ear: "Left ear", playKey: "main",
     menuOpen: true, jumpOpen: true, menuStopped: true, setupWarn: true, earWarn: true,
     optDone: { n: true, r: true, d: true }, optOrder: ["n", "r", "d"]
   };
   const r = shell.resetAllState(st);
-  assert.deepEqual(r, shell.initialState());
+  assert.deepEqual(r, { ...shell.initialState(), framed: false, devScale: .731 });
   assert.equal(shell.STORAGE_KEY, "pnq-mtp-v1");
 });
 

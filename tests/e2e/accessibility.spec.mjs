@@ -337,7 +337,10 @@ test.describe("accessibility and participant copy", () => {
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expectVisibleFocus(menu);
     await menu.press("Enter");
-    await expect(menu).toHaveAttribute("aria-expanded", "true");
+    const coveredMenu = page.locator('[data-session-navigation-region="session-menu"]');
+    await expect(coveredMenu).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("[data-session-navigation]")).toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator("[data-session-navigation]")).toHaveAttribute("inert", "");
     await expect(page.getByRole("dialog", { name: "Session menu" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Close", exact: true })).toBeFocused();
     const reset = page.getByRole("button", { name: "Reset application" });

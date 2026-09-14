@@ -1,6 +1,7 @@
 /*
- * End-to-end tests for the app shell (REQ-001, REQ-020): navigation and
- * persistence, framed vs bare chrome, conditional Back, and audio hard stop.
+ * End-to-end tests for the app shell (REQ-001, REQ-007, REQ-008, REQ-009,
+ * REQ-020): top navigation, safe-area chrome, reset geometry, persistence,
+ * conditional Back, and audio hard stop.
  */
 import { test, expect } from "@playwright/test";
 import { openSessionMenu, startMatchingOption, startSessionFromSplash } from "./onboarding-helpers.mjs";
@@ -104,6 +105,27 @@ async function expectContainedShell(page, expectedMode) {
   }
 }
 
+async function expectTopChromeContinuity(page, expectedMode) {
+  const result = await page.locator("[data-device-frame]").evaluate((frame, mode) => {
+    const screen = frame.querySelector("[data-screen]");
+    const navigation = frame.querySelector("[data-session-navigation]");
+    const adjacent = navigation
+      || screen.querySelector("[data-onboarding-navigation]")
+      || screen.querySelector("[data-dashboard-header]")
+      || screen;
+    const chrome = mode === "bare"
+      ? frame.querySelector('[data-safe-area="top"]')
+      : frame.querySelector("[data-framed-status-bar]");
+    return {
+      chrome: getComputedStyle(chrome).backgroundColor,
+      adjacent: getComputedStyle(adjacent).backgroundColor,
+      overflow: frame.scrollWidth > frame.clientWidth + 1
+    };
+  }, expectedMode);
+  expect(result.chrome).toBe(result.adjacent);
+  expect(result.overflow).toBe(false);
+}
+
 test.describe("app shell", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -182,6 +204,28 @@ test.describe("app shell", () => {
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
   });
 
+  test("applicable screens mount one dark navigation above content while launch and dashboard keep their own chrome", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Get started" }).click();
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+    await expect(page.locator("[data-onboarding-navigation]")).toHaveCount(1);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Yes, that's me" }).click();
+    await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+    await page.getByRole("button", { name: "New Session" }).click();
+
+    const navigation = page.locator("[data-session-navigation]");
+    await expect(navigation).toHaveCount(1);
+    await expect(page.locator("[data-shell-footer]")).toHaveCount(0);
+    const positions = await page.locator("[data-device-frame]").evaluate((frame) => {
+      const nav = frame.querySelector("[data-session-navigation]").getBoundingClientRect();
+      const screen = frame.querySelector("[data-screen]").getBoundingClientRect();
+      return { navigationBottom: nav.bottom, screenTop: screen.top };
+    });
+    expect(positions.navigationBottom).toBeLessThanOrEqual(positions.screenTop + .5);
+  });
+
   test("app shell hard-stops audio on every screen and stage transition", async ({ page }) => {
     await page.goto("/");
     await completeSetup(page);
@@ -212,6 +256,7 @@ test.describe("app shell chrome", () => {
     await visitShellScreens(page, async (label) => {
       visited.push(label);
       await expectContainedShell(page, "bare");
+      await expectTopChromeContinuity(page, "bare");
     });
     expect(visited).toEqual([
       "Launch", "Create account · entry", "Create account · confirmation",
@@ -223,7 +268,10 @@ test.describe("app shell chrome", () => {
   test("every shell screen remains a centered logical 390 by 844 phone on desktop", async ({ page }) => {
     test.setTimeout(60000);
     await page.setViewportSize({ width: 1024, height: 900 });
-    await visitShellScreens(page, async () => expectContainedShell(page, "framed"));
+    await visitShellScreens(page, async () => {
+      await expectContainedShell(page, "framed");
+      await expectTopChromeContinuity(page, "framed");
+    });
   });
 
   for (const scenario of [
@@ -267,6 +315,57 @@ test.describe("app shell chrome", () => {
     await expect(input).toHaveValue("LOCAL-ONLY-DRAFT");
     expect(Math.round((await frame.boundingBox()).width)).toBe(390);
   });
+
+  for (const scenario of [
+    { width: 619, height: 900, mode: "bare" },
+    { width: 620, height: 900, mode: "framed" },
+    { width: 700, height: 700, mode: "framed" }
+  ]) {
+    test(`Reset application preserves ${scenario.mode} geometry at ${scenario.width}x${scenario.height}`, async ({ page }) => {
+      await page.setViewportSize({ width: scenario.width, height: scenario.height });
+      await page.addInitScript(() => sessionStorage.setItem("pnq-mtp-v1", JSON.stringify({
+        onboardingSeen: true, earSeen: true, setupSeen: true, eduSeen: true,
+        optDone: {}, optOrder: []
+      })));
+      await page.goto("/");
+      await page.getByRole("button", { name: "Close matching options" }).click();
+      const frame = page.locator("[data-device-frame]");
+      const before = await frame.evaluate((node) => ({
+        mode: node.getAttribute("data-device-frame"),
+        transform: node.style.transform,
+        rect: (() => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()
+      }));
+
+      await page.getByRole("button", { name: "Session menu" }).click();
+      await page.getByRole("button", { name: "Reset application" }).click();
+      await expect(page.locator('[data-screen-label="Launch"]')).toBeVisible();
+      const after = await frame.evaluate((node) => ({
+        mode: node.getAttribute("data-device-frame"),
+        transform: node.style.transform,
+        rect: (() => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()
+      }));
+
+      expect(after).toEqual(before);
+      expect(after.mode).toBe(scenario.mode);
+      await expect(page.locator("[data-session-navigation]")).toHaveCount(0);
+      await expect(page.locator("[role='dialog']")).toHaveCount(0);
+      expect(await page.evaluate((storageKey) => sessionStorage.getItem(storageKey), key)).toBeNull();
+      expect(await page.evaluate(() => {
+        const state = window.__pnqAppState();
+        return {
+          screen: state.screen, playKey: state.playKey, menuOpen: state.menuOpen,
+          helpOpen: state.helpOpen, matchingOptionsOpen: state.matchingOptionsOpen,
+          onboardingSeen: state.onboardingSeen, earSeen: state.earSeen,
+          setupSeen: state.setupSeen, eduSeen: state.eduSeen,
+          optDone: state.optDone, optOrder: state.optOrder
+        };
+      })).toEqual({
+        screen: "launch", playKey: null, menuOpen: false, helpOpen: false,
+        matchingOptionsOpen: false, onboardingSeen: false, earSeen: false,
+        setupSeen: false, eduSeen: false, optDone: {}, optOrder: []
+      });
+    });
+  }
 
   test("responsive web shell does not opt into installability or offline state", async ({ page }) => {
     await page.goto("/");

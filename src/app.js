@@ -288,6 +288,8 @@ class App extends React.Component {
     try { sessionStorage.removeItem(shell.STORAGE_KEY); } catch (err) {}
     this.setState((s) => ({
       ...shell.resetAllState(s),
+      accountConfirmation: false,
+      helpOpen: false,
       matchingOptions: matchingOptions.openMatchingOptions(),
       matchingOptionsOpen: false,
       matchingContext: "dashboard",
@@ -309,7 +311,7 @@ class App extends React.Component {
     });
   }
 
-  // REQ-012: footer Help is driven by the active matching context, so a
+  // Contextual Help is driven by the active matching context, so a
   // screen can expose only the assistance actions it previously owned.
   contextualHelpActions() {
     const st = this.state;
@@ -563,7 +565,8 @@ class App extends React.Component {
         key: "b",
         style: {
           flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          textAlign: "center", padding: "24px 40px", background: "var(--gradient-navy)"
+          textAlign: "center", padding: "24px 40px",
+          backgroundColor: "var(--navy-900)", backgroundImage: "var(--gradient-navy)"
         }
       },
         e("img", { src: "assets/waveform-mark.svg", alt: "", style: { width: "118px", height: "40px" } }),
@@ -580,7 +583,10 @@ class App extends React.Component {
   }
 
   onboardingBack(onClick) {
-    return e("div", { key: "nav", style: { flex: "none", minHeight: "50px", display: "flex", alignItems: "center", padding: "0 14px", background: "var(--navy-800)" } },
+    return e("div", {
+      key: "nav", "data-onboarding-navigation": "",
+      style: { flex: "none", minHeight: "50px", display: "flex", alignItems: "center", padding: "0 14px", background: "var(--navy-800)" }
+    },
       e("button", {
         type: "button", onClick,
         style: { display: "flex", alignItems: "center", gap: "4px", minHeight: "44px", padding: "0 8px", border: "none", background: "transparent", color: "var(--white)", font: "500 16px var(--font-text)", cursor: "pointer" }
@@ -680,7 +686,14 @@ class App extends React.Component {
       }
     ];
     return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--interface-app)" } },
-      e("header", { style: { flex: "none", background: "var(--gradient-navy-dashboard)", color: "var(--text-on-dark)", padding: "18px 24px 28px" } },
+      e("header", {
+        "data-dashboard-header": "",
+        style: {
+          flex: "none", backgroundColor: "var(--navy-800)",
+          backgroundImage: "var(--gradient-navy-dashboard)",
+          color: "var(--text-on-dark)", padding: "18px 24px 28px"
+        }
+      },
         e("div", { style: { display: "flex", alignItems: "center", gap: "9px" } },
           e("img", { src: "assets/waveform-mark.svg", alt: "", style: { width: "28px", height: "28px" } }),
           e("div", { style: { font: "700 17px var(--font-ui)", letterSpacing: "-.015em", color: "var(--text-on-dark)" } }, "pnq health")),
@@ -2158,20 +2171,22 @@ class App extends React.Component {
     const framed = st.framed;
     const dark = st.screen === "setup" || st.screen === "home" && st.matchingContext === "setup";
     const onboardingScreen = ["launch", "account", "dashboard"].includes(st.screen);
-    const statusOnDark = dark || onboardingScreen;
     const indicatorOnDark = dark || st.screen === "launch";
-    const chromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
-    const statusBg = statusOnDark ? "var(--navy-800)" : "var(--gray-50)";
-    const chromeLine = dark ? "var(--interface-dark-border)" : "var(--gray-200)";
-    const chromeFg = dark ? "var(--blue-300)" : "var(--blue-700)";
+    const topChromeBg = st.screen === "launch" ? "var(--navy-900)" : "var(--navy-800)";
+    const bottomChromeBg = dark ? "var(--navy-900)" : "var(--gray-50)";
+    const navigationBg = "var(--navy-800)";
+    const navigationLine = "var(--interface-dark-border)";
+    const navigationFg = "var(--blue-300)";
     const prog = shell.progress(c, s, st);
     const progShow = st.screen === "flow" && prog.show;
-    const nav = shell.navShow(st);
+    const showBack = shell.navShow(st);
+    const showSessionNavigation = !onboardingScreen;
     const label = shell.screenLabelOf(st.screen, c, s);
     const helpActions = this.contextualHelpActions();
-    const footerControlStyle = {
+    const navigationBlocked = st.menuOpen || st.helpOpen || st.screen === "home" && st.matchingOptionsOpen;
+    const navigationControlStyle = {
       display: "flex", alignItems: "center", gap: "6px", minHeight: "44px",
-      padding: "0 8px", border: "none", background: "transparent", color: chromeFg,
+      padding: "0 8px", border: "none", background: "transparent", color: navigationFg,
       font: "600 15px var(--font-ui)", cursor: "pointer"
     };
 
@@ -2215,8 +2230,65 @@ class App extends React.Component {
         }
       },
         framed
-          ? e(DS.StatusBar, { time: "9:41", onDark: statusOnDark, background: statusOnDark ? "var(--navy-800)" : chromeBg })
-          : e("div", { "data-safe-area": "top", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-top)", background: chromeBg } }),
+          ? e("div", {
+            "data-framed-status-bar": "", style: { flex: "none", background: topChromeBg }
+          }, e(DS.StatusBar, { time: "9:41", onDark: true, background: "transparent" }))
+          : e("div", {
+            "data-safe-area": "top", "aria-hidden": "true",
+            style: { flex: "none", height: "env(safe-area-inset-top)", background: topChromeBg }
+          }),
+        showSessionNavigation ? e("nav", {
+          "data-session-navigation": "",
+          "aria-label": "Session navigation",
+          ...(navigationBlocked ? { "aria-hidden": "true", inert: "" } : {}),
+          style: {
+            // Three fixed grid regions keep absent Back or Help actions from
+            // moving or overlapping the invisible moderator hotspot.
+            flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 56px minmax(0, 1fr)",
+            alignItems: "center", columnGap: "8px", minHeight: "50px", padding: "2px 8px",
+            width: "100%", boxSizing: "border-box", pointerEvents: navigationBlocked ? "none" : undefined,
+            background: navigationBg, borderBottom: "1px solid " + navigationLine
+          }
+        },
+          showBack
+            ? e("button", {
+              type: "button", "data-session-navigation-region": "back", onClick: () => this.onBack(),
+              style: { ...navigationControlStyle, gridColumn: "1", justifySelf: "start" }
+            },
+              e("span", {
+                style: {
+                  display: "block", width: "9px", height: "9px",
+                  borderLeft: "2.4px solid " + navigationFg,
+                  borderBottom: "2.4px solid " + navigationFg,
+                  transform: "rotate(45deg)"
+                }
+              }), "Back")
+            : e("span", {
+              "data-session-navigation-region": "back", "aria-hidden": "true",
+              style: { display: "block", gridColumn: "1", height: "44px" }
+            }),
+          e("button", {
+            type: "button", ref: (node) => { this.menuButton = node; }, onClick: () => this.openMenu(),
+            "data-session-navigation-region": "session-menu",
+            "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
+            "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
+            style: {
+              gridColumn: "2", justifySelf: "center", width: "56px", height: "44px",
+              border: "none", background: "transparent", cursor: "pointer"
+            }
+          }),
+          helpActions.length
+            ? e("button", {
+              type: "button", ref: (node) => { this.helpButton = node; }, onClick: () => this.openHelp(),
+              "data-session-navigation-region": "help",
+              "aria-haspopup": "dialog", "aria-expanded": st.helpOpen ? "true" : "false",
+              "aria-controls": st.helpOpen ? "contextual-help-dialog" : undefined,
+              style: { ...navigationControlStyle, gridColumn: "3", justifySelf: "end" }
+            }, "Help")
+            : e("span", {
+              "data-session-navigation-region": "help", "aria-hidden": "true",
+              style: { display: "block", gridColumn: "3", height: "44px" }
+            })) : null,
         progShow ? e("div", { "data-progress": "", style: { flex: "none", padding: "10px 22px 12px", background: "var(--gray-50)", borderBottom: "1px solid var(--gray-200)" } },
           e("div", { style: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px" } },
             e("span", { style: { font: font.label, letterSpacing: ".16em", color: "var(--text-label)" } }, prog.lbl),
@@ -2226,46 +2298,9 @@ class App extends React.Component {
         screenRoot,
         st.menuOpen ? this.renderMenu() : null,
         st.helpOpen && helpActions.length ? this.renderHelp() : null,
-        onboardingScreen ? null : e("div", {
-          "data-shell-footer": "",
-          ...(st.screen === "home" && st.matchingOptionsOpen ? { "aria-hidden": "true", inert: "" } : {}),
-          style: {
-            // REQ-013: reserve independent left, center, and right hit regions
-            // even when one of the visible footer controls is absent.
-            flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) 56px minmax(0, 1fr)",
-            alignItems: "center", columnGap: "8px", padding: "2px 8px 4px",
-            width: "100%", boxSizing: "border-box",
-            background: chromeBg, borderTop: "1px solid " + chromeLine
-          }
-        },
-          nav
-            ? e("button", {
-              type: "button", "data-footer-region": "back", onClick: () => this.onBack(),
-              style: { ...footerControlStyle, gridColumn: "1", justifySelf: "start" }
-            },
-              e("span", { style: { display: "block", width: "9px", height: "9px", borderLeft: "2.4px solid " + chromeFg, borderBottom: "2.4px solid " + chromeFg, transform: "rotate(45deg)" } }), "Back")
-            : e("span", { "data-footer-region": "back", "aria-hidden": "true", style: { display: "block", gridColumn: "1", height: "44px" } }),
-          st.screen === "dashboard"
-            ? e("span", { "data-footer-region": "session-menu", "aria-hidden": "true", style: { display: "block", gridColumn: "2", justifySelf: "center", width: "56px", height: "44px" } })
-            : e("button", {
-              type: "button", ref: (node) => { this.menuButton = node; }, onClick: () => this.openMenu(),
-              "data-footer-region": "session-menu",
-              "aria-label": "Session menu", "aria-haspopup": "dialog", "aria-expanded": st.menuOpen ? "true" : "false",
-              "aria-controls": st.menuOpen ? "session-menu-dialog" : undefined,
-              style: { gridColumn: "2", justifySelf: "center", width: "56px", height: "44px", border: "none", background: "transparent", cursor: "pointer" }
-            }),
-          helpActions.length
-            ? e("button", {
-              type: "button", ref: (node) => { this.helpButton = node; }, onClick: () => this.openHelp(),
-              "data-footer-region": "help",
-              "aria-haspopup": "dialog", "aria-expanded": st.helpOpen ? "true" : "false",
-              "aria-controls": st.helpOpen ? "contextual-help-dialog" : undefined,
-              style: { ...footerControlStyle, gridColumn: "3", justifySelf: "end" }
-            }, "Help")
-            : e("span", { "data-footer-region": "help", "aria-hidden": "true", style: { display: "block", gridColumn: "3", height: "44px" } })),
         framed
-          ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : chromeBg })
-          : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: chromeBg } }),
+          ? e(DS.HomeIndicator, { onDark: indicatorOnDark, background: st.screen === "launch" ? "var(--navy-600)" : bottomChromeBg })
+          : e("div", { "data-safe-area": "bottom", "aria-hidden": "true", style: { flex: "none", height: "env(safe-area-inset-bottom)", background: bottomChromeBg } }),
         st.screen === "home" && st.matchingOptionsOpen ? this.renderMatchingOptionsSheet() : null));
   }
 }
