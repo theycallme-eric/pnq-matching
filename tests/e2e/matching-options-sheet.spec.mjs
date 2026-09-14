@@ -26,6 +26,8 @@ test.describe("matching-options full-device bottom sheet", () => {
     const layer = page.locator("[data-matching-options-layer]");
     const sheet = page.locator("[data-matching-options-sheet]");
 
+    await expect(context).toHaveAttribute("data-matching-options-context", "education");
+    await expect(context.getByText("What to listen for", { exact: true })).toBeVisible();
     await expect(context).toHaveAttribute("aria-hidden", "true");
     await expect(context).toHaveAttribute("inert", "");
     await expect(footer).toHaveAttribute("aria-hidden", "true");
@@ -88,7 +90,8 @@ test.describe("matching-options full-device bottom sheet", () => {
 
     await expect(page.locator("[data-matching-options-layer]")).toHaveCount(0);
     await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
-    await expect(page.locator("[data-matching-options-context]")).not.toHaveAttribute("aria-hidden", "true");
+    await expect(page.locator('[data-matching-options-context="education"]')).not.toHaveAttribute("aria-hidden", "true");
+    await expect(page.getByText("What to listen for", { exact: true })).toBeVisible();
     await expect(page.locator("[data-shell-footer]")).not.toHaveAttribute("aria-hidden", "true");
     const state = await page.evaluate(() => window.__pnqAppState());
     expect(state.screen).toBe("home");
@@ -104,23 +107,30 @@ test.describe("matching-options full-device bottom sheet", () => {
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeDisabled();
   });
 
-  test("selection alone enables Continue and Continue separately advances", async ({ page }) => {
-    await restoreReadyOptions(page);
+  for (const [number, concept, label] of [
+    [1, "n", "Narrowing · Refinement pass"],
+    [2, "r", "Shared · Listen and respond"],
+    [3, "d", "Field · Pitch and volume"]
+  ]) {
+    test(`Option ${number} selection alone enables Continue and only Continue enters it`, async ({ page }) => {
+      await restoreReadyOptions(page);
 
-    const continueButton = page.getByRole("button", { name: "Continue", exact: true });
-    const second = page.getByRole("button", { name: "Option 2", exact: true });
-    await expect(continueButton).toBeDisabled();
+      const continueButton = page.getByRole("button", { name: "Continue", exact: true });
+      const option = page.getByRole("button", { name: `Option ${number}`, exact: true });
+      await expect(continueButton).toBeDisabled();
+      await expect(page.locator('[data-option-state="selected"]')).toHaveCount(0);
 
-    await second.click();
-    await expect(second).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[aria-pressed="true"][data-option-state="selected"]')).toHaveCount(1);
-    await expect(continueButton).toBeEnabled();
-    await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
+      await option.click();
+      await expect(option).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator('[aria-pressed="true"][data-option-state="selected"]')).toHaveCount(1);
+      await expect(continueButton).toBeEnabled();
+      await expect(page.locator('[data-screen-label="Matching options"]')).toBeVisible();
 
-    await continueButton.click();
-    await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
-    expect(await page.evaluate(() => window.__pnqAppState().concept)).toBe("r");
-  });
+      await continueButton.click();
+      await expect(page.locator(`[data-screen-label="${label}"]`)).toBeVisible();
+      expect(await page.evaluate(() => window.__pnqAppState().concept)).toBe(concept);
+    });
+  }
 
   test("keeps the completion summary visible behind the reopened sheet", async ({ page }) => {
     await restoreReadyOptions(page);
