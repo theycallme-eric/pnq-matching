@@ -56,6 +56,7 @@ test.describe("completed option return", () => {
     await expect(completedSummary).toContainText("You chose to finish");
     await expect(screen(page, "Setup · Ear")).toHaveCount(0);
     await expect(screen(page, "Setup · Headphones and volume")).toHaveCount(0);
+    await expect(screen(page, "Shared · What to listen for")).toHaveCount(0);
 
     const options = [1, 2, 3].map((number) => page.getByRole("button", { name: `Option ${number}`, exact: true }));
     await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
@@ -82,5 +83,6 @@ test.describe("completed option return", () => {
     expect(state.matchingContextData).toBeNull();
     expect(state.optDone).toEqual({ r: true });
     expect(state.optOrder).toEqual(["r"]);
+    expect(state.eduSeen).toBe(true);
   });
 });

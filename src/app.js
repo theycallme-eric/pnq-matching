@@ -98,7 +98,9 @@ class App extends React.Component {
         ...restored,
         accountConfirmation: false,
         matchingOptions: matchingOptions.openMatchingOptions(),
-        matchingOptionsOpen: restored.screen === "home"
+        matchingOptionsOpen: restored.screen === "home",
+        matchingContext: restored.screen === "home" ? "education" : "dashboard",
+        matchingContextData: null
       });
     } catch (err) {}
     this.measure = () => {
@@ -197,8 +199,14 @@ class App extends React.Component {
   goScreen(screen, extra) {
     this.hardStop();
     this.setState((s) => {
-      const next = shell.goScreenState(s, screen, extra);
-      if (screen !== "home") return { ...next, matchingOptionsOpen: false };
+      // Participant navigation can request the selector from Back or the
+      // session menu, but it must never skip an unfinished session gate.
+      const candidate = { ...s, ...(extra || {}) };
+      const destination = screen === "home" && !shell.optionSelectionReady(candidate)
+        ? !candidate.earSeen ? "ear" : !candidate.setupSeen ? "setup" : "edu"
+        : screen;
+      const next = shell.goScreenState(s, destination, extra);
+      if (destination !== "home") return { ...next, matchingOptionsOpen: false };
       return {
         ...next,
         matchingOptions: matchingOptions.openMatchingOptions(),
@@ -818,7 +826,7 @@ class App extends React.Component {
       e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--navy-900)" } },
         e(DS.Button, {
           variant: "primary", size: "md", onDark: true, disabled: !(st.hp && ready),
-          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("home", { setupSeen: true }) : this.setState({ setupWarn: true })
+          onClick: () => (st.hp && st.vol >= 100) ? this.goScreen("edu", { setupSeen: true }) : this.setState({ setupWarn: true })
         }, "Continue"),
         e("div", { style: { height: "9px" } }))
     ];
@@ -827,7 +835,8 @@ class App extends React.Component {
   renderMatchingContext() {
     const st = this.state;
     if (st.matchingContext === "education") {
-      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } }, this.renderEdu(() => {}));
+      return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" } },
+        this.renderEdu(() => this.goScreen("home", { eduSeen: true })));
     }
     if (st.matchingContext === "setup") {
       return e("div", { style: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--navy-900)" } }, this.renderSetup());

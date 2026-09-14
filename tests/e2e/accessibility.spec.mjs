@@ -204,6 +204,8 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones Plug in/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
+    await auditScreen("What to listen for");
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await auditScreen("Matching options");
 
     expect(problems).toEqual([]);
@@ -239,6 +241,8 @@ test.describe("accessibility and participant copy", () => {
     await page.getByRole("button", { name: /Headphones/ }).click();
     await page.getByLabel("Device volume").fill("100");
     await page.getByRole("button", { name: "Continue" }).click();
+    await audit("What to listen for");
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     await audit("Matching options");
     await openSessionMenu(page);
     await page.getByRole("button", { name: "Jump to a different section" }).click();
@@ -305,6 +309,10 @@ test.describe("accessibility and participant copy", () => {
     await volume.press("End");
     await expect(volume).toHaveValue("100");
     await page.getByRole("button", { name: "Continue" }).press("Enter");
+
+    const educationStart = page.getByRole("button", { name: "I'm ready to start" });
+    await expectVisibleFocus(educationStart);
+    await educationStart.press("Enter");
 
     const option = page.getByRole("button", { name: "Option 1" });
     await expectVisibleFocus(option);
@@ -384,8 +392,10 @@ test.describe("accessibility and participant copy", () => {
     await bothEars.press("Space");
     await expect(bothEars).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Continue" }).click();
-    await openSessionMenu(page);
-    await page.getByRole("button", { name: "Return to matching options" }).click();
+    await page.getByRole("button", { name: /Headphones Plug in/ }).click();
+    await page.getByLabel("Device volume").fill("100");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "I'm ready to start" }).click();
     const option = page.getByRole("button", { name: "Option 1" });
     await expect(option).not.toHaveAttribute("aria-disabled", /.*/);
     await expect(option).toHaveAttribute("aria-pressed", "false");
