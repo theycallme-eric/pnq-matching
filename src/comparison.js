@@ -19,6 +19,10 @@ const clamp = (v) => Math.max(0, Math.min(1, v));
 
 export const SPREAD_FLOOR = 0.06;
 export const FATIGUE_ROUND = 10;
+export const DIRECTIONAL_CLOSE = {
+  vol: "This volume is close",
+  pitch: "This pitch is close"
+};
 
 // One directional answer. Movement answers step a set amount and shrink the
 // next step; "nohear" is the audibility escape (REQ-016): it raises the level

@@ -282,6 +282,31 @@ test("Option 3 carries playback and heard state through zoom and Confidence", ()
   assert.equal(confidence.heardStage["d|conf"], true);
 });
 
+test("Option 2 preserves directional playback but starts its first A/B pair unauditioned", () => {
+  const initial = shell.initialState();
+  const volume = {
+    ...initial,
+    screen: "flow",
+    concept: "r",
+    playKey: "main",
+    stages: { ...initial.stages, r: "dir" }
+  };
+  const directionalBack = shell.stageState({
+    ...volume,
+    r: { ...volume.r, phase: "pitch" }
+  }, "r", "dir", { phase: "vol" });
+  assert.equal(directionalBack.playKey, "main");
+  assert.equal(directionalBack.heardStage["r|dir|vol"], true);
+
+  const pair = shell.stageState({
+    ...volume,
+    r: { ...volume.r, phase: "pitch", pitchOk: 1 }
+  }, "r", "comp", { round: 1, uncertain: 0 });
+  assert.equal(pair.playKey, null);
+  assert.equal(pair.prHeardA, false);
+  assert.equal(pair.prHeardB, false);
+});
+
 test("screen roots carry the established data-screen-label values without Privacy", () => {
   assert.equal(shell.screenLabelOf("launch"), "Launch");
   assert.equal(shell.screenLabelOf("privacy"), "");

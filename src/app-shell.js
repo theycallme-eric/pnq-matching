@@ -237,7 +237,11 @@ export function playbackTransition(s, destination) {
   const sameActiveOption = d.kind === "stage" && s.screen === "flow" && d.screen === "flow" &&
     d.concept === s.concept && OPTORDER.includes(s.concept);
   const audibleStages = !PLAYBACK_BOUNDARY_STAGES.has(fromStage) && !PLAYBACK_BOUNDARY_STAGES.has(d.stage);
-  return sameActiveOption && validOwner && audibleStages ? "preserve" : "hard-stop";
+  // The first A/B pair is a deliberate participant-controlled audition
+  // boundary. The directional candidate stops here so neither side appears
+  // to have been played before its explicit Play action.
+  const enteringFirstPair = s.concept === "r" && fromStage === "dir" && d.stage === "comp";
+  return sameActiveOption && validOwner && audibleStages && !enteringFirstPair ? "preserve" : "hard-stop";
 }
 
 function heardKeyAt(c, stage, obj) {
@@ -320,13 +324,6 @@ export function stageState(s, c, stage, obj) {
   // Field's existing CTA uses its local heard flag as well as the shared gate.
   // A tone updated into the new viewport has genuinely been heard there.
   if (c === "d" && (stage === "field" || stage === "zoom")) next.d = { ...next.d, heard: true };
-  // Entering an A/B stage with the carried main candidate presents it as
-  // Sound 1. Record only that audition; Sound 2 stays participant-controlled.
-  if (c === "r" && stage === "comp") {
-    next.prKey = "r|comp|" + next.r.round + "|" + next.r.uncertain;
-    next.prHeardA = s.playKey !== "prB";
-    next.prHeardB = s.playKey === "prB";
-  }
   return next;
 }
 

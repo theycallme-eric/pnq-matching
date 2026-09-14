@@ -5,6 +5,14 @@ import { freshR } from "../../src/app-shell.js";
 
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, (msg || "") + " expected " + b + ", got " + a);
 
+test("directional confirmations use the approved context-specific close language", () => {
+  assert.deepEqual(comparison.DIRECTIONAL_CLOSE, {
+    vol: "This volume is close",
+    pitch: "This pitch is close"
+  });
+  assert.doesNotMatch(Object.values(comparison.DIRECTIONAL_CLOSE).join("\n"), /set|finish up/i);
+});
+
 test("directional volume answers step the level and halve the next step", () => {
   const r = freshR();
   const res = comparison.dirAnswer(r, "louder");

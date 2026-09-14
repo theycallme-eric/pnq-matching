@@ -70,20 +70,22 @@ async function completeOption(page, number) {
   await chooseOption(page, number);
   if (number === 2) {
     await page.getByText("Start Sound", { exact: true }).click();
-    await page.getByRole("button", { name: "The volume is set, move on" }).click();
-    await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
-    await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
+    await page.getByRole("button", { name: "This volume is close" }).click();
+    await page.getByRole("button", { name: "This pitch is close" }).click();
+    await page.getByRole("button", { name: "This pitch is close" }).click();
+    await page.getByRole("button", { name: "Play sound 1" }).click();
+    await page.getByRole("button", { name: "Play sound 2" }).click();
     await page.getByRole("button", { name: "They sound the same" }).click();
   } else if (number === 1) {
     await page.getByText("Start Sound", { exact: true }).click();
-    await page.getByRole("button", { name: "The volume is about right" }).click();
+    await page.getByRole("button", { name: "This volume is close" }).click();
     await page.getByRole("button", { name: "Next: closer adjustments" }).click();
     await page.getByRole("button", { name: "Next: fine adjustments" }).click();
-    await page.getByRole("button", { name: "This matches what I hear" }).click();
+    await page.getByRole("button", { name: "This pitch is close" }).click();
   } else {
     await page.getByRole("button", { name: "Play the sound" }).click();
     for (let level = 0; level < 3; level++) {
-      await page.getByRole("button", { name: level < 2 ? "Look closely at this area" : "This sounds like my tinnitus" }).click();
+      await page.getByRole("button", { name: level < 2 ? "Look closely at this area" : "This sound is close" }).click();
     }
   }
   await page.getByText("Fairly close").click();

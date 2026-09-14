@@ -25,10 +25,10 @@ async function expectNoPrematureSelector(page) {
 async function finishOption1(page) {
   await startMatchingOption(page, 1);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
-  await page.getByRole("button", { name: "The volume is about right" }).click();
+  await page.getByRole("button", { name: "This volume is close" }).click();
   await page.getByRole("button", { name: "Next: closer adjustments" }).click();
   await page.getByRole("button", { name: "Next: fine adjustments" }).click();
-  await page.getByRole("button", { name: "This matches what I hear" }).click();
+  await page.getByRole("button", { name: "This pitch is close" }).click();
   await page.getByText("Fairly close", { exact: true }).click();
   await page.getByRole("button", { name: "Finish matching" }).click();
 }
@@ -36,9 +36,11 @@ async function finishOption1(page) {
 async function finishOption2(page) {
   await startMatchingOption(page, 2);
   await page.getByRole("button", { name: "Start Sound", exact: true }).click();
-  await page.getByRole("button", { name: "The volume is set, move on" }).click();
-  await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
-  await page.getByRole("button", { name: "The pitch is set, finish up" }).click();
+  await page.getByRole("button", { name: "This volume is close" }).click();
+  await page.getByRole("button", { name: "This pitch is close" }).click();
+  await page.getByRole("button", { name: "This pitch is close" }).click();
+  await page.getByRole("button", { name: "Play sound 1" }).click();
+  await page.getByRole("button", { name: "Play sound 2" }).click();
   await page.getByRole("button", { name: "They sound the same" }).click();
   await page.getByText("Fairly close", { exact: true }).click();
   await page.getByRole("button", { name: "Finish matching" }).click();

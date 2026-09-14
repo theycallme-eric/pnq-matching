@@ -9,6 +9,9 @@ import {
   APPLICATION_STRUCTURAL_OVERLINES,
   auditApplicationParticipantStrings
 } from "../../src/app-copy.js";
+import { PRIMARY as NARROWING_ACTIONS } from "../../src/narrowing.js";
+import { DIRECTIONAL_CLOSE } from "../../src/comparison.js";
+import { FINAL_ACTION as FIELD_FINAL_ACTION } from "../../src/field.js";
 
 test("copy-rules: required reassurance and neutral option labels are explicit", () => {
   assert.equal(REQUIRED_COPY.reassurance, "There are no wrong answers");
@@ -72,6 +75,27 @@ test("copy-rules: neutral alternatives and non-claim treatment boundaries pass",
     "Choose an option with your moderator.",
     "Option 1", "Option 2", "Option 3", "Done", "Return to matching options"
   ]), []);
+});
+
+test("copy-rules: Options 1, 2, and 3 expose only the approved close confirmations", () => {
+  const participantConfirmations = [
+    NARROWING_ACTIONS.vol,
+    NARROWING_ACTIONS.p3,
+    DIRECTIONAL_CLOSE.vol,
+    DIRECTIONAL_CLOSE.pitch,
+    FIELD_FINAL_ACTION
+  ];
+  assert.deepEqual(participantConfirmations, [
+    "This volume is close",
+    "This pitch is close",
+    "This volume is close",
+    "This pitch is close",
+    "This sound is close"
+  ]);
+  assert.doesNotMatch(
+    participantConfirmations.join("\n"),
+    /This matches what I hear|The volume is set, move on|The pitch is set, finish up|This sounds like my tinnitus/
+  );
 });
 
 test("copy-rules: sentence case passes and uppercase is limited to registered structure", () => {

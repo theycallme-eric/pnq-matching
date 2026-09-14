@@ -45,11 +45,16 @@ test.describe("contextual matching help", () => {
     await seed(page);
     await jumpTo(page, "Volume");
 
+    await page.getByText("Start Sound", { exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
+
     let dialog = await openHelp(page, ["Can't hear this"]);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
     await dialog.getByRole("button", { name: "Can't hear this", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText("That’s okay. We made the sound a little easier to hear. Press play and try again.")).toBeVisible();
     expect((await appState(page)).n.level).toBeCloseTo(.52, 6);
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
 
     await jumpTo(page, "Pitch · fine");
     dialog = await openHelp(page, ["Wider range", "Can't hear this"]);

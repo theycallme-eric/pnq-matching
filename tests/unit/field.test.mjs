@@ -5,6 +5,11 @@ import { freshD, backTarget, initialState, keepRefiningTarget, stageState } from
 
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, (msg || "") + " expected " + b + ", got " + a);
 
+test("the final field judgment uses the approved close language", () => {
+  assert.equal(field.FINAL_ACTION, "This sound is close");
+  assert.doesNotMatch(field.FINAL_ACTION, /This sounds like my tinnitus/);
+});
+
 test("the marker maps horizontal to pitch and vertical to a capped volume", () => {
   const top = field.dSpec({ ...freshD(), x: .25, y: 0 });
   assert.equal(top.kind, "tone");
