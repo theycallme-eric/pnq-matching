@@ -244,7 +244,7 @@ test.describe("app shell", () => {
     await startMatchingOption(page, 1);
     await page.getByText("Start Sound", { exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
-    await page.getByRole("button", { name: "The volume is about right" }).click();
+    await page.getByRole("button", { name: "This volume is close" }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("main");
     await expect(page.getByRole("button", { name: "Stop Sound", exact: true })).toHaveAttribute("aria-pressed", "true");
 

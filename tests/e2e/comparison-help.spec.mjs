@@ -72,5 +72,8 @@ test.describe("comparison contextual Help (REQ-001, REQ-003)", () => {
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(page.locator('[data-screen-label="Shared · Listen and respond"]')).toBeVisible();
     expect((await appState(page)).stages.r).toBe("dir");
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
+    await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "This pitch is close" })).toBeEnabled();
   });
 });

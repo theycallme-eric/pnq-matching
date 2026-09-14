@@ -57,7 +57,7 @@ test.describe("matching stepper navigation (REQ-014)", () => {
     let actions = stepActions(page);
     await expect(actions.previous).toHaveText("Previous step");
     await expect(actions.previous).toBeDisabled();
-    await expect(actions.next).toHaveText("The volume is about right");
+    await expect(actions.next).toHaveText("This volume is close");
     await expect(actions.next).toBeDisabled();
     await expectActionRegionSeparated(page);
 
@@ -132,7 +132,7 @@ test.describe("matching stepper navigation (REQ-014)", () => {
     actions = stepActions(page);
     await expect(actions.previous).toHaveText("Previous step");
     await expect(actions.previous).toBeEnabled();
-    await expect(actions.next).toHaveText("This sounds like my tinnitus");
+    await expect(actions.next).toHaveText("This sound is close");
     await expectActionRegionSeparated(page);
 
     await actions.previous.click();

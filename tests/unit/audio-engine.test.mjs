@@ -177,6 +177,7 @@ test("exports the exact V5 surface", () => {
     "freqOf",
     "play",
     "update",
+    "updateOwner",
     "stop",
     "panic",
     "setMuted",
@@ -374,6 +375,17 @@ test("update() with same kinds retunes in place and keeps the owner", () => {
   assert.equal(liveSources()[0], osc, "no rebuild for same kinds");
   const target = osc.frequency.last("target");
   assert.ok(Math.abs(target.v - engine.freqOf("tone", 0.9)) < 1e-9);
+});
+
+test("updateOwner() hands the live graph to the selected candidate without stopping it", () => {
+  engine.panic();
+  engine.play("prB", [spec("tone", 0.8, 0.4)]);
+  const osc = liveSources()[0];
+  assert.equal(engine.updateOwner("prA", [spec("tone", 0.3, 0.4)]), true);
+  assert.equal(engine.playingKey(), "prA");
+  assert.equal(liveSources()[0], osc, "candidate handoff keeps the existing source");
+  assert.equal(osc.stoppedAt, null, "handoff does not introduce a silent stop");
+  assert.ok(Math.abs(osc.frequency.last("target").v - engine.freqOf("tone", 0.3)) < 1e-9);
 });
 
 test("update() with a kind change rebuilds under the same owner key", () => {
