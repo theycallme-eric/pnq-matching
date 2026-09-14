@@ -54,6 +54,10 @@ test("copy-rules: application audit retains every immersive-shell banned categor
     ["The options are ranked from best to worst", "sequential option framing"],
     ["The alternatives are three sequential stages", "sequential option framing"],
     ["You have been placed in an assigned arm", "sequential option framing"],
+    ["This matches what I hear", "definitive matching claim"],
+    ["This sounds like my tinnitus", "definitive matching claim"],
+    ["The volume is set, move on", "definitive matching claim"],
+    ["The pitch is set, finish up", "definitive matching claim"],
     ["This sound is clinically proven to cure tinnitus", "unsupported clinical claim"],
     ["This treatment will work for you", "unsupported clinical claim"]
   ]);
@@ -65,7 +69,7 @@ test("copy-rules: application audit retains every immersive-shell banned categor
     APPLICATION_BANNED_COPY_PATTERNS.map(({ label }) => label),
     [
       "internal concept name", "prototype or fictional framing", "prototype implementation terminology", "technical audio value",
-      "failure-recovery framing", "sequential option framing", "unsupported clinical claim"
+      "failure-recovery framing", "sequential option framing", "definitive matching claim", "unsupported clinical claim"
     ]
   );
 });
@@ -73,7 +77,10 @@ test("copy-rules: application audit retains every immersive-shell banned categor
 test("copy-rules: neutral alternatives and non-claim treatment boundaries pass", () => {
   assert.deepEqual(auditApplicationParticipantStrings([
     "Choose an option with your moderator.",
-    "Option 1", "Option 2", "Option 3", "Done", "Return to matching options"
+    "Option 1", "Option 2", "Option 3", "Done", "Return to matching options",
+    "This volume is close", "This pitch is close", "This sound is close",
+    "Mine is louder", "Mine is quieter", "Mine is higher", "Mine is lower",
+    "Which one is closer?", "Neither is close"
   ]), []);
 });
 

@@ -26,6 +26,10 @@ export const APPLICATION_BANNED_COPY_PATTERNS = Object.freeze([
     pattern: /(?:\b(?:options?\s*(?:[123])?|alternatives?)\b.{0,48}\b(?:stages?|methods?|approaches?|concepts?|assigned arms?|winners?|fallbacks?|ranked?|ranking|recommend(?:ed|ation)?|first|second|third|next|previous)\b|\b(?:stages?|methods?|approaches?|concepts?|assigned arms?|winners?|fallbacks?|ranked?|ranking|recommend(?:ed|ation)?|first|second|third|next|previous)\b.{0,48}\b(?:options?\s*(?:[123])?|alternatives?)\b|\bassigned arms?\b)/i
   },
   {
+    label: "definitive matching claim",
+    pattern: /\b(?:this matches what I hear|this sounds like my tinnitus|the volume is set, move on|the pitch is set, finish up)\b/i
+  },
+  {
     label: "unsupported clinical claim",
     pattern: /(?:\b(?:clinically|medically) proven\b|\bguaranteed (?:outcome|relief|results?)\b|\b(?:clinically proven|guaranteed|cures?|treats?|will (?:cure|treat|reduce|relieve|eliminate))\b.{0,64}\b(?:tinnitus|symptoms?)\b|\b(?:tinnitus|symptoms?)\b.{0,64}\b(?:clinically proven|guaranteed|cures?|treats?|will (?:cure|treat|reduce|relieve|eliminate))\b|\btreatment\b.{0,40}\b(?:will work|effective|relief|outcome|cure)\b)/i
   }
