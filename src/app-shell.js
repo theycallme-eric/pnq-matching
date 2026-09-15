@@ -54,7 +54,7 @@ export function stageLabel(c, stage) {
 
 export function freshN() { return { pitch: .5, level: .4, center: .5, lo: .34, hi: .66, extra: 0, widened: 0, note: "", conf: null, closeEnough: false }; }
 export function freshF() { return { editing: 1, s1: null, s2: null, fam: null, charIdx: null, work: null, note: "", conf: null }; }
-export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
+export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, originalEndpoint: null, winnerPitch: null, challengerPitch: null, challengerSide: 1, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
 export function freshD() { return { x: .5, y: .5, cx: .5, cy: .5, level: 0, heard: false, zoomed: false, note: "", conf: null }; }
 export function freshA() { return { kind: "tone", kIdx: 0, est: .5, unc: .5, cand: .5, phase: "pitch", level: .45, lstep: .22, closes: 0, lcloses: 0, suggest: false, responded: false, msg: "Press play, then tell us how the sound compares to yours.", note: "", conf: null, stop: null }; }
 export function freshT() { return { x: .5, y: .38, heard: false, labels: false, cx: .5, cy: .38, span: .34, behavior: null, note: "" }; }
@@ -492,16 +492,16 @@ export function jumpStages(cid) {
   if (cid === "r") return [
     mk("Directional · volume", "dir"),
     mk("Directional · pitch", "dir", { phase: "pitch", volOk: 1, level: .46 }),
-    mk("A/B comparisons", "comp", { phase: "pitch", center: .58, level: .46, spread: .26, round: 2 }),
-    mk("A/B · near the floor", "comp", { phase: "pitch", center: .58, level: .46, spread: .075, round: 7 }),
-    mk("A/B · long session", "comp", { phase: "pitch", center: .58, level: .46, spread: .1, round: 11 }),
+    mk("A/B comparisons", "comp", { phase: "pitch", center: .58, level: .46, spread: .26, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .71, challengerSide: 1, round: 2 }),
+    mk("A/B · near the floor", "comp", { phase: "pitch", center: .58, level: .46, spread: .075, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .6175, challengerSide: 1, round: 7 }),
+    mk("A/B · long session", "comp", { phase: "pitch", center: .58, level: .46, spread: .1, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .63, challengerSide: 1, round: 11 }),
     mk("Confidence", "conf", { center: .58, level: .46 }),
     mk("Steps converging", "dir", { phase: "pitch", volOk: 1, level: .46, center: .62, pstep: .072, dirRounds: 6 }),
-    mk("A/B · early", "comp", { phase: "pitch", center: .62, level: .46, spread: .26, round: 2 }),
-    mk("A/B · nearly identical", "comp", { phase: "pitch", center: .62, level: .46, spread: .075, round: 7 }),
-    mk("“Neither is close”", "comp", { phase: "pitch", center: .5, level: .46, spread: .38, round: 4, uncertain: 1, note: "Neither, then. We have widened out and moved to a different area." }),
+    mk("A/B · early", "comp", { phase: "pitch", center: .62, level: .46, spread: .26, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .75, challengerSide: 1, round: 2 }),
+    mk("A/B · nearly identical", "comp", { phase: "pitch", center: .62, level: .46, spread: .075, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .6575, challengerSide: 1, round: 7 }),
+    mk("“Neither is close”", "comp", { phase: "pitch", center: .5, level: .46, spread: .38, originalEndpoint: .5, winnerPitch: .5, challengerPitch: .69, challengerSide: 1, round: 4, uncertain: 1, note: "Neither, then. We have widened out and moved to a different area." }),
     mk("Bounced back to directions", "dir", { phase: "pitch", volOk: 1, level: .46, pstep: .18, dirRounds: 8, msg: "Those were hard to tell apart, so we have gone back to simple directions. Is your sound higher or lower than this?" }),
-    mk("Long session · fatigue", "comp", { phase: "pitch", center: .62, level: .46, spread: .1, round: 14 })
+    mk("Long session · fatigue", "comp", { phase: "pitch", center: .62, level: .46, spread: .1, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .67, challengerSide: 1, round: 14 })
   ];
   return [
     mk("Whole field", "field"),

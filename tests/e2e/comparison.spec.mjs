@@ -93,6 +93,69 @@ test.describe("comparison (Option 2)", () => {
     r = await rState(page);
     expect(r.spread).toBeCloseTo(.216, 6);
     expect(r.round).toBe(1);
+    expect(r.originalEndpoint).toBeCloseTo(.7, 6);
+    expect(r.winnerPitch).toBeCloseTo(.7, 6);
+    await expect(page.locator('[data-sound-position="1"]')).toHaveAttribute("data-sound-pitch", String(r.originalEndpoint));
+
+    await page.getByRole("button", { name: "Play sound 1" }).click();
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
+    const endpointRequest = await page.evaluate(() => window.__pnqLastAudioRequest);
+    expect(endpointRequest.key).toBe("prA");
+    expect(endpointRequest.specs[0].pitch).toBeCloseTo(.7, 6);
+  });
+
+  test("both winner branches retain the exact choice as Sound 1 while Sound 2 narrows", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "A/B comparisons");
+
+    const pairPitches = () => page.locator("[data-sound-position]").evaluateAll((cards) =>
+      cards.map((card) => Number(card.getAttribute("data-sound-pitch")))
+    );
+    const auditionPair = async () => {
+      await page.getByRole("button", { name: "Play sound 1" }).click();
+      await page.getByRole("button", { name: "Play sound 2" }).click();
+    };
+    const picks = page.getByRole("button", { name: "This one" });
+
+    const first = await pairPitches();
+    await auditionPair();
+    await picks.first().click();
+    const second = await pairPitches();
+    expect(second[0]).toBeCloseTo(first[0], 12);
+    expect(second[1]).not.toBeCloseTo(first[1], 12);
+    expect(Math.abs(second[1] - second[0])).toBeLessThan(Math.abs(first[1] - first[0]));
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
+    expect(await page.evaluate(() => window.__pnqLastAudioRequest.specs[0].pitch)).toBeCloseTo(second[0], 12);
+    await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
+    await expect(picks.first()).toBeDisabled();
+    await expect(picks.nth(1)).toBeDisabled();
+
+    await page.getByRole("button", { name: "Stop sound 1" }).click();
+    await auditionPair();
+    await picks.first().click();
+    const third = await pairPitches();
+    expect(third[0]).toBeCloseTo(second[0], 12);
+    expect(Math.abs(third[1] - third[0])).toBeLessThan(Math.abs(second[1] - second[0]));
+
+    // Exercise the other branch from a fresh ordinary pair so the preceding
+    // consecutive Sound 1 wins do not reach the existing spread-floor exit.
+    await jumpTo(page, "A/B comparisons");
+    const challengerRound = await pairPitches();
+    await auditionPair();
+    const selectedChallenger = challengerRound[1];
+    await picks.nth(1).click();
+    const next = await pairPitches();
+    expect(next[0]).toBeCloseTo(selectedChallenger, 12);
+    expect(next[1]).not.toBeCloseTo(challengerRound[0], 12);
+    expect(next[1]).not.toBeCloseTo(challengerRound[1], 12);
+    expect(next[1]).toBeGreaterThanOrEqual(0);
+    expect(next[1]).toBeLessThanOrEqual(1);
+    expect(Math.abs(next[1] - next[0])).toBeLessThan(Math.abs(challengerRound[1] - challengerRound[0]));
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
+    const winnerRequest = await page.evaluate(() => window.__pnqLastAudioRequest);
+    expect(winnerRequest.key).toBe("prA");
+    expect(winnerRequest.specs[0].pitch).toBeCloseTo(next[0], 12);
+    await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("A/B guidance and every choice follow the current pair's two auditions", async ({ page }) => {
@@ -128,7 +191,8 @@ test.describe("comparison (Option 2)", () => {
     const r = await rState(page);
     expect(r.round).toBe(3);
     expect(r.spread).toBeCloseTo(.156, 6);
-    expect(r.center).toBeCloseTo(.45, 6);
+    expect(r.center).toBeCloseTo(.58, 6);
+    expect(r.winnerPitch).toBeCloseTo(.58, 6);
     for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
     await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
@@ -156,7 +220,7 @@ test.describe("comparison (Option 2)", () => {
     await page.getByRole("button", { name: "This one" }).nth(1).click();
     await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
     await expect(page.getByText("Stop Sound", { exact: true })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prB");
+    await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
     const r = await rState(page);
     expect(r.stop).toBe("floor");
     expect(r.spread).toBeCloseTo(.045, 6);
