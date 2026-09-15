@@ -10,6 +10,8 @@
  * one owner; the renderer updates that owner to the destination parameters.
  */
 
+import { FREQUENCY_RANGES, freqOf } from "./audio-mapping.js";
+
 // `launch` and `home` remain the renderer-facing ids for the splash and option
 // selector. Keeping those stable lets the protected option flows stay wholly
 // independent of the surrounding patient-app journey.
@@ -374,14 +376,11 @@ export function backTarget(s) {
 // per-concept confidence intro, the keep-refining re-entry point per concept,
 // the Match complete summary rows, and the completion reducer.
 
-export const FRQ = { tone: [250, 10000], hiss: [350, 8400], buzz: [55, 440], click: [400, 6400] };
+export const FRQ = FREQUENCY_RANGES;
+export { freqOf };
 export const KWORD = { tone: "tone", hiss: "hiss", buzz: "buzzing", click: "clicking" };
 export const BWORD = { steady: "Steady", pulse: "Pulsing", gap: "Comes and goes", waver: "Wavering" };
 
-export function freqOf(kind, p) {
-  const r = FRQ[kind] || FRQ.tone, q = Math.max(0, Math.min(1, p));
-  return r[0] * Math.pow(r[1] / r[0], q);
-}
 export function fmtHz(f) { return f < 1000 ? Math.round(f / 5) * 5 + " Hz" : (f / 1000).toFixed(1) + " kHz"; }
 export function fmtDb(l) { return Math.round(18 + Math.max(0, Math.min(1, l)) * 57) + " dB"; }
 export function techOf(spec) { return "≈ " + fmtHz(freqOf(spec.kind, spec.pitch)) + " · " + fmtDb(spec.level); }
