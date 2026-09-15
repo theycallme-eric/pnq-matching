@@ -1380,8 +1380,8 @@ class App extends React.Component {
     this.applyR(res);
   }
 
-  // Shared · Two-sound comparison (REQ-008): forced-choice pairs that halve
-  // the spread, with the same-answer stop, the fatigue finisher and contextual
+  // Shared · Two-sound comparison (REQ-005, REQ-008): three retained-winner
+  // choices followed by at most one exact endpoint validation, plus contextual
   // Help for Option 2's "can't hear" escape (REQ-003).
   renderPair() {
     const st = this.state, c = st.concept;
@@ -1390,14 +1390,18 @@ class App extends React.Component {
     if (c === "r") {
       const r = st.r;
       ({ A, B } = comparison.pairSpecs(r));
-      title = "Which one is closer?";
-      caption = "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
-      note = comparison.compNote(r);
+      title = r.validation ? "One final comparison" : "Which one is closer?";
+      caption = r.validation
+        ? "Compare your current match with the sound you first landed on. Whichever you choose will be your final match."
+        : "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
+      note = r.validation ? "" : comparison.compNote(r);
       pickA = (spec) => this.rPick("prA", spec);
       pickB = (spec) => this.rPick("prB", spec);
-      secs.push({ label: "Neither is close", f: () => this.rNeither() });
-      secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
-      if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+      if (!r.validation) {
+        secs.push({ label: "Neither is close", f: () => this.rNeither() });
+        secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
+        if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+      }
     } else if (c === "a") {
       ({ A, B } = pres.aChalSpecs(st.a));
       title = "One more check";

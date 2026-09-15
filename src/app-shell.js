@@ -56,7 +56,7 @@ export function stageLabel(c, stage) {
 
 export function freshN() { return { pitch: .5, level: .4, center: .5, lo: .34, hi: .66, extra: 0, widened: 0, note: "", conf: null, closeEnough: false }; }
 export function freshF() { return { editing: 1, s1: null, s2: null, fam: null, charIdx: null, work: null, note: "", conf: null }; }
-export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, originalEndpoint: null, winnerPitch: null, challengerPitch: null, challengerSide: 1, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
+export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, originalEndpoint: null, winnerPitch: null, challengerPitch: null, challengerSide: 1, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, ordinaryChoices: 0, validation: false, validationComplete: false, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
 export function freshD() { return { x: .5, y: .5, cx: .5, cy: .5, level: 0, heard: false, zoomed: false, note: "", conf: null }; }
 export function freshA() { return { kind: "tone", kIdx: 0, est: .5, unc: .5, cand: .5, phase: "pitch", level: .45, lstep: .22, closes: 0, lcloses: 0, suggest: false, responded: false, msg: "Press play, then tell us how the sound compares to yours.", note: "", conf: null, stop: null }; }
 export function freshT() { return { x: .5, y: .38, heard: false, labels: false, cx: .5, cy: .38, span: .34, behavior: null, note: "" }; }
@@ -552,9 +552,9 @@ export function progress(c, s, st) {
       return on("MATCHING YOUR SOUND", w, "", r.phase === "vol" ? "VOLUME" : "PITCH");
     }
     if (s !== "comp") return off;
-    const left = Math.max(1, Math.ceil(Math.log(.06 / r.spread) / Math.log(.6)));
-    const spent = r.round - 1, total = spent + left;
-    return on("COMPARING", pct(.76 + (spent / total) * .22), "Each choice halves the difference between the two sounds.", "PAIR " + r.round + " OF " + total);
+    if (r.validation) return on("COMPARING", "98%", "One final comparison with the sound you first landed on.", "FINAL CHECK");
+    const spent = Math.max(0, Math.min(3, r.ordinaryChoices || 0));
+    return on("COMPARING", pct(.76 + (spent / 3) * .18), "Each choice narrows around the sound you picked.", "PAIR " + (spent + 1) + " OF 3");
   }
   if (c === "f") {
     const m = { family: ["20%", "Choosing a starting description."], char: ["40%", "Narrowing within that description."], tune: ["65%", "Adjusting pitch and loudness."], layer: ["85%", "Adding a second sound, if there is one."] }[s];
