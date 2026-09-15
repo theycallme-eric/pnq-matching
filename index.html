@@ -23,9 +23,9 @@ body { background: var(--interface-app); }
 /* REQ-022: every participant control keeps at least a 44px touch target. */
 [data-device-frame] button { min-width: 44px !important; min-height: 44px !important; }
 [data-device-frame] input[type="range"] { min-height: 44px !important; height: 44px !important; }
-/* REQ-012: focus remains visible when a vendored component supplies its
-   resting shadow inline. */
-[data-device-frame] button:focus-visible,
+/* REQ-012: bespoke shell controls retain visible focus; shared Button focus
+   semantics are owned by the design-system component. */
+[data-device-frame] button:not([data-pnq-button]):focus-visible,
 [data-device-frame] input:focus-visible {
   outline: 3px solid var(--focus-border) !important;
   outline-offset: 2px !important;
@@ -36,24 +36,6 @@ body { background: var(--interface-app); }
   outline-offset: 2px !important;
   box-shadow: var(--focus-ring) !important;
 }
-/* Keep the approved action token while pairing it with brand-navy text so
-   this shell meets its stricter 4.5:1 text contract. */
-[data-pnq-variant="primary"][data-pnq-disabled="false"] {
-  background: var(--action-primary) !important;
-  color: var(--brand-navy) !important;
-}
-[data-pnq-disabled="true"] {
-  background: var(--interface-disabled) !important;
-  color: var(--gray-800) !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-[data-pnq-disabled="true"][data-pnq-on-dark="true"] {
-  background: var(--interface-disabled-dark) !important;
-  color: var(--white) !important;
-}
-[data-dashboard-action] > div { background: var(--action-primary) !important; }
-[data-dashboard-action] > div div { color: var(--brand-navy) !important; }
 [data-prescription-field] label,
 [data-prescription-field] input + div { color: var(--text-body) !important; }
 @keyframes pnqRing { 0% { transform: scale(.72); opacity: .75; } 100% { transform: scale(1.5); opacity: 0; } }

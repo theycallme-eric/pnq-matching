@@ -63,20 +63,22 @@ test.describe("matching stepper navigation (REQ-014)", () => {
 
     const disabledStyle = await actions.next.evaluate((button) => {
       const probe = document.createElement("div");
-      probe.style.background = "var(--interface-disabled)";
+      probe.style.background = "var(--gradient-action-disabled)";
       document.body.appendChild(probe);
-      const standardBackground = getComputedStyle(probe).backgroundColor;
+      const standardBackground = getComputedStyle(probe).backgroundImage;
       probe.remove();
       const style = getComputedStyle(button);
       return {
-        background: style.backgroundColor,
+        background: style.backgroundImage,
         borderStyle: style.borderStyle,
+        borderColor: style.borderColor,
         boxShadow: style.boxShadow,
         standardBackground
       };
     });
     expect(disabledStyle.background).toBe(disabledStyle.standardBackground);
-    expect(disabledStyle.borderStyle).toBe("none");
+    expect(disabledStyle.borderStyle).toBe("solid");
+    expect(disabledStyle.borderColor).toBe("rgba(0, 0, 0, 0)");
     expect(disabledStyle.boxShadow).toBe("none");
 
     await jumpTo(page, "OPTION 1", "Pitch · coarse");

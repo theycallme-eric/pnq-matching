@@ -16,20 +16,7 @@ import * as matchingOptions from "./matching-options.js";
 
 const DSBase = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
-// Keep the vendored component snapshot immutable. This boundary adapter adds
-// state hooks for the shell's stricter contrast treatment.
-const DS = {
-  ...DSBase,
-  Button(props) {
-    const variant = props.variant || "primary";
-    return e(DSBase.Button, {
-      ...props,
-      "data-pnq-variant": variant,
-      "data-pnq-disabled": props.disabled ? "true" : "false",
-      "data-pnq-on-dark": props.onDark ? "true" : "false"
-    });
-  }
-};
+const DS = DSBase;
 const DEFAULT_PRESCRIPTION_ID = "PNQ-4821-LK";
 
 // Onboarding examples: loudness holds pitch constant and pitch holds loudness
