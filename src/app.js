@@ -1426,15 +1426,28 @@ class App extends React.Component {
         // in the confidence markup; escapes must reassure (REQ-016), so it
         // renders here on the pair screen instead.
         note ? this.noteBox(note, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-        e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
-          secs.map((sec) =>
-            e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
-              e(DS.Button, { variant: "ghost", disabled: c === "r" && !ready, onClick: sec.f }, sec.label)))),
-        c === "r" ? null : e("button", {
-          onClick: noHear,
-          style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
-        }, "I can't hear these sounds"))
+      c === "r"
+        ? this.screenActionRegion(
+          e("div", {
+            "data-comparison-outcomes": "",
+            style: {
+              display: "flex", flexDirection: "column", alignItems: "stretch",
+              gap: "var(--space-8)", minWidth: 0
+            }
+          }, secs.map((sec) =>
+            e(DS.Button, {
+              key: sec.label, variant: "ghost", disabled: !ready, onClick: sec.f
+            }, sec.label)))
+        )
+        : e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
+            secs.map((sec) =>
+              e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
+                e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
+          e("button", {
+            onClick: noHear,
+            style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+          }, "I can't hear these sounds"))
     ];
   }
 

@@ -110,6 +110,74 @@ async function expectVerticalStepActions(page, nextLabel) {
   expect(nextBox.width).toBeCloseTo(previousBox.width, 0);
 }
 
+async function expectComparisonOutcomeStack(page, labels) {
+  const stack = page.locator("[data-comparison-outcomes]");
+  const actions = stack.getByRole("button");
+
+  await expect(stack).toHaveCount(1);
+  await expect(actions).toHaveText(labels);
+
+  const layout = await stack.evaluate((element) => {
+    const stackRect = element.getBoundingClientRect();
+    const content = element.closest("[data-screen]")
+      .querySelector('[style*="overflow-y: auto"]');
+    const contentRect = content.getBoundingClientRect();
+    const buttons = [...element.querySelectorAll("button")].map((button) => {
+      const buttonRect = button.getBoundingClientRect();
+      const label = button.querySelector("span");
+      const labelRect = label.getBoundingClientRect();
+      const labelRange = document.createRange();
+      labelRange.selectNodeContents(label);
+      return {
+        x: buttonRect.x,
+        top: buttonRect.top,
+        right: buttonRect.right,
+        bottom: buttonRect.bottom,
+        width: buttonRect.width,
+        fontSize: parseFloat(getComputedStyle(button).fontSize),
+        lineCount: labelRange.getClientRects().length,
+        labelInsideButton: labelRect.left >= buttonRect.left - 0.5
+          && labelRect.right <= buttonRect.right + 0.5
+          && labelRect.top >= buttonRect.top - 0.5
+          && labelRect.bottom <= buttonRect.bottom + 0.5,
+        noOverflow: button.scrollWidth <= button.clientWidth + 1
+          && button.scrollHeight <= button.clientHeight + 1
+      };
+    });
+    return {
+      stack: {
+        left: stackRect.left,
+        right: stackRect.right,
+        top: stackRect.top,
+        bottom: stackRect.bottom,
+        noOverflow: element.scrollWidth <= element.clientWidth + 1
+      },
+      contentDoesNotOverlap: contentRect.bottom <= stackRect.top + 0.5,
+      contentCanScroll: getComputedStyle(content).overflowY === "auto",
+      buttons
+    };
+  });
+
+  expect(layout.stack.noOverflow).toBe(true);
+  expect(layout.contentDoesNotOverlap).toBe(true);
+  expect(layout.contentCanScroll).toBe(true);
+  for (const [index, button] of layout.buttons.entries()) {
+    expect(button.fontSize).toBe(14);
+    expect(button.lineCount).toBe(1);
+    expect(button.labelInsideButton).toBe(true);
+    expect(button.noOverflow).toBe(true);
+    expect(button.x).toBeCloseTo(layout.buttons[0].x, 0);
+    expect(button.width).toBeCloseTo(layout.buttons[0].width, 0);
+    if (index > 0) {
+      expect(layout.buttons[index - 1].bottom).toBeLessThanOrEqual(button.top + 0.5);
+    }
+  }
+  expect(layout.buttons[0].x).toBeCloseTo(layout.stack.left, 0);
+  expect(layout.buttons[0].right).toBeCloseTo(layout.stack.right, 0);
+
+  return layout;
+}
+
 const stepScenarios = [
   ["OPTION 1", "Volume", "This volume is close"],
   ["OPTION 1", "Pitch · coarse", "Next: closer adjustments"],
@@ -188,4 +256,61 @@ test.describe("matching action layout (REQ-001, REQ-004, REQ-005)", () => {
     await page.locator('[data-step-action="previous"]').click();
     expect(await page.evaluate(() => window.__pnqAppState().stages.n)).toBe("p1");
   });
+
+  test("Option 2 outcomes stay vertically stacked through every comparison gate state", async ({ page }) => {
+    await seed(page);
+    await jumpTo(page, "OPTION 2", "Directional · volume");
+    const reference = await actionGeometry(page, "This volume is close");
+
+    await jumpTo(page, "OPTION 2", "A/B comparisons");
+    const labels = ["Neither is close", "They sound the same"];
+    const baselineLayout = await expectComparisonOutcomeStack(page, labels);
+    expect((await actionGeometry(page, labels.at(-1))).bottomGap).toBeCloseTo(reference.bottomGap, 0);
+
+    await page.getByRole("button", { name: "Play sound 1" }).click();
+    expect((await expectComparisonOutcomeStack(page, labels)).buttons).toEqual(baselineLayout.buttons);
+
+    await jumpTo(page, "OPTION 2", "A/B comparisons");
+    await page.getByRole("button", { name: "Play sound 2" }).click();
+    expect((await expectComparisonOutcomeStack(page, labels)).buttons).toEqual(baselineLayout.buttons);
+
+    await page.getByRole("button", { name: "Play sound 1" }).click();
+    const readyLayout = await expectComparisonOutcomeStack(page, labels);
+    expect(readyLayout.buttons).toEqual(baselineLayout.buttons);
+
+    await page.getByRole("button", { name: "This one" }).first().click();
+    expect((await expectComparisonOutcomeStack(page, labels)).buttons).toEqual(baselineLayout.buttons);
+  });
+
+  for (const viewport of [
+    { width: 390, height: 844, mode: "bare" },
+    { width: 320, height: 568, mode: "bare" },
+    { width: 1024, height: 900, mode: "framed" }
+  ]) {
+    test(`Option 2 outcome labels fit the stable bottom stack at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await seed(page);
+      await jumpTo(page, "OPTION 2", "Directional · volume");
+      const reference = await actionGeometry(page, "This volume is close");
+      let twoActionLayout;
+
+      for (const scenario of [
+        ["A/B comparisons", ["Neither is close", "They sound the same"]],
+        ["A/B · long session", ["Neither is close", "They sound the same", "Finish from my best match"]]
+      ]) {
+        const [stage, labels] = scenario;
+        await jumpTo(page, "OPTION 2", stage);
+        await expect(page.locator("[data-device-frame]")).toHaveAttribute("data-device-frame", viewport.mode);
+        const layout = await expectComparisonOutcomeStack(page, labels);
+        const geometry = await actionGeometry(page, labels.at(-1));
+        expect(geometry.bottomGap).toBeCloseTo(reference.bottomGap, 0);
+        if (labels.length === 2) {
+          twoActionLayout = layout;
+        } else {
+          expect(layout.stack.bottom).toBeCloseTo(twoActionLayout.stack.bottom, 0);
+          expect(layout.stack.top).toBeLessThan(twoActionLayout.stack.top);
+        }
+      }
+    });
+  }
 });
