@@ -1727,8 +1727,21 @@ class App extends React.Component {
   renderDField() {
     const st = this.state, d = st.d;
     const v = field.view(d);
+    // On a short, bare phone the field owns the remaining vertical space
+    // above the fixed action stack. This keeps the established screen and
+    // controls intact while allowing the square to shrink before its labels
+    // can enter the action region.
+    const compactField = !st.framed && window.innerHeight <= 650;
     const hue = field.hueOf(v.level), nextHue = field.hueOf(v.level + 1);
-    const axis = (label) => e("span", { style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)", writingMode: "vertical-rl", transform: "rotate(180deg)" } }, label);
+    // Keep the complete 56px pointer target inside the usable square even at
+    // a logical 0 or 1 coordinate. The logical/audio position still reaches
+    // the full range; only the target's visual center is inset by its radius.
+    const markerInset = (position) =>
+      "calc(" + (position * 100).toFixed(1) + "% + " + (28 - position * 56).toFixed(1) + "px)";
+    const axis = (label) => e("span", {
+      "data-field-axis-label": label.toLowerCase(),
+      style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)", writingMode: "vertical-rl", transform: "rotate(180deg)" }
+    }, label);
     const gridLine = (p, vert) => e("line", {
       key: (vert ? "v" : "h") + p,
       x1: vert ? p : 0, y1: vert ? 0 : p, x2: vert ? p : 100, y2: vert ? 100 : p,
@@ -1748,21 +1761,44 @@ class App extends React.Component {
       });
     };
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
-        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, v.title),
-        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, v.body),
-        e("div", { style: { marginTop: "12px" } },
+      e("div", {
+        key: "b", "data-field-content": "",
+        style: {
+          flex: 1, minHeight: 0, overflowY: "auto", padding: compactField ? "6px 20px 4px" : "12px 20px 10px",
+          display: "flex", flexDirection: "column"
+        }
+      },
+        e("div", {
+          "data-field-intro": "",
+          style: compactField
+            ? { flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gridTemplateAreas: "'title play' 'body body'", columnGap: "8px", alignItems: "start" }
+            : { flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gridTemplateAreas: "'title' 'body' 'play'" }
+        },
+          e("div", { style: { gridArea: "title", font: (compactField ? "700 20px/1.16" : "700 23px/1.16") + " var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", alignSelf: "center" } }, v.title),
+          e("div", { style: { gridArea: "body", font: compactField ? "400 12.5px/1.35 var(--font-text)" : "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: compactField ? "4px" : "7px", minHeight: compactField ? 0 : "63px" } }, v.body),
+          e("div", { style: { gridArea: "play", marginTop: compactField ? 0 : "12px" } },
           e(DS.Button, {
-            variant: "outline", size: "sm",
+            variant: "outline", size: "sm", "data-field-playback": "",
             onClick: () => {
               if (this.state.playKey !== "dfield") this.pat("d", { heard: true });
               this.toggleKey("dfield", [field.dSpec(this.state.d)]);
             }
-          }, st.playKey === "dfield" ? "Stop the sound" : d.heard ? "Play from here" : "Play the sound")),
-        e("div", { style: { display: "flex", gap: "9px", marginTop: "12px", alignItems: "stretch" } },
+          }, st.playKey === "dfield" ? "Stop the sound" : d.heard ? "Play from here" : "Play the sound"))),
+        e("div", {
+          "data-field-layout": "",
+          style: {
+            display: "flex", flex: compactField ? "1 1 auto" : "none", minHeight: compactField ? 0 : undefined,
+            gap: "9px", marginTop: compactField ? "4px" : "12px", alignItems: "stretch",
+            justifyContent: compactField ? "center" : undefined
+          }
+        },
           e("div", { style: { flex: "none", width: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", paddingBottom: "21px" } },
             axis("LOUDER"), axis("QUIETER")),
-          e("div", { style: { flex: 1, minWidth: 0 } },
+          e("div", {
+            style: compactField
+              ? { flex: "none", minWidth: 0, width: "min(100%, max(112px, calc(100dvh - 430px)))", alignSelf: "flex-start" }
+              : { flex: 1, minWidth: 0 }
+          },
             e("div", { "data-field": "", style: { position: "relative", width: "100%", aspectRatio: "1", borderRadius: "18px", border: "1.5px solid var(--gray-300)", background: "var(--white)", touchAction: "none", overflow: "hidden" } },
               e("div", { "data-field-grid": "", style: { position: "absolute", inset: 0, backgroundImage: field.fieldBg(v.level), pointerEvents: "none", transform: "scale(" + v.scale + ")", transformOrigin: v.origin, transition: "transform 560ms cubic-bezier(.4,0,.2,1),transform-origin 560ms cubic-bezier(.4,0,.2,1)" } },
                 e("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", style: { position: "absolute", inset: 0, width: "100%", height: "100%" } },
@@ -1783,7 +1819,7 @@ class App extends React.Component {
                 "data-field-marker": "",
                 onPointerDown: (ev) => this.dDown(ev), onPointerMove: (ev) => this.dMove(ev), onPointerUp: () => this.dUp(),
                 style: {
-                  position: "absolute", left: (v.locX * 100).toFixed(1) + "%", top: (v.locY * 100).toFixed(1) + "%",
+                  position: "absolute", left: markerInset(v.locX), top: markerInset(v.locY),
                   width: "56px", height: "56px", borderRadius: "50%",
                   background: field.tint("var(--blue-500)", 24), border: "2.5px solid var(--control-accent)",
                   transform: "translate(-50%,-50%)", cursor: "grab", touchAction: "none",
@@ -1793,13 +1829,13 @@ class App extends React.Component {
               },
                 e("span", { style: { display: "block", width: "12px", height: "12px", borderRadius: "50%", background: "var(--control-accent)" } }))),
             e("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "8px", font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)" } },
-              e("span", null, "LOWER"), e("span", null, "HIGHER")))),
+              e("span", { "data-field-axis-label": "lower" }, "LOWER"), e("span", { "data-field-axis-label": "higher" }, "HIGHER")))),
         st.showTech ? e("div", { "data-technical-values": true, style: { font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "6px" } }, shell.techOf(field.dSpec(d))) : null,
         // The prototype computes this note but its display block sits stranded
         // in the Families intro markup; escapes must reassure (REQ-016), so it
         // renders here on the field screen instead.
         d.note ? this.noteBox(d.note, "12px") : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
+        e("div", { style: { flex: "none", display: "flex", justifyContent: "center", alignItems: "center", padding: compactField ? 0 : "2px 0 9px", minHeight: "44px", marginTop: compactField ? 0 : "10px" } },
           this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())))),
       this.stepActionRegion({
         canPrevious: v.level > 0, onPrevious: previous,
