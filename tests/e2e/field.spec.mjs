@@ -28,6 +28,78 @@ async function drag(page, toX, toY) {
   await page.mouse.up();
 }
 
+const bottomOf = (box) => box.y + box.height;
+const rightOf = (box) => box.x + box.width;
+const overlaps = (a, b) =>
+  a.x < rightOf(b) && rightOf(a) > b.x && a.y < bottomOf(b) && bottomOf(a) > b.y;
+
+async function expectCenterHitTarget(page, locator) {
+  const ownsCenter = await locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return hit === element || element.contains(hit);
+  });
+  expect(ownsCenter).toBe(true);
+}
+
+async function expectCompleteFieldFit(page, viewport) {
+  const field = page.locator("[data-field]");
+  const layout = page.locator("[data-field-layout]");
+  const content = page.locator("[data-field-content]");
+  const marker = page.locator("[data-field-marker]");
+  const actionRegion = page.locator("[data-primary-action-region]");
+  const playback = page.locator("[data-field-playback]");
+  const back = page.getByRole("button", { name: "Back", exact: true });
+  const progressive = page.getByRole("button", { name: "Look closely at this area" });
+  const labels = ["LOUDER", "QUIETER", "LOWER", "HIGHER"]
+    .map((label) => page.getByText(label, { exact: true }));
+
+  await expect(field).toBeVisible();
+  await expect(layout).toBeVisible();
+  await expect(content).toBeVisible();
+  await expect(marker).toBeVisible();
+  await expect(playback).toBeVisible();
+  await expect(back).toBeVisible();
+  await expect(progressive).toBeVisible();
+  for (const label of labels) await expect(label).toBeVisible();
+
+  const [fieldBox, layoutBox, markerBox, actionBox, playbackBox, backBox, progressiveBox, ...labelBoxes] =
+    await Promise.all([
+      field.boundingBox(), layout.boundingBox(), marker.boundingBox(), actionRegion.boundingBox(),
+      playback.boundingBox(), back.boundingBox(), progressive.boundingBox(),
+      ...labels.map((label) => label.boundingBox())
+    ]);
+
+  for (const box of [fieldBox, layoutBox, markerBox, actionBox, playbackBox, backBox, progressiveBox, ...labelBoxes]) {
+    expect(box).not.toBeNull();
+    expect(box.x).toBeGreaterThanOrEqual(-0.5);
+    expect(rightOf(box)).toBeLessThanOrEqual(viewport.width + 0.5);
+    expect(box.y).toBeGreaterThanOrEqual(-0.5);
+    expect(bottomOf(box)).toBeLessThanOrEqual(viewport.height + 0.5);
+  }
+
+  // The grid stays square, while its complete label layout remains above the
+  // fixed progressive-action region at the initial, unscrolled position.
+  expect(Math.abs(fieldBox.width - fieldBox.height)).toBeLessThanOrEqual(1);
+  expect(bottomOf(layoutBox)).toBeLessThanOrEqual(actionBox.y + 0.5);
+  expect(bottomOf(fieldBox)).toBeLessThanOrEqual(actionBox.y + 0.5);
+  for (const labelBox of labelBoxes) {
+    expect(bottomOf(labelBox)).toBeLessThanOrEqual(actionBox.y + 0.5);
+    expect(overlaps(labelBox, fieldBox)).toBe(false);
+    expect(overlaps(labelBox, markerBox)).toBe(false);
+  }
+  expect(overlaps(playbackBox, layoutBox)).toBe(false);
+  expect(overlaps(layoutBox, actionBox)).toBe(false);
+  expect(overlaps(backBox, layoutBox)).toBe(false);
+  expect(overlaps(progressiveBox, layoutBox)).toBe(false);
+  expect(await content.evaluate((element) => element.scrollTop)).toBe(0);
+
+  await expectCenterHitTarget(page, playback);
+  await expectCenterHitTarget(page, back);
+  await expectCenterHitTarget(page, progressive);
+  await expectCenterHitTarget(page, marker);
+}
+
 test.describe("field (Option 3)", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -47,6 +119,51 @@ test.describe("field (Option 3)", () => {
     await expect(page.getByRole("button", { name: label })).toBeEnabled();
     expect(await primaryActionTop(page, label)).toBe(initialTop);
   });
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 }
+  ]) {
+    test(`complete field and controls fit and operate at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await seed(page);
+      await jumpTo(page, "Whole field");
+      await expectCompleteFieldFit(page, viewport);
+
+      // The marker remains pointer-reachable across the usable square.
+      const fieldBox = await page.locator("[data-field]").boundingBox();
+      await drag(page, fieldBox.x + fieldBox.width - 3, fieldBox.y + 3);
+      let d = await dState(page);
+      expect(d.x).toBeGreaterThan(.95);
+      expect(d.y).toBeLessThan(.05);
+
+      // Playback works from the keyboard and pointer; the progressive and
+      // fixed Back actions remain keyboard-operable without covering the field.
+      const playback = page.locator("[data-field-playback]");
+      await playback.focus();
+      await page.keyboard.press("Enter");
+      await expect.poll(() => playing(page)).toBe("dfield");
+      await playback.click();
+      await expect.poll(() => playing(page)).toBe(null);
+      await playback.click();
+      await expect.poll(() => playing(page)).toBe("dfield");
+      const progressive = page.getByRole("button", { name: "Look closely at this area" });
+      await expect(progressive).toBeEnabled();
+      await progressive.focus();
+      await page.keyboard.press("Enter");
+      d = await dState(page);
+      expect(d.level).toBe(1);
+      await expectCompleteFieldFit(page, viewport);
+
+      const back = page.getByRole("button", { name: "Back", exact: true });
+      await back.focus();
+      await page.keyboard.press("Enter");
+      d = await dState(page);
+      expect(d.level).toBe(0);
+      await expect(page.getByText(/Back to the whole range/)).toBeVisible();
+      await expectCompleteFieldFit(page, viewport);
+    });
+  }
 
   test("field broad pass: dragging steers pitch and volume live, capped at the ceiling", async ({ page }) => {
     await seed(page);
