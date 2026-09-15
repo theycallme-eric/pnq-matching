@@ -95,15 +95,18 @@ test.describe("comparison (Option 2)", () => {
     expect(r.round).toBe(1);
   });
 
-  test("A/B choices unlock only after both sounds play, and a new pair re-locks them", async ({ page }) => {
+  test("A/B guidance and every choice follow the current pair's two auditions", async ({ page }) => {
     await seed(page);
     await jumpTo(page, "A/B comparisons");
     await expect(page.locator('[data-screen-label="Shared · Two-sound comparison"]')).toBeVisible();
 
     const picks = page.getByRole("button", { name: "This one" });
+    const outcomes = page.getByRole("button", { name: /Neither is close|They sound the same/ });
+    const applicableChoices = page.getByRole("button", { name: /This one|Neither is close|They sound the same/ });
     await expect(picks).toHaveCount(2);
-    await expect(picks.first()).toBeDisabled();
-    await expect(picks.nth(1)).toBeDisabled();
+    await expect(outcomes).toHaveCount(2);
+    await expect(applicableChoices).toHaveCount(4);
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
     await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
 
     const sound1 = page.getByRole("button", { name: "Play sound 1" });
@@ -111,13 +114,14 @@ test.describe("comparison (Option 2)", () => {
     await sound1.click();
     await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
-    await expect(picks.first()).toBeDisabled();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
+    await expect(page.getByText("Play Sound 2 before choosing.")).toBeVisible();
+    await expect(page.getByText("Play both sounds before choosing.")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Play sound 2" }).click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prB");
-    await expect(picks.first()).toBeEnabled();
-    await expect(picks.nth(1)).toBeEnabled();
-    await expect(page.getByText("Play both sounds before choosing.")).toHaveCount(0);
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeEnabled();
+    await expect(page.locator("[data-comparison-guidance]")).toHaveCount(0);
 
     await picks.first().click();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prA");
@@ -125,8 +129,7 @@ test.describe("comparison (Option 2)", () => {
     expect(r.round).toBe(3);
     expect(r.spread).toBeCloseTo(.156, 6);
     expect(r.center).toBeCloseTo(.45, 6);
-    await expect(picks.first()).toBeDisabled();
-    await expect(picks.nth(1)).toBeDisabled();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
     await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Stop sound 1" })).toHaveAttribute("aria-pressed", "true");
     expect(await page.evaluate(() => {
@@ -134,13 +137,15 @@ test.describe("comparison (Option 2)", () => {
       return [s.prKey, s.prHeardA, s.prHeardB];
     })).toEqual([null, false, false]);
 
-    // The carried selection is not a new-pair audition. Stop it, then play
-    // both newly rendered candidates explicitly to unlock the next choice.
+    // The carried selection is not a new-pair audition. Stop it, then audition
+    // Sound 2 first so the exact remaining-sound guidance is covered too.
     await page.getByRole("button", { name: "Stop sound 1" }).click();
-    await page.getByRole("button", { name: "Play sound 1" }).click();
-    await expect(picks.first()).toBeDisabled();
     await page.getByRole("button", { name: "Play sound 2" }).click();
-    await expect(picks.first()).toBeEnabled();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
+    await expect(page.getByText("Play Sound 1 before choosing.")).toBeVisible();
+    await page.getByRole("button", { name: "Play sound 1" }).click();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeEnabled();
+    await expect(page.locator("[data-comparison-guidance]")).toHaveCount(0);
   });
 
   test("reaching the spread floor ends the loop into Confidence", async ({ page }) => {
@@ -201,10 +206,16 @@ test.describe("comparison (Option 2)", () => {
     await seed(page);
     await jumpTo(page, "A/B · long session");
     const finish = page.getByRole("button", { name: "Finish from my best match" });
-    await expect(finish).toBeDisabled();
+    const applicableChoices = page.getByRole("button", { name: /This one|Neither is close|They sound the same|Finish from my best match/ });
+    await expect(applicableChoices).toHaveCount(5);
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
+    await expect(page.getByText("Play both sounds before choosing.")).toBeVisible();
     await page.getByRole("button", { name: "Play sound 1" }).click();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeDisabled();
+    await expect(page.getByText("Play Sound 2 before choosing.")).toBeVisible();
     await page.getByRole("button", { name: "Play sound 2" }).click();
-    await expect(finish).toBeEnabled();
+    for (const choice of await applicableChoices.all()) await expect(choice).toBeEnabled();
+    await expect(page.locator("[data-comparison-guidance]")).toHaveCount(0);
     await finish.click();
     await expect(page.locator('[data-screen-label="Shared · Confidence"]')).toBeVisible();
     await expect.poll(() => page.evaluate(() => window.__pnqAudioEngine.playingKey())).toBe("prB");

@@ -1402,14 +1402,23 @@ class App extends React.Component {
       noHear = () => this.pat("l", { note: "We made the sounds a little easier to hear. Try again.", prior: { ...this.state.l.prior, level: Math.min(.85, this.state.l.prior.level + .12) } });
       note = st.l.note;
     }
-    const ready = this.prReady(gating.pairKeyOf(st));
+    const pairKey = gating.pairKeyOf(st);
+    const ready = this.prReady(pairKey);
+    const guidance = c === "r"
+      ? gating.prGuidance(st, pairKey)
+      : ready ? "" : "Play both sounds before choosing.";
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, title),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } },
           caption),
-        e("div", { style: { font: "500 13px/1.4 var(--font-ui)", color: ready ? "var(--text-muted)" : "var(--text-heading)", marginTop: "2px", minHeight: "18px" } },
-          ready ? "" : "Play both sounds before choosing."),
+        e("div", { style: { marginTop: "2px", minHeight: "18px" } },
+          guidance ? e("div", {
+            "data-comparison-guidance": true,
+            role: "status",
+            "aria-live": "polite",
+            style: { font: "500 13px/1.4 var(--font-ui)", color: "var(--text-heading)" }
+          }, guidance) : null),
         e("div", { style: { display: "flex", gap: "11px", marginTop: "14px" } },
           this.pairCard("a", A, "Sound 1", ready, pickA, false),
           this.pairCard("b", B, "Sound 2", ready, pickB, badgeB)),
