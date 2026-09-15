@@ -42,6 +42,52 @@ async function renderButtonFixture(page, { disabled = false, theme }) {
   }, { disabled, theme, variants });
 }
 
+async function renderActionShadowFixture(page) {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const host = document.createElement("div");
+    host.id = "action-shadow-fixture";
+    host.style.cssText = "position:fixed;inset:0;z-index:9999;background:var(--interface-app);padding:32px;display:grid;gap:12px";
+    document.body.append(host);
+    const DS = window.PNQHealthDesignSystem_deabce;
+    ReactDOM.render(
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(DS.Button, { variant: "primary", size: "md", "data-action-control": "primary" }, "Primary"),
+        React.createElement(DS.Button, { variant: "solid", size: "md", "data-action-control": "solid" }, "Solid"),
+        React.createElement("div", { "data-action-control": "hero" }, React.createElement(DS.HeroActionCard, {
+          eyebrow: "Hero", title: "Hero action", description: "Fixture"
+        })),
+        React.createElement(DS.Button, {
+          variant: "primary", size: "lg", "data-action-control": "tall", style: { boxShadow: "var(--shadow-action-tall)" }
+        }, "Tall"),
+        React.createElement(DS.Button, { variant: "primary", size: "sm", "data-action-control": "small" }, "Small"),
+        React.createElement(DS.Button, {
+          variant: "solid", size: "xs", "data-action-control": "extra-small", style: { boxShadow: "var(--shadow-action-xs)" }
+        }, "Extra small")
+      ),
+      host
+    );
+  });
+}
+
+async function resolvedShadow(locator) {
+  return locator.evaluate((element) => {
+    const value = getComputedStyle(element).boxShadow;
+    const color = value.match(/rgba?\(([^)]+)\)/);
+    const lengths = value.replace(/rgba?\([^)]+\)/, "").match(/-?[\d.]+px/g)?.map(parseFloat) || [];
+    const channels = color[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+    return {
+      x: lengths[0],
+      y: lengths[1],
+      blur: lengths[2],
+      rgb: channels.slice(0, 3),
+      alpha: channels.length > 3 ? channels[3] : 1
+    };
+  });
+}
+
 async function snapshot(button) {
   return button.evaluate((element) => {
     const parse = (value) => {
@@ -157,6 +203,25 @@ async function stateSnapshots(page, button) {
 
 test.describe("shared Button semantics", () => {
   test.use({ viewport: { width: 900, height: 720 } });
+
+  test("action controls resolve to the restrained shared shadow family", async ({ page }) => {
+    await renderActionShadowFixture(page);
+    const expected = {
+      primary: { x: 0, y: 5, blur: 11, rgb: [31, 127, 196], alpha: .2 },
+      solid: { x: 0, y: 2, blur: 6, rgb: [90, 169, 226], alpha: .2 },
+      hero: { x: 0, y: 8, blur: 17, rgb: [31, 127, 196], alpha: .2 },
+      tall: { x: 0, y: 6, blur: 13, rgb: [31, 127, 196], alpha: .2 },
+      small: { x: 0, y: 5, blur: 11, rgb: [31, 127, 196], alpha: .2 },
+      "extra-small": { x: 0, y: 2, blur: 6, rgb: [47, 124, 192], alpha: .17 }
+    };
+
+    for (const [control, shadow] of Object.entries(expected)) {
+      const locator = control === "hero"
+        ? page.locator('[data-action-control="hero"] > div')
+        : page.locator(`[data-action-control="${control}"]`);
+      expect(await resolvedShadow(locator), `${control} resting shadow`).toEqual(shadow);
+    }
+  });
 
   for (const theme of themes) {
     test(`${theme.name} variants meet label, boundary, focus, and geometry thresholds in every enabled state`, async ({ page }) => {
