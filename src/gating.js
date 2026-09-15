@@ -38,9 +38,28 @@ export function pairKeyOf(x) {
   return null;
 }
 
+// Read the current pair's auditions once so availability and its explanation
+// cannot drift into separate control systems.
+function prAuditions(x, key) {
+  const current = !!key && x.prKey === key;
+  const sound1 = current && !!x.prHeardA;
+  const sound2 = current && !!x.prHeardB;
+  return { sound1, sound2, ready: sound1 && sound2 };
+}
+
 // Both sounds of the current pair heard: the A/B choices may unlock.
 export function prReady(x, key) {
-  return !!key && x.prKey === key && x.prHeardA && x.prHeardB;
+  return prAuditions(x, key).ready;
+}
+
+// Human-readable explanation of the same gate. A key mismatch is a newly
+// rendered pair, even when an owner from the selected candidate still plays.
+export function prGuidance(x, key) {
+  const { sound1, sound2, ready } = prAuditions(x, key);
+  if (ready) return "";
+  if (sound1) return "Play Sound 2 before choosing.";
+  if (sound2) return "Play Sound 1 before choosing.";
+  return "Play both sounds before choosing.";
 }
 
 // State patch for playing one side of a pair. Each new pair has to be heard

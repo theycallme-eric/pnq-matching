@@ -28,15 +28,23 @@ test("directional phases have independent heard keys", () => {
 test("A/B judgment unlocks only after both sounds of the same pair", () => {
   const state = { ...shell.initialState(), concept: "r", stages: { ...shell.initialState().stages, r: "comp" } };
   const firstKey = gating.pairKeyOf(state);
+  assert.equal(gating.prGuidance(state, firstKey), "Play both sounds before choosing.");
   const afterA = { ...state, ...gating.prHeardState(state, "a", firstKey) };
   assert.equal(gating.prReady(afterA, firstKey), false);
+  assert.equal(gating.prGuidance(afterA, firstKey), "Play Sound 2 before choosing.");
   const afterB = { ...afterA, ...gating.prHeardState(afterA, "b", firstKey) };
   assert.equal(gating.prReady(afterB, firstKey), true);
+  assert.equal(gating.prGuidance(afterB, firstKey), "");
+
+  const afterBOnly = { ...state, ...gating.prHeardState(state, "b", firstKey) };
+  assert.equal(gating.prReady(afterBOnly, firstKey), false);
+  assert.equal(gating.prGuidance(afterBOnly, firstKey), "Play Sound 1 before choosing.");
 
   const nextPair = { ...afterB, r: { ...afterB.r, round: afterB.r.round + 1 } };
   const nextKey = gating.pairKeyOf(nextPair);
   assert.notEqual(nextKey, firstKey);
   assert.equal(gating.prReady(nextPair, nextKey), false, "a new pair relocks judgment");
+  assert.equal(gating.prGuidance(nextPair, nextKey), "Play both sounds before choosing.");
 });
 
 test("entering A/B with a carried directional sound does not count either audition", () => {

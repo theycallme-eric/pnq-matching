@@ -16,20 +16,7 @@ import * as matchingOptions from "./matching-options.js";
 
 const DSBase = window.PNQHealthDesignSystem_deabce;
 const e = React.createElement;
-// Keep the vendored component snapshot immutable. This boundary adapter adds
-// state hooks for the shell's stricter contrast treatment.
-const DS = {
-  ...DSBase,
-  Button(props) {
-    const variant = props.variant || "primary";
-    return e(DSBase.Button, {
-      ...props,
-      "data-pnq-variant": variant,
-      "data-pnq-disabled": props.disabled ? "true" : "false",
-      "data-pnq-on-dark": props.onDark ? "true" : "false"
-    });
-  }
-};
+const DS = DSBase;
 const DEFAULT_PRESCRIPTION_ID = "PNQ-4821-LK";
 
 // Onboarding examples: loudness holds pitch constant and pitch holds loudness
@@ -1415,14 +1402,23 @@ class App extends React.Component {
       noHear = () => this.pat("l", { note: "We made the sounds a little easier to hear. Try again.", prior: { ...this.state.l.prior, level: Math.min(.85, this.state.l.prior.level + .12) } });
       note = st.l.note;
     }
-    const ready = this.prReady(gating.pairKeyOf(st));
+    const pairKey = gating.pairKeyOf(st);
+    const ready = this.prReady(pairKey);
+    const guidance = c === "r"
+      ? gating.prGuidance(st, pairKey)
+      : ready ? "" : "Play both sounds before choosing.";
     return [
       e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "10px 20px 10px" } },
         e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, title),
         e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } },
           caption),
-        e("div", { style: { font: "500 13px/1.4 var(--font-ui)", color: ready ? "var(--text-muted)" : "var(--text-heading)", marginTop: "2px", minHeight: "18px" } },
-          ready ? "" : "Play both sounds before choosing."),
+        e("div", { style: { marginTop: "2px", minHeight: "18px" } },
+          guidance ? e("div", {
+            "data-comparison-guidance": true,
+            role: "status",
+            "aria-live": "polite",
+            style: { font: "500 13px/1.4 var(--font-ui)", color: "var(--text-heading)" }
+          }, guidance) : null),
         e("div", { style: { display: "flex", gap: "11px", marginTop: "14px" } },
           this.pairCard("a", A, "Sound 1", ready, pickA, false),
           this.pairCard("b", B, "Sound 2", ready, pickB, badgeB)),
@@ -1430,15 +1426,28 @@ class App extends React.Component {
         // in the confidence markup; escapes must reassure (REQ-016), so it
         // renders here on the pair screen instead.
         note ? this.noteBox(note, "14px") : null),
-      e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
-        e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
-          secs.map((sec) =>
-            e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
-              e(DS.Button, { variant: "ghost", disabled: c === "r" && !ready, onClick: sec.f }, sec.label)))),
-        c === "r" ? null : e("button", {
-          onClick: noHear,
-          style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
-        }, "I can't hear these sounds"))
+      c === "r"
+        ? this.screenActionRegion(
+          e("div", {
+            "data-comparison-outcomes": "",
+            style: {
+              display: "flex", flexDirection: "column", alignItems: "stretch",
+              gap: "var(--space-8)", minWidth: 0
+            }
+          }, secs.map((sec) =>
+            e(DS.Button, {
+              key: sec.label, variant: "ghost", disabled: !ready, onClick: sec.f
+            }, sec.label)))
+        )
+        : e("div", { key: "f", style: { flex: "none", padding: "8px 22px 0", background: "var(--gray-50)", display: "flex", flexDirection: "column", gap: "9px" } },
+          e("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap" } },
+            secs.map((sec) =>
+              e("div", { key: sec.label, style: { flex: 1, minWidth: "150px" } },
+                e(DS.Button, { variant: "ghost", onClick: sec.f }, sec.label)))),
+          e("button", {
+            onClick: noHear,
+            style: { display: "block", width: "100%", border: "none", background: "transparent", color: "var(--text-muted)", font: "500 13px var(--font-ui)", padding: "4px 0 9px", minHeight: "44px", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px" }
+          }, "I can't hear these sounds"))
     ];
   }
 

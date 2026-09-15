@@ -10,11 +10,11 @@
   --shadow-thumb: 0 2px 6px rgba(20, 30, 55, 0.2);
   --shadow-thumb-dark: 0 2px 6px rgba(0, 0, 0, 0.4);
 
-  --shadow-action: 0 10px 22px rgba(31, 127, 196, 0.4);
-  --shadow-action-tall: 0 12px 26px rgba(31, 127, 196, 0.42);
-  --shadow-action-hero: 0 16px 34px rgba(31, 127, 196, 0.4);
-  --shadow-action-sm: 0 4px 12px rgba(90, 169, 226, 0.4);
-  --shadow-action-xs: 0 4px 12px rgba(47, 124, 192, 0.34);
+  --shadow-action: 0 5px 11px rgba(31, 127, 196, 0.2);
+  --shadow-action-tall: 0 6px 13px rgba(31, 127, 196, 0.2);
+  --shadow-action-hero: 0 8px 17px rgba(31, 127, 196, 0.2);
+  --shadow-action-sm: 0 2px 6px rgba(90, 169, 226, 0.2);
+  --shadow-action-xs: 0 2px 6px rgba(47, 124, 192, 0.17);
   --shadow-segment: 0 2px 6px rgba(47, 124, 192, 0.32);
   --shadow-play-idle: 0 2px 8px rgba(47, 124, 192, 0.12);
   --shadow-play-active: 0 4px 14px rgba(47, 124, 192, 0.4);
