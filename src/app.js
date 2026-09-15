@@ -135,6 +135,16 @@ class App extends React.Component {
     return false;
   }
 
+  // Keep the existing browser-test seam aligned with the exact request that
+  // the app successfully handed to the audio engine. This adds no engine API
+  // or participant-facing state.
+  recordAudioRequest(key, specs) {
+    window.__pnqLastAudioRequest = {
+      key,
+      specs: specs.map((spec) => ({ ...spec }))
+    };
+  }
+
   hardStopEngine() {
     this.withAudio((a) => { try { if (a.panic) a.panic(); else a.stop(); } catch (err) {} });
   }
@@ -159,6 +169,7 @@ class App extends React.Component {
         return a.play(key, specs);
       });
       if (!started) return;
+      this.recordAudioRequest(key, specs);
       // State changes only after the engine confirms playback.
       if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
       else this.setState({ playKey: key });
@@ -204,15 +215,17 @@ class App extends React.Component {
 
   // Apply an Option 2 comparison result: stay on the stage with a patch, or
   // leave it (phase done, spread floor, fallback to directional). A selected
-  // A/B candidate is handed the existing graph without stop()/play(); every
-  // newly rendered pair still clears both explicit-audition flags.
+  // A/B candidate is handed to the stable Sound 1 owner without stop()/play();
+  // every newly rendered pair still clears both explicit-audition flags.
   applyR(res, selected) {
     const carrySelection = !!selected && this.optionPlaying();
+    const winnerOwner = "prA";
     if (res.kind === "stage") {
       if (!carrySelection) { this.go("r", res.stage, res.obj); return; }
       this.withAudio((a) => {
-        if (!this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec]))) return;
-        this.setState({ playKey: selected.owner }, () => this.go("r", res.stage, res.obj));
+        if (!this.audioCall(a, () => a.updateOwner(winnerOwner, [selected.spec]))) return;
+        this.recordAudioRequest(winnerOwner, [selected.spec]);
+        this.setState({ playKey: winnerOwner }, () => this.go("r", res.stage, res.obj));
       });
       return;
     }
@@ -220,10 +233,14 @@ class App extends React.Component {
     this.setState((s) => ({
       r: { ...s.r, ...res.patch },
       ...(changesPair ? { prKey: null, prHeardA: false, prHeardB: false } : {}),
-      ...(carrySelection ? { playKey: selected.owner } : {})
+      ...(carrySelection ? { playKey: winnerOwner } : {})
     }), () => {
       if (!carrySelection) { this.syncOption(); return; }
-      this.withAudio((a) => this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec])));
+      this.withAudio((a) => {
+        if (this.audioCall(a, () => a.updateOwner(winnerOwner, [selected.spec]))) {
+          this.recordAudioRequest(winnerOwner, [selected.spec]);
+        }
+      });
     });
   }
 
@@ -1333,7 +1350,7 @@ class App extends React.Component {
       pick(spec);
     };
     const ring = (delay) => e("span", { style: { position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid var(--blue-300)", animation: "pnqRing 1.8s ease-out infinite" + delay } });
-    return e("div", { key: pk, style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
+    return e("div", { key: pk, "data-sound-position": which === "a" ? "1" : "2", "data-sound-pitch": String(spec.pitch), style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
       e("div", { style: { position: "relative", width: "58px", height: "58px" } },
         playing ? ring("") : null,
         playing ? ring(" .9s") : null,

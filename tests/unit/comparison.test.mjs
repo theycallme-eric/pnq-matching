@@ -34,7 +34,7 @@ test("one about-right volume answer advances to the pitch phase", () => {
   assert.equal(res.patch.dirBase, 1);
 });
 
-test("directional pitch answers step the center; the second settle enters A/B", () => {
+test("directional pitch answers step the center; the second settle preserves the exact endpoint in A/B", () => {
   const r = { ...freshR(), phase: "pitch" };
   const higher = comparison.dirAnswer(r, "higher");
   close(higher.patch.center, .7);
@@ -49,8 +49,27 @@ test("directional pitch answers step the center; the second settle enters A/B", 
   assert.equal(second.kind, "stage");
   assert.equal(second.stage, "comp");
   close(second.obj.spread, Math.max(.12, .2 * 1.8));
+  close(second.obj.originalEndpoint, .5);
+  close(second.obj.winnerPitch, .5);
+  assert.notEqual(second.obj.challengerPitch, .5);
+  const firstPair = comparison.pairSpecs({ ...r, ...second.obj });
+  close(firstPair.A.pitch, .5, "Sound 1 is the exact directional endpoint");
+  close(firstPair.B.pitch, second.obj.challengerPitch);
+  assert.notEqual((firstPair.A.pitch + firstPair.B.pitch) / 2, .5, "the endpoint is not reinterpreted as a midpoint");
   assert.equal(second.obj.round, 1);
   assert.equal(second.obj.uncertain, 0);
+});
+
+test("first comparison challengers stay distinct and in range at both endpoints", () => {
+  for (const center of [0, 1]) {
+    const r = { ...freshR(), phase: "pitch", center, pitchOk: 1, pstep: .2 };
+    const entered = comparison.dirAnswer(r, "right");
+    const { A, B } = comparison.pairSpecs({ ...r, ...entered.obj });
+    close(entered.obj.originalEndpoint, center);
+    close(A.pitch, center);
+    assert.ok(B.pitch >= 0 && B.pitch <= 1);
+    assert.notEqual(B.pitch, center);
+  }
 });
 
 test("the directional escape raises the level and reassures in both phases", () => {
@@ -64,19 +83,55 @@ test("the directional escape raises the level and reassures in both phases", () 
   close(capped.patch.level, .85);
 });
 
-test("the pair straddles the center and a pick halves the spread onto it", () => {
-  const r = { ...freshR(), phase: "pitch", center: .58, level: .46, spread: .26, round: 2 };
+test("Sound 1 wins consecutive rounds while only narrowing challengers are regenerated", () => {
+  const r = {
+    ...freshR(), phase: "pitch", center: .58, level: .46, spread: .26, round: 2,
+    originalEndpoint: .58, winnerPitch: .58, challengerPitch: .71, challengerSide: 1
+  };
   const { A, B } = comparison.pairSpecs(r);
-  close(A.pitch, .45);
+  close(A.pitch, .58);
   close(B.pitch, .71);
   assert.equal(A.level, .46);
 
   const res = comparison.pick(r, A.pitch);
   assert.equal(res.kind, "patch");
-  close(res.patch.center, .45);
+  close(res.patch.center, .58);
+  close(res.patch.winnerPitch, .58);
+  assert.notEqual(res.patch.challengerPitch, B.pitch, "only Sound 2 gets a new identity");
   close(res.patch.spread, .156);
   assert.equal(res.patch.round, 3);
   assert.equal(res.patch.uncertain, 0, "a decisive pick clears the uncertain streak");
+
+  const next = { ...r, ...res.patch };
+  const nextPair = comparison.pairSpecs(next);
+  close(nextPair.A.pitch, .58, "the unchanged winner stays in Sound 1");
+  assert.ok(Math.abs(nextPair.B.pitch - nextPair.A.pitch) < Math.abs(B.pitch - A.pitch));
+
+  const again = comparison.pick(next, nextPair.A.pitch);
+  const thirdPair = comparison.pairSpecs({ ...next, ...again.patch });
+  close(thirdPair.A.pitch, .58, "the same winner survives another comparison");
+  assert.ok(Math.abs(thirdPair.B.pitch - thirdPair.A.pitch) < Math.abs(nextPair.B.pitch - nextPair.A.pitch));
+  close(again.patch.originalEndpoint, .58, "the phase-one endpoint remains distinct from pair updates");
+});
+
+test("a Sound 2 win moves that exact challenger to Sound 1 and narrows a new bounded challenger around it", () => {
+  const r = {
+    ...freshR(), phase: "pitch", center: .58, level: .46, spread: .26, round: 2,
+    originalEndpoint: .58, winnerPitch: .58, challengerPitch: .71, challengerSide: 1
+  };
+  const before = comparison.pairSpecs(r);
+  const res = comparison.pick(r, before.B.pitch);
+  assert.equal(res.kind, "patch");
+  close(res.patch.center, .71);
+  close(res.patch.winnerPitch, .71);
+  close(res.patch.originalEndpoint, .58);
+
+  const after = comparison.pairSpecs({ ...r, ...res.patch });
+  close(after.A.pitch, before.B.pitch, "the selected challenger is now Sound 1");
+  assert.notEqual(after.B.pitch, before.A.pitch);
+  assert.notEqual(after.B.pitch, before.B.pitch);
+  assert.ok(after.B.pitch >= 0 && after.B.pitch <= 1);
+  assert.ok(Math.abs(after.B.pitch - after.A.pitch) < Math.abs(before.B.pitch - before.A.pitch));
 });
 
 test("a pick below the spread floor ends the loop into Confidence", () => {
