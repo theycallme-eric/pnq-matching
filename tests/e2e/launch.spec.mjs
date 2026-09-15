@@ -43,7 +43,7 @@ test("launch screen loads the design system and renders the blue welcome mark", 
   await expect(page.getByText(/prototype|fictional/i)).toHaveCount(0);
 });
 
-test("launch enters account setup directly and disabled buttons use the solid design-system treatment", async ({ page }) => {
+test("launch enters account setup directly and disabled primary buttons keep their shared variant treatment", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Get started" }).click();
 
@@ -55,20 +55,21 @@ test("launch enters account setup directly and disabled buttons use the solid de
   await input.fill("a");
   const disabled = page.getByRole("button", { name: "Continue" });
   await expect(disabled).toHaveAttribute("aria-disabled", "true");
-  await expect(disabled).toHaveCSS("background-color", "rgb(223, 226, 231)");
   const treatment = await disabled.evaluate((button) => {
     const tokenProbe = document.createElement("div");
-    tokenProbe.style.background = "var(--interface-disabled)";
+    tokenProbe.style.background = "var(--gradient-action-disabled)";
     document.body.append(tokenProbe);
     const result = {
-      background: getComputedStyle(button).backgroundColor,
+      background: getComputedStyle(button).backgroundImage,
       borderStyle: getComputedStyle(button).borderStyle,
-      tokenBackground: getComputedStyle(tokenProbe).backgroundColor
+      borderColor: getComputedStyle(button).borderColor,
+      tokenBackground: getComputedStyle(tokenProbe).backgroundImage
     };
     tokenProbe.remove();
     return result;
   });
-  expect(treatment.borderStyle).not.toBe("dashed");
+  expect(treatment.borderStyle).toBe("solid");
+  expect(treatment.borderColor).toBe("rgba(0, 0, 0, 0)");
   expect(treatment.background).toBe(treatment.tokenBackground);
 });
 

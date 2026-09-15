@@ -12,6 +12,10 @@
   --navy-400: #25324d;
 
   /* Blue — the single accent family */
+  --blue-950: #0d466e;
+  --blue-900: #0f507e;
+  --blue-850: #145f94;
+  --blue-800: #176da8;
   --blue-700: #1f7fc4;
   --blue-600: #2f7cc0;
   --blue-500: #2e9fe0;
@@ -115,13 +119,66 @@
   --brand-blue: var(--blue-500);
   --brand-blue-deep: var(--blue-700);
   --brand-blue-light: var(--blue-300);
-  --action-primary: var(--blue-400);
+  --action-primary: var(--blue-800);
   --control-accent: var(--blue-600);
-  --gradient-action: linear-gradient(155deg, #2e9fe0 0%, #1f7fc4 100%); /* @kind color */
+  --gradient-action: linear-gradient(155deg, var(--button-primary-start) 0%, var(--button-primary-end) 100%);
+  --gradient-action-hover: linear-gradient(155deg, var(--button-primary-hover-start) 0%, var(--button-primary-hover-end) 100%);
+  --gradient-action-active: linear-gradient(155deg, var(--button-primary-active-start) 0%, var(--button-primary-active-end) 100%);
+  --gradient-action-disabled: linear-gradient(155deg, var(--button-disabled-primary-start) 0%, var(--button-disabled-primary-end) 100%);
+  --gradient-action-disabled-on-dark: linear-gradient(155deg, var(--button-disabled-primary-on-dark-start) 0%, var(--button-disabled-primary-on-dark-end) 100%);
   --gradient-navy: linear-gradient(165deg, #16263f 0%, #1d3354 58%, #23406a 100%); /* @kind color */
   --gradient-navy-dashboard: linear-gradient(165deg, #16263f 0%, #1d3354 64%, #23406a 100%); /* @kind color */
   --gradient-treatment: linear-gradient(180deg, #16263f 0%, #1d3354 100%); /* @kind color */
   --gradient-orb: linear-gradient(155deg, #3aa0e6, #2f7cc0); /* @kind color */
+
+  /* ---- Semantic: shared Button ----
+     Each interaction and availability state resolves through this one shared
+     palette. The component keeps its variant geometry constant; only these
+     colors, elevation, and cursor communicate state. */
+  --button-action-label: var(--white);
+  --button-primary-start: var(--blue-800);
+  --button-primary-end: var(--blue-850);
+  --button-primary-hover-start: var(--blue-850);
+  --button-primary-hover-end: var(--blue-900);
+  --button-primary-active-start: var(--blue-900);
+  --button-primary-active-end: var(--blue-950);
+  --button-solid-background: var(--blue-800);
+  --button-solid-hover-background: var(--blue-850);
+  --button-solid-active-background: var(--blue-900);
+  --button-outline-background: var(--white);
+  --button-outline-hover-background: var(--blue-75);
+  --button-outline-active-background: var(--blue-100);
+  --button-outline-label: var(--blue-800);
+  --button-outline-border: var(--blue-800);
+  --button-outline-on-dark-background: rgba(255, 255, 255, 0.08);
+  --button-outline-on-dark-hover-background: rgba(255, 255, 255, 0.13);
+  --button-outline-on-dark-active-background: rgba(255, 255, 255, 0.18);
+  --button-outline-on-dark-label: var(--white);
+  --button-outline-on-dark-border: var(--on-dark-80);
+  --button-ghost-label: var(--gray-700);
+  --button-ghost-hover-background: var(--blue-75);
+  --button-ghost-active-background: var(--blue-100);
+  --button-ghost-on-dark-label: var(--on-dark-80);
+  --button-ghost-on-dark-hover-background: rgba(255, 255, 255, 0.08);
+  --button-ghost-on-dark-active-background: rgba(255, 255, 255, 0.13);
+
+  --button-disabled-label: var(--gray-700);
+  --button-disabled-primary-start: var(--gray-200);
+  --button-disabled-primary-end: var(--gray-300);
+  --button-disabled-solid-background: var(--gray-200);
+  --button-disabled-outline-background: var(--white);
+  --button-disabled-outline-label: var(--gray-600);
+  --button-disabled-outline-border: var(--gray-500);
+  --button-disabled-ghost-label: var(--gray-600);
+  --button-disabled-primary-on-dark-start: var(--navy-500);
+  --button-disabled-primary-on-dark-end: var(--navy-400);
+  --button-disabled-solid-on-dark-background: var(--navy-500);
+  --button-disabled-on-dark-label: var(--on-dark-80);
+  --button-disabled-outline-on-dark-background: rgba(255, 255, 255, 0.04);
+  --button-disabled-outline-on-dark-border: var(--on-dark-60);
+
+  --button-focus-indicator: var(--navy-700);
+  --button-focus-indicator-on-dark: var(--white);
 
   /* ---- Semantic: status ---- */
   --status-success: var(--green-500);

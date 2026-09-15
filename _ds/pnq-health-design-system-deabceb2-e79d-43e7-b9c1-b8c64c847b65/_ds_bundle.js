@@ -980,11 +980,11 @@ const pnqButtonBase = {
   justifyContent: "center",
   gap: "9px",
   width: "100%",
-  border: "none",
+  border: "var(--border-selected) solid transparent",
   borderRadius: "var(--radius-button)",
   fontFamily: "var(--font-ui)",
   fontWeight: "var(--weight-semibold)",
-  transition: "background-color var(--dur-base) var(--ease-standard), box-shadow var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard)"
+  transition: "background var(--dur-base) var(--ease-standard), box-shadow var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard)"
 };
 const pnqButtonSizes = {
   lg: {
@@ -1009,47 +1009,72 @@ const pnqButtonSizes = {
     borderRadius: "var(--radius-lg)"
   }
 };
-function pnqButtonVariant(variant, disabled, onDark) {
-  if (disabled) {
-    return onDark ? {
-      background: "var(--interface-disabled-dark)",
-      color: "var(--on-dark-45)",
-      boxShadow: "none",
-      cursor: "not-allowed"
-    } : {
-      background: "var(--interface-disabled)",
-      color: "var(--text-disabled)",
-      boxShadow: "none",
-      cursor: "not-allowed"
-    };
+function pnqDisabledButtonVariant(variant, onDark) {
+  const shared = {
+    boxShadow: "none",
+    cursor: "not-allowed"
+  };
+  switch (variant) {
+    case "primary":
+      return {
+        ...shared,
+        background: onDark ? "var(--gradient-action-disabled-on-dark)" : "var(--gradient-action-disabled)",
+        color: onDark ? "var(--button-disabled-on-dark-label)" : "var(--button-disabled-label)"
+      };
+    case "solid":
+      return {
+        ...shared,
+        background: onDark ? "var(--button-disabled-solid-on-dark-background)" : "var(--button-disabled-solid-background)",
+        color: onDark ? "var(--button-disabled-on-dark-label)" : "var(--button-disabled-label)"
+      };
+    case "outline":
+      return {
+        ...shared,
+        background: onDark ? "var(--button-disabled-outline-on-dark-background)" : "var(--button-disabled-outline-background)",
+        color: onDark ? "var(--button-disabled-on-dark-label)" : "var(--button-disabled-outline-label)",
+        border: onDark ? "var(--border-selected) solid var(--button-disabled-outline-on-dark-border)" : "var(--border-selected) solid var(--button-disabled-outline-border)"
+      };
+    case "ghost":
+      return {
+        ...shared,
+        background: "transparent",
+        color: onDark ? "var(--button-disabled-on-dark-label)" : "var(--button-disabled-ghost-label)",
+        height: "var(--h-button-ghost)",
+        fontSize: "var(--fs-body-sm)"
+      };
+    default:
+      return shared;
   }
+}
+function pnqButtonVariant(variant, disabled, onDark) {
+  if (disabled) return pnqDisabledButtonVariant(variant, onDark);
   switch (variant) {
     case "primary":
       return {
         background: "var(--gradient-action)",
-        color: "var(--white)",
+        color: "var(--button-action-label)",
         boxShadow: "var(--shadow-action)",
         cursor: "pointer"
       };
     case "solid":
       return {
-        background: "var(--action-primary)",
-        color: "var(--white)",
+        background: "var(--button-solid-background)",
+        color: "var(--button-action-label)",
         boxShadow: "var(--shadow-action-sm)",
         cursor: "pointer"
       };
     case "outline":
       return {
-        background: onDark ? "rgba(255,255,255,.08)" : "var(--white)",
-        color: onDark ? "var(--white)" : "var(--control-accent)",
-        border: onDark ? "1.5px solid rgba(255,255,255,.3)" : "var(--border-selected) solid var(--control-accent)",
+        background: onDark ? "var(--button-outline-on-dark-background)" : "var(--button-outline-background)",
+        color: onDark ? "var(--button-outline-on-dark-label)" : "var(--button-outline-label)",
+        border: onDark ? "var(--border-selected) solid var(--button-outline-on-dark-border)" : "var(--border-selected) solid var(--button-outline-border)",
         boxShadow: "none",
         cursor: "pointer"
       };
     case "ghost":
       return {
-        background: "none",
-        color: onDark ? "var(--on-dark-70)" : "var(--gray-475)",
+        background: "transparent",
+        color: onDark ? "var(--button-ghost-on-dark-label)" : "var(--button-ghost-label)",
         boxShadow: "none",
         cursor: "pointer",
         height: "var(--h-button-ghost)",
@@ -1080,17 +1105,13 @@ function Button({
   return /*#__PURE__*/React.createElement("button", _extends({
     type: "button",
     "aria-disabled": disabled || undefined,
+    "data-pnq-button": "",
+    "data-pnq-variant": variant,
+    "data-pnq-size": size,
+    "data-pnq-disabled": disabled ? "true" : "false",
+    "data-pnq-on-dark": onDark ? "true" : "false",
     onClick: onClick,
     style: resolved,
-    onMouseDown: e => {
-      if (!disabled) e.currentTarget.style.transform = "scale(var(--press-scale))";
-    },
-    onMouseUp: e => {
-      e.currentTarget.style.transform = "none";
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.transform = "none";
-    }
   }, rest), leadingIcon, /*#__PURE__*/React.createElement("span", null, children), trailingIcon);
 }
 Object.assign(__ds_scope, { Button });

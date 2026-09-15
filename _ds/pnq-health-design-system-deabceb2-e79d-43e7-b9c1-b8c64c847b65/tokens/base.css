@@ -17,8 +17,55 @@ button { font-family: var(--font-ui); }
 
 input::placeholder { color: #aab2bd; letter-spacing: 0; }
 input:focus-visible,
-button:focus-visible {
+button:not([data-pnq-button]):focus-visible {
   outline: none;
   border-color: var(--focus-border);
   box-shadow: var(--focus-ring);
+}
+
+/* Shared Button interaction states. Inline component styles establish each
+   variant's normal/disabled identity; these selectors centralize the browser
+   states without changing dimensions, borders, padding, or label size. */
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="primary"]:hover {
+  background: var(--gradient-action-hover) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="primary"]:active {
+  background: var(--gradient-action-active) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="solid"]:hover {
+  background: var(--button-solid-hover-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="solid"]:active {
+  background: var(--button-solid-active-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="outline"]:hover {
+  background: var(--button-outline-hover-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="outline"]:active {
+  background: var(--button-outline-active-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="outline"][data-pnq-on-dark="true"]:hover {
+  background: var(--button-outline-on-dark-hover-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="outline"][data-pnq-on-dark="true"]:active {
+  background: var(--button-outline-on-dark-active-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="ghost"]:hover {
+  background: var(--button-ghost-hover-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="ghost"]:active {
+  background: var(--button-ghost-active-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="ghost"][data-pnq-on-dark="true"]:hover {
+  background: var(--button-ghost-on-dark-hover-background) !important;
+}
+[data-pnq-button][data-pnq-disabled="false"][data-pnq-variant="ghost"][data-pnq-on-dark="true"]:active {
+  background: var(--button-ghost-on-dark-active-background) !important;
+}
+[data-pnq-button]:focus-visible {
+  outline: 3px solid var(--button-focus-indicator);
+  outline-offset: 2px;
+}
+[data-pnq-button][data-pnq-on-dark="true"]:focus-visible {
+  outline-color: var(--button-focus-indicator-on-dark);
 }
