@@ -11,13 +11,15 @@
 //
 // It is not device-validated audio. Real, calibrated sound generation replaces this wholesale.
 
+import { MASTER_LEVEL, freqOf, gainOf } from './audio-mapping.js';
+export { MASTER_LEVEL, effectiveGainOf, freqOf, gainOf } from './audio-mapping.js';
+
 let ctx = null, master = null, panner = null, layers = [], noise = null;
 let muted = false, curKey = null, ear = 'both', gen = 0;
 
 const EARPAN = { left: -1, right: 1, both: 0 };
-// Prototype listening-review level. Every synthesized voice reaches this one
-// master, preserving all relative per-voice gains and ear routing.
-const MASTER_LEVEL = 0.25;
+// Every synthesized voice reaches the reduced shared master, preserving
+// relative per-voice gains and ear routing.
 
 function buildGraph(c) {
   master = c.createGain();
@@ -55,12 +57,6 @@ function noiseBuf(c) {
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   noise = b; return b;
 }
-const FR = { tone: [250, 10000], hiss: [350, 8400], buzz: [55, 440], click: [400, 6400] };
-export function freqOf(kind, p) {
-  const r = FR[kind] || FR.tone, q = Math.max(0, Math.min(1, p));
-  return r[0] * Math.pow(r[1] / r[0], q);
-}
-function gainOf(level) { const l = Math.max(0, Math.min(1, level)); return 0.02 + l * l * 0.55; }
 function target(param, value, time, constant) {
   try { param.setTargetAtTime(value, time, constant); } catch (e) { param.value = value; }
 }
