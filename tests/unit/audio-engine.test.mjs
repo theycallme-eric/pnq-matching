@@ -1,14 +1,17 @@
 /*
  * Unit tests for src/audio-engine.js (REQ-017) against a mocked AudioContext.
  *
- * Covers: the V5 export surface, freqOf exponential mapping over the four
- * kinds' FRQ ranges, squared-level gain, StereoPanner per-ear routing, the
- * single-playback-owner rule (play() always stops the previous owner), and
- * hard-stop/panic semantics (nothing audible afterwards, graph immediately
- * playable again).
+ * Covers: deterministic calibration seams, freqOf exponential mapping over
+ * the four kinds' ranges, reduced loudness gain, StereoPanner per-ear
+ * routing, the single-playback-owner rule (play() always stops the previous
+ * owner), and hard-stop/panic semantics (nothing audible afterwards, graph
+ * immediately playable again).
  */
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as comparison from "../../src/comparison.js";
+import * as field from "../../src/field.js";
+import { FRQ as technicalRanges, freqOf as technicalFreqOf, freshD, freshR } from "../../src/app-shell.js";
 
 /* ---------- mocked Web Audio API ---------- */
 
@@ -156,10 +159,18 @@ function liveSources() {
   return ctx().sources.filter((s) => s.started && s.stoppedAt === null);
 }
 
-const gainOf = (level) => {
+const expectedGainOf = (level) => {
+  const l = Math.max(0, Math.min(1, level));
+  return 0.015 + l * l * 0.2192;
+};
+
+const BASELINE_MASTER_LEVEL = 0.25;
+const baselineGainOf = (level) => {
   const l = Math.max(0, Math.min(1, level));
   return 0.02 + l * l * 0.55;
 };
+const baselineEffectiveGainOf = (level) => BASELINE_MASTER_LEVEL * baselineGainOf(level);
+const EFFECTIVE_GAIN_TOLERANCE = 1e-9;
 
 const spec = (kind, pitch = 0.5, level = 0.5, bright = 0) => ({
   kind,
@@ -170,8 +181,11 @@ const spec = (kind, pitch = 0.5, level = 0.5, bright = 0) => ({
 
 /* ---------- export surface ---------- */
 
-test("exports the exact V5 surface", () => {
+test("exports the playback surface and deterministic calibration seams", () => {
   const surface = [
+    "MASTER_LEVEL",
+    "effectiveGainOf",
+    "gainOf",
     "ready",
     "unlock",
     "freqOf",
@@ -185,9 +199,10 @@ test("exports the exact V5 surface", () => {
     "earIsRouted",
     "playingKey"
   ];
-  for (const name of surface) {
+  for (const name of surface.filter((name) => name !== "MASTER_LEVEL")) {
     assert.equal(typeof engine[name], "function", `${name} is exported`);
   }
+  assert.equal(typeof engine.MASTER_LEVEL, "number");
   assert.deepEqual(Object.keys(engine).sort(), surface.slice().sort());
 });
 
@@ -197,13 +212,13 @@ test("ready() and unlock() build the graph on the mocked context", () => {
   const { panner, master } = graph();
   assert.ok(panner, "a StereoPanner is connected to the destination");
   assert.ok(master, "the master gain feeds the panner");
-  assert.equal(master.gain.value, 0.25, "one shared master starts at the review level");
+  assert.equal(master.gain.value, 0.1, "one shared master starts at the reduced review level");
 });
 
 /* ---------- freqOf: exponential mapping over per-kind FRQ ranges ---------- */
 
 const FRQ = {
-  tone: [250, 10000],
+  tone: [1600, 16000],
   hiss: [350, 8400],
   buzz: [55, 440],
   click: [400, 6400]
@@ -231,16 +246,45 @@ test("freqOf maps 0..1 exponentially across each kind's range", () => {
 });
 
 test("freqOf clamps pitch and falls back to the tone range", () => {
-  assert.equal(engine.freqOf("tone", -2), 250);
-  assert.equal(engine.freqOf("tone", 5), 10000);
+  assert.equal(engine.freqOf("tone", -2), 1600);
+  assert.equal(engine.freqOf("tone", 5), 16000);
   assert.equal(engine.freqOf("buzz", -0.01), 55);
-  assert.equal(engine.freqOf("nonsense", 0), 250);
-  assert.equal(engine.freqOf("nonsense", 1), 10000);
+  assert.equal(engine.freqOf("nonsense", 0), 1600);
+  assert.equal(engine.freqOf("nonsense", 1), 16000);
+});
+
+test("tone positions stay ordered and retain high-frequency interior resolution", () => {
+  const positions = [0, 0.1, 0.25, 0.5, 0.75, 0.875, 0.99, 1];
+  const frequencies = positions.map((position) => engine.freqOf("tone", position));
+  for (let i = 1; i < frequencies.length; i++) {
+    assert.ok(frequencies[i] > frequencies[i - 1], `${positions[i]} maps above ${positions[i - 1]}`);
+  }
+  assert.ok(engine.freqOf("tone", 0.875) > 11000, "a high-frequency target has useful interior reach");
+  assert.ok(engine.freqOf("tone", 0.875) < 16000, "a high-frequency target is not pinned to maximum");
+  assert.ok(engine.freqOf("tone", 0.99) < 16000, "fine adjustment remains available near the ceiling");
+});
+
+test("non-tone sound-family ranges remain at their baseline anchors", () => {
+  for (const [kind, [lo, hi]] of Object.entries({
+    hiss: [350, 8400],
+    buzz: [55, 440],
+    click: [400, 6400]
+  })) {
+    assert.equal(engine.freqOf(kind, 0), lo, `${kind} low endpoint`);
+    assert.equal(engine.freqOf(kind, 1), hi, `${kind} high endpoint`);
+  }
+});
+
+test("technical values use the same tone domain as synthesized consumers", () => {
+  assert.deepEqual(technicalRanges.tone, [1600, 16000]);
+  for (const position of [0, 0.22, 0.5, 0.78, 0.875, 1]) {
+    assert.equal(technicalFreqOf("tone", position), engine.freqOf("tone", position));
+  }
 });
 
 /* ---------- synthesis kinds and squared-level gain ---------- */
 
-test("the four kinds synthesize with freqOf pitch and squared-level gain", () => {
+test("the four kinds synthesize with freqOf pitch and reduced squared-level gain", () => {
   for (const kind of ["tone", "hiss", "buzz", "click"]) {
     engine.panic();
     assert.equal(engine.play(`k-${kind}`, [spec(kind, 0.5, 0.7)]), true);
@@ -249,8 +293,8 @@ test("the four kinds synthesize with freqOf pitch and squared-level gain", () =>
     const ramp = gains[0].gain.last("ramp");
     assert.ok(ramp, `${kind}: level ramped in`);
     assert.ok(
-      Math.abs(ramp.v - gainOf(0.7)) < 1e-9,
-      `${kind}: gain is 0.02 + level^2 * 0.55`
+      Math.abs(ramp.v - expectedGainOf(0.7)) < 1e-9,
+      `${kind}: gain is 0.015 + level^2 * 0.2192`
     );
     const live = liveSources();
     if (kind === "hiss") {
@@ -274,16 +318,77 @@ test("the four kinds synthesize with freqOf pitch and squared-level gain", () =>
   }
 });
 
-test("gain is squared-level over the clamped 0..1 range (via update)", () => {
+test("gain clamps safely and is strictly increasing across the participant range", () => {
   engine.panic();
   engine.play("g", [spec("tone", 0.5, 0)]);
-  for (const level of [0, 0.25, 0.5, 1, 2, -1]) {
+  for (const level of [0, 0.12, 0.25, 0.5, 0.75, 1, 2, -1]) {
     engine.update([spec("tone", 0.5, level)]);
     const target = layerGains()[0].gain.last("target");
-    assert.ok(Math.abs(target.v - gainOf(level)) < 1e-9, `level ${level}`);
+    assert.ok(Math.abs(target.v - expectedGainOf(level)) < 1e-9, `level ${level}`);
   }
-  assert.equal(gainOf(0), 0.02);
-  assert.ok(Math.abs(gainOf(1) - 0.57) < 1e-9);
+  assert.equal(engine.gainOf(-1), engine.gainOf(0), "quiet endpoint clamps");
+  assert.equal(engine.gainOf(2), engine.gainOf(1), "loud endpoint clamps");
+  const ordered = [0, 0.01, 0.12, 0.25, 0.5, 0.75, 0.99, 1].map(engine.gainOf);
+  for (let i = 1; i < ordered.length; i++) assert.ok(ordered[i] > ordered[i - 1]);
+});
+
+test("effective loudness anchors match the approved baseline relationships", () => {
+  assert.equal(engine.MASTER_LEVEL, 0.1, "the shared master is reduced from 0.25");
+
+  const baselineQuiet = baselineEffectiveGainOf(0);
+  const baselineThirdMarkedStep = baselineEffectiveGainOf(0.12);
+  const baselineLoud = baselineEffectiveGainOf(1);
+  assert.ok(engine.effectiveGainOf(0) < baselineQuiet, "the new quiet end is below the baseline minimum");
+  assert.ok(
+    Math.abs(engine.effectiveGainOf(0.5) - baselineThirdMarkedStep) <= EFFECTIVE_GAIN_TOLERANCE,
+    "the midpoint matches baseline level 0.12 (the third 0.04 marked step) within 1e-9"
+  );
+  assert.ok(engine.effectiveGainOf(1) < baselineLoud * 0.5, "the loud end is materially below baseline maximum");
+
+  for (const level of [0, 0.12, 0.25, 0.5, 0.75, 1]) {
+    assert.ok(
+      engine.effectiveGainOf(level) < baselineEffectiveGainOf(level),
+      `level ${level} is lower than the corresponding baseline output`
+    );
+  }
+});
+
+test("setup, education, and Options 1-3 use the shared reduced mappings", () => {
+  const option2Pair = comparison.pairSpecs(freshR());
+  const consumers = [
+    ["setup sample", spec("tone", 0.5, 0.42, 0.2)],
+    ["education lower sample", spec("tone", 0.22, 0.42, 0.1)],
+    ["education higher sample", spec("tone", 0.78, 0.42, 0.2)],
+    ["education quiet sample", spec("tone", 0.5, 0.26, 0.14)],
+    ["education loud sample", spec("tone", 0.5, 0.62, 0.14)],
+    ["Option 1", spec("tone", 0.5, 0.4, 0.3)],
+    ["Option 2 directional", spec("tone", freshR().center, freshR().level, 0.3)],
+    ["Option 2 A", option2Pair.A],
+    ["Option 2 B", option2Pair.B],
+    ["Option 3", field.dSpec(freshD())]
+  ];
+
+  for (const [name, consumerSpec] of consumers) {
+    engine.panic();
+    assert.equal(engine.play(name, [consumerSpec]), true);
+    const { master } = graph();
+    const layer = layerGains()[0];
+    const source = liveSources()[0];
+    assert.equal(master.gain.value, engine.MASTER_LEVEL, `${name}: reduced shared master`);
+    assert.deepEqual(layer.connections, [master], `${name}: voice routes through the shared master`);
+    assert.ok(
+      Math.abs(layer.gain.last("ramp").v - engine.gainOf(consumerSpec.level)) < 1e-9,
+      `${name}: shared loudness mapping`
+    );
+    assert.ok(
+      Math.abs(source.frequency.value - engine.freqOf("tone", consumerSpec.pitch)) < 1e-9,
+      `${name}: shared tone mapping`
+    );
+    assert.ok(
+      engine.effectiveGainOf(consumerSpec.level) < baselineEffectiveGainOf(consumerSpec.level),
+      `${name}: effective output is lower than baseline`
+    );
+  }
 });
 
 /* ---------- per-ear routing through the single StereoPanner ---------- */
@@ -342,7 +447,7 @@ test("setMuted silences and restores the master gain", () => {
   engine.panic();
   assert.equal(graph().master.gain.value, 0, "a rebuild cannot bypass mute");
   engine.setMuted(false);
-  assert.equal(graph().master.gain.value, 0.25, "unmute restores the shared review level");
+  assert.equal(graph().master.gain.value, 0.1, "unmute restores the shared review level");
 });
 
 /* ---------- single playback owner ---------- */
@@ -407,7 +512,7 @@ test("stop() leaves nothing audible; update() while stopped starts nothing", () 
   const playing = liveSources();
   engine.stop();
   assert.equal(engine.playingKey(), null);
-  assert.equal(graph().master.gain.value, 0.25, "stop does not alter the shared master");
+  assert.equal(graph().master.gain.value, 0.1, "stop does not alter the shared master");
   for (const s of playing) assert.notEqual(s.stoppedAt, null);
   assert.equal(liveSources().length, 0, "no source is producing output");
   const startedBefore = ctx().sources.length;
@@ -424,7 +529,7 @@ test("play and update failures panic to one silent, rebuildable graph", () => {
   assert.equal(engine.play("broken-play", [spec("hiss")]), false);
   assert.equal(engine.playingKey(), null);
   assert.equal(liveSources().length, 0, "a partially built source is stopped");
-  assert.equal(graph().master.gain.value, 0.25);
+  assert.equal(graph().master.gain.value, 0.1);
   c.createBiquadFilter = createFilter;
 
   assert.equal(engine.play("broken-update", [spec("tone")]), true);
@@ -435,7 +540,7 @@ test("play and update failures panic to one silent, rebuildable graph", () => {
   assert.equal(engine.playingKey(), null);
   assert.notEqual(source.stoppedAt, null);
   assert.equal(liveSources().length, 0);
-  assert.equal(graph().master.gain.value, 0.25);
+  assert.equal(graph().master.gain.value, 0.1);
 });
 
 test("panic() tears the graph down, rebuilds it, and it plays again immediately", () => {
@@ -451,7 +556,7 @@ test("panic() tears the graph down, rebuilds it, and it plays again immediately"
   const rebuilt = graph();
   assert.ok(rebuilt.master && rebuilt.panner, "fresh graph reaches destination");
   assert.notEqual(rebuilt.master, old.master);
-  assert.equal(rebuilt.master.gain.value, 0.25, "panic rebuild restores the same shared master");
+  assert.equal(rebuilt.master.gain.value, 0.1, "panic rebuild restores the same shared master");
   assert.equal(engine.play("after-panic", [spec("tone")]), true);
   assert.equal(engine.playingKey(), "after-panic");
   assert.equal(liveSources().length, 1);
