@@ -32,7 +32,7 @@ export function markHeardState(s) {
 // like a new pair and reset the heard flags.
 export function pairKeyOf(x) {
   const c = x.concept, s = x.stages[c];
-  if (c === "r" && s === "comp") return "r|comp|" + x.r.round + "|" + x.r.uncertain;
+  if (c === "r" && s === "comp") return "r|comp|" + x.r.round + "|" + x.r.uncertain + "|" + (x.r.validation ? "validation" : "ordinary");
   if (c === "a" && s === "chal") return "a|chal";
   if (c === "l" && s === "prior") return "l|prior";
   return null;

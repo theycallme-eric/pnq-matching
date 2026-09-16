@@ -135,6 +135,16 @@ class App extends React.Component {
     return false;
   }
 
+  // Keep the existing browser-test seam aligned with the exact request that
+  // the app successfully handed to the audio engine. This adds no engine API
+  // or participant-facing state.
+  recordAudioRequest(key, specs) {
+    window.__pnqLastAudioRequest = {
+      key,
+      specs: specs.map((spec) => ({ ...spec }))
+    };
+  }
+
   hardStopEngine() {
     this.withAudio((a) => { try { if (a.panic) a.panic(); else a.stop(); } catch (err) {} });
   }
@@ -159,6 +169,7 @@ class App extends React.Component {
         return a.play(key, specs);
       });
       if (!started) return;
+      this.recordAudioRequest(key, specs);
       // State changes only after the engine confirms playback.
       if (key === "main") this.setState((s) => ({ playKey: key, ...gating.markHeardState(s) }));
       else this.setState({ playKey: key });
@@ -204,15 +215,17 @@ class App extends React.Component {
 
   // Apply an Option 2 comparison result: stay on the stage with a patch, or
   // leave it (phase done, spread floor, fallback to directional). A selected
-  // A/B candidate is handed the existing graph without stop()/play(); every
-  // newly rendered pair still clears both explicit-audition flags.
+  // A/B candidate is handed to the stable Sound 1 owner without stop()/play();
+  // every newly rendered pair still clears both explicit-audition flags.
   applyR(res, selected) {
     const carrySelection = !!selected && this.optionPlaying();
+    const winnerOwner = "prA";
     if (res.kind === "stage") {
       if (!carrySelection) { this.go("r", res.stage, res.obj); return; }
       this.withAudio((a) => {
-        if (!this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec]))) return;
-        this.setState({ playKey: selected.owner }, () => this.go("r", res.stage, res.obj));
+        if (!this.audioCall(a, () => a.updateOwner(winnerOwner, [selected.spec]))) return;
+        this.recordAudioRequest(winnerOwner, [selected.spec]);
+        this.setState({ playKey: winnerOwner }, () => this.go("r", res.stage, res.obj));
       });
       return;
     }
@@ -220,10 +233,14 @@ class App extends React.Component {
     this.setState((s) => ({
       r: { ...s.r, ...res.patch },
       ...(changesPair ? { prKey: null, prHeardA: false, prHeardB: false } : {}),
-      ...(carrySelection ? { playKey: selected.owner } : {})
+      ...(carrySelection ? { playKey: winnerOwner } : {})
     }), () => {
       if (!carrySelection) { this.syncOption(); return; }
-      this.withAudio((a) => this.audioCall(a, () => a.updateOwner(selected.owner, [selected.spec])));
+      this.withAudio((a) => {
+        if (this.audioCall(a, () => a.updateOwner(winnerOwner, [selected.spec]))) {
+          this.recordAudioRequest(winnerOwner, [selected.spec]);
+        }
+      });
     });
   }
 
@@ -1333,7 +1350,7 @@ class App extends React.Component {
       pick(spec);
     };
     const ring = (delay) => e("span", { style: { position: "absolute", inset: 0, borderRadius: "50%", border: "2px solid var(--blue-300)", animation: "pnqRing 1.8s ease-out infinite" + delay } });
-    return e("div", { key: pk, style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
+    return e("div", { key: pk, "data-sound-position": which === "a" ? "1" : "2", "data-sound-pitch": String(spec.pitch), style: { flex: 1, background: "var(--white)", border: "1.5px solid " + (playing ? "var(--control-accent)" : "var(--gray-200)"), borderRadius: "16px", padding: "16px 10px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "9px" } },
       e("div", { style: { position: "relative", width: "58px", height: "58px" } },
         playing ? ring("") : null,
         playing ? ring(" .9s") : null,
@@ -1363,8 +1380,8 @@ class App extends React.Component {
     this.applyR(res);
   }
 
-  // Shared · Two-sound comparison (REQ-008): forced-choice pairs that halve
-  // the spread, with the same-answer stop, the fatigue finisher and contextual
+  // Shared · Two-sound comparison (REQ-005, REQ-008): three retained-winner
+  // choices followed by at most one exact endpoint validation, plus contextual
   // Help for Option 2's "can't hear" escape (REQ-003).
   renderPair() {
     const st = this.state, c = st.concept;
@@ -1373,14 +1390,18 @@ class App extends React.Component {
     if (c === "r") {
       const r = st.r;
       ({ A, B } = comparison.pairSpecs(r));
-      title = "Which one is closer?";
-      caption = "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
-      note = comparison.compNote(r);
+      title = r.validation ? "One final comparison" : "Which one is closer?";
+      caption = r.validation
+        ? "Compare your current match with the sound you first landed on. Whichever you choose will be your final match."
+        : "Both are near the sound you landed on. Pick whichever is closer to what you hear. They get more alike as you go.";
+      note = r.validation ? "" : comparison.compNote(r);
       pickA = (spec) => this.rPick("prA", spec);
       pickB = (spec) => this.rPick("prB", spec);
-      secs.push({ label: "Neither is close", f: () => this.rNeither() });
-      secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
-      if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+      if (!r.validation) {
+        secs.push({ label: "Neither is close", f: () => this.rNeither() });
+        secs.push({ label: "They sound the same", f: () => this.go("r", "conf", { stop: "same" }) });
+        if (r.round >= comparison.FATIGUE_ROUND) secs.push({ label: "Finish from my best match", f: () => this.go("r", "conf") });
+      }
     } else if (c === "a") {
       ({ A, B } = pres.aChalSpecs(st.a));
       title = "One more check";
@@ -1710,8 +1731,21 @@ class App extends React.Component {
   renderDField() {
     const st = this.state, d = st.d;
     const v = field.view(d);
+    // On a short, bare phone the field owns the remaining vertical space
+    // above the fixed action stack. This keeps the established screen and
+    // controls intact while allowing the square to shrink before its labels
+    // can enter the action region.
+    const compactField = !st.framed && window.innerHeight <= 650;
     const hue = field.hueOf(v.level), nextHue = field.hueOf(v.level + 1);
-    const axis = (label) => e("span", { style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)", writingMode: "vertical-rl", transform: "rotate(180deg)" } }, label);
+    // Keep the complete 56px pointer target inside the usable square even at
+    // a logical 0 or 1 coordinate. The logical/audio position still reaches
+    // the full range; only the target's visual center is inset by its radius.
+    const markerInset = (position) =>
+      "calc(" + (position * 100).toFixed(1) + "% + " + (28 - position * 56).toFixed(1) + "px)";
+    const axis = (label) => e("span", {
+      "data-field-axis-label": label.toLowerCase(),
+      style: { font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)", writingMode: "vertical-rl", transform: "rotate(180deg)" }
+    }, label);
     const gridLine = (p, vert) => e("line", {
       key: (vert ? "v" : "h") + p,
       x1: vert ? p : 0, y1: vert ? 0 : p, x2: vert ? p : 100, y2: vert ? 100 : p,
@@ -1731,21 +1765,44 @@ class App extends React.Component {
       });
     };
     return [
-      e("div", { key: "b", style: { flex: 1, overflowY: "auto", padding: "12px 20px 10px" } },
-        e("div", { style: { font: "700 23px/1.16 var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em" } }, v.title),
-        e("div", { style: { font: "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: "7px", minHeight: "63px" } }, v.body),
-        e("div", { style: { marginTop: "12px" } },
+      e("div", {
+        key: "b", "data-field-content": "",
+        style: {
+          flex: 1, minHeight: 0, overflowY: "auto", padding: compactField ? "6px 20px 4px" : "12px 20px 10px",
+          display: "flex", flexDirection: "column"
+        }
+      },
+        e("div", {
+          "data-field-intro": "",
+          style: compactField
+            ? { flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gridTemplateAreas: "'title play' 'body body'", columnGap: "8px", alignItems: "start" }
+            : { flex: "none", display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gridTemplateAreas: "'title' 'body' 'play'" }
+        },
+          e("div", { style: { gridArea: "title", font: (compactField ? "700 20px/1.16" : "700 23px/1.16") + " var(--font-ui)", color: "var(--text-heading)", letterSpacing: "-.015em", alignSelf: "center" } }, v.title),
+          e("div", { style: { gridArea: "body", font: compactField ? "400 12.5px/1.35 var(--font-text)" : "400 14px/1.5 var(--font-text)", color: "var(--text-body)", marginTop: compactField ? "4px" : "7px", minHeight: compactField ? 0 : "63px" } }, v.body),
+          e("div", { style: { gridArea: "play", marginTop: compactField ? 0 : "12px" } },
           e(DS.Button, {
-            variant: "outline", size: "sm",
+            variant: "outline", size: "sm", "data-field-playback": "",
             onClick: () => {
               if (this.state.playKey !== "dfield") this.pat("d", { heard: true });
               this.toggleKey("dfield", [field.dSpec(this.state.d)]);
             }
-          }, st.playKey === "dfield" ? "Stop the sound" : d.heard ? "Play from here" : "Play the sound")),
-        e("div", { style: { display: "flex", gap: "9px", marginTop: "12px", alignItems: "stretch" } },
+          }, st.playKey === "dfield" ? "Stop the sound" : d.heard ? "Play from here" : "Play the sound"))),
+        e("div", {
+          "data-field-layout": "",
+          style: {
+            display: "flex", flex: compactField ? "1 1 auto" : "none", minHeight: compactField ? 0 : undefined,
+            gap: "9px", marginTop: compactField ? "4px" : "12px", alignItems: "stretch",
+            justifyContent: compactField ? "center" : undefined
+          }
+        },
           e("div", { style: { flex: "none", width: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", paddingBottom: "21px" } },
             axis("LOUDER"), axis("QUIETER")),
-          e("div", { style: { flex: 1, minWidth: 0 } },
+          e("div", {
+            style: compactField
+              ? { flex: "none", minWidth: 0, width: "min(100%, max(112px, calc(100dvh - 430px)))", alignSelf: "flex-start" }
+              : { flex: 1, minWidth: 0 }
+          },
             e("div", { "data-field": "", style: { position: "relative", width: "100%", aspectRatio: "1", borderRadius: "18px", border: "1.5px solid var(--gray-300)", background: "var(--white)", touchAction: "none", overflow: "hidden" } },
               e("div", { "data-field-grid": "", style: { position: "absolute", inset: 0, backgroundImage: field.fieldBg(v.level), pointerEvents: "none", transform: "scale(" + v.scale + ")", transformOrigin: v.origin, transition: "transform 560ms cubic-bezier(.4,0,.2,1),transform-origin 560ms cubic-bezier(.4,0,.2,1)" } },
                 e("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", style: { position: "absolute", inset: 0, width: "100%", height: "100%" } },
@@ -1766,7 +1823,7 @@ class App extends React.Component {
                 "data-field-marker": "",
                 onPointerDown: (ev) => this.dDown(ev), onPointerMove: (ev) => this.dMove(ev), onPointerUp: () => this.dUp(),
                 style: {
-                  position: "absolute", left: (v.locX * 100).toFixed(1) + "%", top: (v.locY * 100).toFixed(1) + "%",
+                  position: "absolute", left: markerInset(v.locX), top: markerInset(v.locY),
                   width: "56px", height: "56px", borderRadius: "50%",
                   background: field.tint("var(--blue-500)", 24), border: "2.5px solid var(--control-accent)",
                   transform: "translate(-50%,-50%)", cursor: "grab", touchAction: "none",
@@ -1776,13 +1833,13 @@ class App extends React.Component {
               },
                 e("span", { style: { display: "block", width: "12px", height: "12px", borderRadius: "50%", background: "var(--control-accent)" } }))),
             e("div", { style: { display: "flex", justifyContent: "space-between", marginTop: "8px", font: "700 9.5px var(--font-ui)", letterSpacing: ".14em", color: "var(--text-label)" } },
-              e("span", null, "LOWER"), e("span", null, "HIGHER")))),
+              e("span", { "data-field-axis-label": "lower" }, "LOWER"), e("span", { "data-field-axis-label": "higher" }, "HIGHER")))),
         st.showTech ? e("div", { "data-technical-values": true, style: { font: "500 12px var(--font-ui)", color: "var(--text-muted)", marginTop: "6px" } }, shell.techOf(field.dSpec(d))) : null,
         // The prototype computes this note but its display block sits stranded
         // in the Families intro markup; escapes must reassure (REQ-016), so it
         // renders here on the field screen instead.
         d.note ? this.noteBox(d.note, "12px") : null,
-        e("div", { style: { display: "flex", justifyContent: "center", alignItems: "center", padding: "2px 0 9px", minHeight: "44px", marginTop: "10px" } },
+        e("div", { style: { flex: "none", display: "flex", justifyContent: "center", alignItems: "center", padding: compactField ? 0 : "2px 0 9px", minHeight: "44px", marginTop: compactField ? 0 : "10px" } },
           this.escapeLink("Start over", () => this.jump("d", "field", shell.freshD())))),
       this.stepActionRegion({
         canPrevious: v.level > 0, onPrevious: previous,

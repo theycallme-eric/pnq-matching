@@ -10,6 +10,8 @@
  * one owner; the renderer updates that owner to the destination parameters.
  */
 
+import { FREQUENCY_RANGES, freqOf } from "./audio-mapping.js";
+
 // `launch` and `home` remain the renderer-facing ids for the splash and option
 // selector. Keeping those stable lets the protected option flows stay wholly
 // independent of the surrounding patient-app journey.
@@ -54,7 +56,7 @@ export function stageLabel(c, stage) {
 
 export function freshN() { return { pitch: .5, level: .4, center: .5, lo: .34, hi: .66, extra: 0, widened: 0, note: "", conf: null, closeEnough: false }; }
 export function freshF() { return { editing: 1, s1: null, s2: null, fam: null, charIdx: null, work: null, note: "", conf: null }; }
-export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
+export function freshR() { return { phase: "vol", level: .4, lstep: .18, center: .5, pstep: .2, spread: .28, originalEndpoint: null, winnerPitch: null, challengerPitch: null, challengerSide: 1, volOk: 0, pitchOk: 0, dirRounds: 0, dirBase: 0, round: 1, ordinaryChoices: 0, validation: false, validationComplete: false, uncertain: 0, msg: "", note: "", conf: null, stop: null }; }
 export function freshD() { return { x: .5, y: .5, cx: .5, cy: .5, level: 0, heard: false, zoomed: false, note: "", conf: null }; }
 export function freshA() { return { kind: "tone", kIdx: 0, est: .5, unc: .5, cand: .5, phase: "pitch", level: .45, lstep: .22, closes: 0, lcloses: 0, suggest: false, responded: false, msg: "Press play, then tell us how the sound compares to yours.", note: "", conf: null, stop: null }; }
 export function freshT() { return { x: .5, y: .38, heard: false, labels: false, cx: .5, cy: .38, span: .34, behavior: null, note: "" }; }
@@ -374,14 +376,11 @@ export function backTarget(s) {
 // per-concept confidence intro, the keep-refining re-entry point per concept,
 // the Match complete summary rows, and the completion reducer.
 
-export const FRQ = { tone: [250, 10000], hiss: [350, 8400], buzz: [55, 440], click: [400, 6400] };
+export const FRQ = FREQUENCY_RANGES;
+export { freqOf };
 export const KWORD = { tone: "tone", hiss: "hiss", buzz: "buzzing", click: "clicking" };
 export const BWORD = { steady: "Steady", pulse: "Pulsing", gap: "Comes and goes", waver: "Wavering" };
 
-export function freqOf(kind, p) {
-  const r = FRQ[kind] || FRQ.tone, q = Math.max(0, Math.min(1, p));
-  return r[0] * Math.pow(r[1] / r[0], q);
-}
 export function fmtHz(f) { return f < 1000 ? Math.round(f / 5) * 5 + " Hz" : (f / 1000).toFixed(1) + " kHz"; }
 export function fmtDb(l) { return Math.round(18 + Math.max(0, Math.min(1, l)) * 57) + " dB"; }
 export function techOf(spec) { return "≈ " + fmtHz(freqOf(spec.kind, spec.pitch)) + " · " + fmtDb(spec.level); }
@@ -492,16 +491,16 @@ export function jumpStages(cid) {
   if (cid === "r") return [
     mk("Directional · volume", "dir"),
     mk("Directional · pitch", "dir", { phase: "pitch", volOk: 1, level: .46 }),
-    mk("A/B comparisons", "comp", { phase: "pitch", center: .58, level: .46, spread: .26, round: 2 }),
-    mk("A/B · near the floor", "comp", { phase: "pitch", center: .58, level: .46, spread: .075, round: 7 }),
-    mk("A/B · long session", "comp", { phase: "pitch", center: .58, level: .46, spread: .1, round: 11 }),
+    mk("A/B comparisons", "comp", { phase: "pitch", center: .58, level: .46, spread: .26, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .71, challengerSide: 1, round: 2 }),
+    mk("A/B · near the floor", "comp", { phase: "pitch", center: .58, level: .46, spread: .075, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .6175, challengerSide: 1, round: 7 }),
+    mk("A/B · long session", "comp", { phase: "pitch", center: .58, level: .46, spread: .1, originalEndpoint: .58, winnerPitch: .58, challengerPitch: .63, challengerSide: 1, round: 11 }),
     mk("Confidence", "conf", { center: .58, level: .46 }),
     mk("Steps converging", "dir", { phase: "pitch", volOk: 1, level: .46, center: .62, pstep: .072, dirRounds: 6 }),
-    mk("A/B · early", "comp", { phase: "pitch", center: .62, level: .46, spread: .26, round: 2 }),
-    mk("A/B · nearly identical", "comp", { phase: "pitch", center: .62, level: .46, spread: .075, round: 7 }),
-    mk("“Neither is close”", "comp", { phase: "pitch", center: .5, level: .46, spread: .38, round: 4, uncertain: 1, note: "Neither, then. We have widened out and moved to a different area." }),
+    mk("A/B · early", "comp", { phase: "pitch", center: .62, level: .46, spread: .26, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .75, challengerSide: 1, round: 2 }),
+    mk("A/B · nearly identical", "comp", { phase: "pitch", center: .62, level: .46, spread: .075, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .6575, challengerSide: 1, round: 7 }),
+    mk("“Neither is close”", "comp", { phase: "pitch", center: .5, level: .46, spread: .38, originalEndpoint: .5, winnerPitch: .5, challengerPitch: .69, challengerSide: 1, round: 4, uncertain: 1, note: "Neither, then. We have widened out and moved to a different area." }),
     mk("Bounced back to directions", "dir", { phase: "pitch", volOk: 1, level: .46, pstep: .18, dirRounds: 8, msg: "Those were hard to tell apart, so we have gone back to simple directions. Is your sound higher or lower than this?" }),
-    mk("Long session · fatigue", "comp", { phase: "pitch", center: .62, level: .46, spread: .1, round: 14 })
+    mk("Long session · fatigue", "comp", { phase: "pitch", center: .62, level: .46, spread: .1, originalEndpoint: .62, winnerPitch: .62, challengerPitch: .67, challengerSide: 1, round: 14 })
   ];
   return [
     mk("Whole field", "field"),
@@ -553,9 +552,9 @@ export function progress(c, s, st) {
       return on("MATCHING YOUR SOUND", w, "", r.phase === "vol" ? "VOLUME" : "PITCH");
     }
     if (s !== "comp") return off;
-    const left = Math.max(1, Math.ceil(Math.log(.06 / r.spread) / Math.log(.6)));
-    const spent = r.round - 1, total = spent + left;
-    return on("COMPARING", pct(.76 + (spent / total) * .22), "Each choice halves the difference between the two sounds.", "PAIR " + r.round + " OF " + total);
+    if (r.validation) return on("COMPARING", "98%", "One final comparison with the sound you first landed on.", "FINAL CHECK");
+    const spent = Math.max(0, Math.min(3, r.ordinaryChoices || 0));
+    return on("COMPARING", pct(.76 + (spent / 3) * .18), "Each choice narrows around the sound you picked.", "PAIR " + (spent + 1) + " OF 3");
   }
   if (c === "f") {
     const m = { family: ["20%", "Choosing a starting description."], char: ["40%", "Narrowing within that description."], tune: ["65%", "Adjusting pitch and loudness."], layer: ["85%", "Adding a second sound, if there is one."] }[s];
